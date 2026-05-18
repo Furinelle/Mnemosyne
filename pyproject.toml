@@ -1,0 +1,13 @@
+[project]
+name = 'mnemosyne'
+version = '0.1.0'
+description = 'Portable dual-agent memory system for LLM agents'
+requires-python = '>=3.10'
+dependencies = []
+
+[project.scripts]
+mnemosyne = 'mnemosyne.cli:main'
+
+[build-system]
+requires = ['hatchling']
+build-backend = 'hatchling.build'
