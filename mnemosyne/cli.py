@@ -111,27 +111,28 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def cmd_init(args: argparse.Namespace) -> int:
-    store = Store('project', Path.cwd() / '.mnemosyne')
-    ensure_store(store, template_text('core_project.md'))
-    store.config_path.write_text(DEFAULT_CONFIG_TOML, encoding='utf-8')
-    print('Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.')
-    agents_path = Path.cwd() / 'AGENTS.md'
+    store = Store("project", Path.cwd() / ".mnemosyne")
+    ensure_store(store, template_text("core_project.md"))
+    store.config_path.write_text(DEFAULT_CONFIG_TOML, encoding="utf-8")
+    print("Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.")
+    agents_path = Path.cwd() / "AGENTS.md"
     if not agents_path.exists():
         try:
-            agents_path.write_text(template_text('AGENTS.md'), encoding='utf-8')
-            print(f'Wrote {agents_path}')
+            agents_path.write_text(template_text("AGENTS.md"), encoding="utf-8")
+            print(f"Wrote {agents_path}")
         except FileNotFoundError:
             pass
-    templates_dir = Path(__file__).resolve().parent.parent / 'templates'
-    settings_path = templates_dir / 'settings.json'
+    templates_dir = Path(__file__).resolve().parent.parent / "templates"
+    settings_path = templates_dir / "settings.json"
     print()
-    print('Next steps:')
-    print('  1. Ensure mnemosyne is importable from any cwd (recommended):')
-    print('       pip install -e .')
-    print('  2. To enable Claude Code auto-injection, merge this hooks config')
-    print(f'     into ~/.claude/settings.json or .claude/settings.json:')
-    print(f'       {settings_path}')
+    print("Next steps:")
+    print("  1. Ensure mnemosyne is importable from any cwd (recommended):")
+    print("       pip install -e .")
+    print("  2. To enable Claude Code auto-injection, merge this hooks config")
+    print(f"     into ~/.claude/settings.json or .claude/settings.json:")
+    print(f"       {settings_path}")
     return 0
+
 
 def cmd_read(args: argparse.Namespace) -> int:
     for store in stores_for_scope(args.scope):
