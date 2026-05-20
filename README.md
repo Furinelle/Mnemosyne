@@ -4,15 +4,18 @@
 
 面向 LLM Agent 的**可迁移通用记忆系统**。专为 Claude Code、Codex 等能调用 Shell 和 Python 的 Agent 设计，让记忆跨对话持久保存、跨 Agent 共享。
 
-- **零外部依赖**：纯 Python 标准库，`>= 3.10`
 - **文件即接口**：记忆存为 Markdown + YAML frontmatter，任何工具可读可写
 - **分层存储**：全局偏好 + 项目知识，互不污染
-- **BM25 检索**：关键词搜索，无需向量数据库
+- **BM25 检索**：纯关键词搜索，无需向量数据库
 - **自动生命周期**：强度衰减、热度晋升、冷数据归档
+- **Claude Code 原生集成**：5 个 hooks 自动注入 / 触发写入 / 后台维护
+- **跨 Agent 协作**：Codex 等外部 Agent 通过 `codex-prep` / `codex-ingest` 双向同步
+
+依赖：Python ≥ 3.11，`portalocker ≥ 2.8`（自动安装，用于并发写锁）。
 
 ---
 
-## 快速上手
+## 5 分钟上手
 
 ### 安装
 
@@ -23,14 +26,14 @@ pip install -e ./Mnemosyne
 
 安装后 `python -m mnemosyne` 在任意目录均可使用。
 
-### 在项目里初始化
+### 初始化项目
 
 ```bash
 cd your-project
 python -m mnemosyne init
 ```
 
-会在当前目录创建 `.mnemosyne/`，包含：
+会在当前目录创建 `.mnemosyne/` 并向项目根写入 `AGENTS.md` 模板（供 Codex 等外部 Agent 读取）：
 
 ```
 .mnemosyne/
@@ -40,6 +43,58 @@ python -m mnemosyne init
   archive/      ← 冷归档（自动维护）
 ```
 
+### 基础用法：手动 CLI
+
+```bash
+# 写入一条踩坑记录
+python -m mnemosyne write --type pitfall --importance 80 \
+  --title "JWT 不能存 localStorage" \
+  --content "存 localStorage 会被 XSS 直接读取，改 httpOnly cookie。"
+
+# 搜索
+python -m mnemosyne search "JWT 认证" --limit 3
+
+# 维护（衰减、归档）
+python -m mnemosyne maintain
+```
+
+### 进阶 1：启用 Claude Code 自动注入
+
+把仓库自带的 hooks 配置合并到 Claude Code 的 `~/.claude/settings.json` 或 `.claude/settings.json`：
+
+```bash
+cat path/to/Mnemosyne/templates/settings.json
+```
+
+配好后 Claude Code 将在以下时机自动调用 Mnemosyne，**完全无需手动 read/search/write**：
+
+| 时机 | Hook | 行为 |
+|---|---|---|
+| 会话开始 | `SessionStart` | 注入 global + project core memory；24h 节流跑后台 maintain |
+| 用户提交 prompt | `UserPromptSubmit` | 用 prompt 关键词搜 top-3 相关记忆并注入 |
+| Edit / Write 工具前 | `PreToolUse` | 用目标文件名搜 top-2 相关记忆并注入 |
+| 会话结束 | `Stop` | dry-run maintain 提示 Core 晋升候选 |
+
+Claude 何时**主动写入**记忆由 `templates/CLAUDE.md` 模板定义的触发条件控制（踩坑 / 架构决策 / 用户偏好 / 代码库知识 / Codex 交接）。把这份模板加入你的 `~/.claude/CLAUDE.md` 即可。
+
+### 进阶 2：与 Codex 双向协作
+
+向 Codex 派任务前，生成含 core memory + 相关历史的 prompt 前缀：
+
+```bash
+python -m mnemosyne codex-prep "调试 JWT 认证失败"
+```
+
+输出可直接拼到 Codex 的输入。`AGENTS.md`（init 自动写出）会告诉 Codex 在回复末尾追加 `**新发现:**` 块。
+
+Codex 完成后，把它的输出喂回 ingest 命令：
+
+```bash
+echo "$CODEX_OUTPUT" | python -m mnemosyne codex-ingest --source codex --commit
+```
+
+默认是 dry-run（只 preview 不写）；加 `--commit` 才真写入。
+
 ---
 
 ## 核心概念
@@ -48,15 +103,15 @@ python -m mnemosyne init
 
 | 层 | 位置 | 内容 | 载入方式 |
 |---|---|---|---|
-| **Core** | `core.md` | 永远不能违反的约束、项目身份 | 每次必载 |
-| **Working** | `working/` | 活跃的决策、踩坑、交接记录 | 按需检索 |
-| **Archive** | `archive/YYYY-MM/` | 强度衰减后的冷记忆 | 显式搜索 |
+| **Core** | `core.md` | 永远不能违反的约束、项目身份 | SessionStart hook 自动注入 |
+| **Working** | `working/` | 活跃的决策、踩坑、交接记录 | UserPromptSubmit / PreToolUse hook 按需检索 |
+| **Archive** | `archive/YYYY-MM/` | 强度衰减后的冷记忆 | 显式 `search --archive` |
 
 ### 记忆类型
 
 | 类型 | 用途 | 典型内容 |
 |---|---|---|
-| `arch_decision` | 架构决策 | 为什么选择这种方案，被否定的方案是什么 |
+| `arch_decision` | 架构决策 | 为什么选 A 不选 B，被否决方案的劣势 |
 | `pitfall` | 踩坑记录 | 现象、根因、修复方式、如何避免 |
 | `codebase` | 代码库知识 | 模块职责、关键入口、依赖关系 |
 | `preference` | 用户偏好 | 用户的编码风格、工具偏好、反馈模式 |
@@ -68,165 +123,93 @@ python -m mnemosyne init
 
 ```
 写入时：strength = --importance 指定的值
-被搜索命中：strength += 5（Working）/ += 20（Archive，重新激活）
+搜索命中（Working）：strength += 5
+搜索命中（Archive，重新激活）：strength += 20
 每次 maintain：strength -= 1
 
-strength < 30 → 移入 Archive
-strength < 5  → 标记 deprecated，不再参与检索
-strength >= 80 且访问次数 >= 3 → 打印为 Core 晋升候选
+strength < 30  → 移入 Archive
+strength < 5   → 标记 deprecated
+strength ≥ 80 且 access_count ≥ 3 → 打印为 Core 晋升候选
 ```
+
+阈值可在 `.mnemosyne/config.toml` 调整。
 
 ---
 
-## 命令详解
+## 命令参考
 
-### `init` — 初始化项目记忆
+| 命令 | 用途 |
+|---|---|
+| `init` | 创建 `.mnemosyne/` 并写出 `AGENTS.md` |
+| `read [--scope all\|global\|project]` | 输出 core memory 用于 prompt 注入 |
+| `write --type T --importance N ...` | 写入一条记忆 |
+| `search QUERY [--type T] [--scope ...] [--archive] [--format json]` | BM25 搜索 |
+| `show ID` | 查看完整记忆（含 frontmatter） |
+| `link ID1 ID2 --rel REL` | 建立双向链接 |
+| `maintain [--scope ...] [--dry-run]` | 衰减、归档、列出 Core 候选 |
+| `codex-prep TASK [--limit 5]` | 生成 Codex handoff prompt 前缀 |
+| `codex-ingest [--source NAME] [--commit]` | 从 stdin 解析 `**新发现:**` 块（默认 dry-run） |
 
-```bash
-python -m mnemosyne init
-```
+### `write` 完整参数
 
-在当前目录创建 `.mnemosyne/` 结构。**第一步必做。**
-
----
-
-### `read` — 读取 Core Memory
-
-```bash
-python -m mnemosyne read                # 只读项目 core.md
-python -m mnemosyne read --scope all    # 全局 + 项目
-python -m mnemosyne read --scope global # 只读全局
-```
-
-输出内容适合直接注入 Agent 的 prompt。**在每次任务开始前调用。**
-
----
-
-### `write` — 写入记忆
-
-```bash
-python -m mnemosyne write \
-  --type pitfall \
-  --importance 80 \
-  --title "JWT 不能存 localStorage" \
-  --tags "auth,security" \
-  --content "JWT 存入 localStorage 会导致 XSS 攻击可直接读取。必须用 httpOnly cookie。" \
-  --expires "认证方案重构时失效"
-```
-
-| 参数 | 说明 | 默认值 |
+| 参数 | 说明 | 默认 |
 |---|---|---|
 | `--type` | 记忆类型（必填） | — |
 | `--importance` | 初始强度 0–100（必填） | — |
-| `--title` | 标题 | 自动从内容提取 |
+| `--title` | 标题 | 自动从首行提取 |
 | `--tags` | 逗号分隔标签 | 空 |
-| `--content` | 内容（或通过 stdin 传入） | 空 |
+| `--content` | 内容（或通过 stdin） | 空 |
 | `--expires` | 失效条件描述 | 空 |
-| `--scope` | `global` 或 `project` | `project` |
-| `--source` | 来源 Agent 名称 | `agent` |
-| `--force` | 跳过去重确认提示 | 否 |
+| `--scope` | `global` / `project` | `project` |
+| `--source` | 来源 Agent 名 | `agent` |
+| `--force` | 跳过去重确认 | 否 |
 
-**去重机制**：写入前自动 BM25 搜索，相似度高时询问是否合并，避免重复条目积累。
+**去重**：未加 `--force` 且为交互式时，写入前自动 BM25 搜索，相似度高会询问是否合并。Hook 路径自动 `--force`。
 
----
-
-### `search` — 搜索记忆
+### `maintain`
 
 ```bash
-python -m mnemosyne search "auth 认证"
-python -m mnemosyne search "性能问题" --type pitfall --limit 3
-python -m mnemosyne search "模块依赖" --scope all --archive
-python -m mnemosyne search "配置" --format json   # 供 Agent 机器解析
+python -m mnemosyne maintain --dry-run   # 预览
+python -m mnemosyne maintain --scope all # 全局 + 项目
 ```
 
-| 参数 | 说明 |
-|---|---|
-| `--scope` | `global` / `project` / `all` |
-| `--type` | 按类型过滤 |
-| `--limit` | 返回条数（默认 5） |
-| `--format` | `text`（默认）或 `json` |
-| `--archive` | 同时搜索归档记忆 |
-
-搜索命中会自动更新 `access_count` 和 `strength`（+5）。
+执行：所有活跃记忆 `strength -= 1`；< 30 移归档；< 5 标 deprecated；≥ 80 且 access ≥ 3 打印晋升候选。**SessionStart hook 已配 24h 节流后台触发**，无需手动跑。
 
 ---
 
-### `maintain` — 维护记忆生命周期
+## Hooks 详解
 
-```bash
-python -m mnemosyne maintain             # 正式执行
-python -m mnemosyne maintain --dry-run   # 预览，不实际修改
-python -m mnemosyne maintain --scope project
-```
+Mnemosyne 提供 5 个 hook 模块，挂载到 Claude Code 后实现读写全自动化。模板见 [`templates/settings.json`](templates/settings.json)。
 
-执行内容：
-1. 所有活跃记忆 `strength -= 1`
-2. `strength < 30` → 移入 `archive/YYYY-MM/`
-3. `strength < 5` → 标记 `deprecated`
-4. `strength >= 80` 且 `access_count >= 3` → 打印为 Core 晋升候选（需手动移入 `core.md`）
+| 模块 | 触发 event | 行为 | 超时 |
+|---|---|---|---|
+| `mnemosyne.hooks.session_start` | `SessionStart` | 注入 core memory；后台跑 maintain（24h 节流） | 10s |
+| `mnemosyne.hooks.user_prompt_submit` | `UserPromptSubmit` | 用 prompt 关键词搜 top-3 注入 | 5s |
+| `mnemosyne.hooks.pre_tool_use` | `PreToolUse` (Edit\|Write) | 用文件名搜 top-2 注入 | 5s |
+| `mnemosyne.hooks.stop` | `Stop` | dry-run maintain，提示 Core 晋升候选 | 5s |
 
-**建议每周运行一次。**
+所有 hook 都包了 `hook_safe()` 装饰器：**任何异常 stderr trace 后退 0，不阻塞 Claude**。
 
----
-
-### `show` — 查看完整记忆
-
-```bash
-python -m mnemosyne show pitfall-2026-05-18-0c0a59
-```
-
-输出记忆的完整 Markdown 内容，包含所有 frontmatter 字段。
+写入触发由 Claude 主动判断，依据 [`templates/CLAUDE.md`](templates/CLAUDE.md) 中的"任务结束前主动写入触发条件"清单。
 
 ---
 
-### `link` — 关联两条记忆
-
-```bash
-python -m mnemosyne link arch_decision-xxx pitfall-yyy --rel caused_by
-```
-
-在两条记忆之间建立双向链接，支持关联语义（`caused_by` / `related_to` / `supersedes` 等）。链接在 `show` 和 `search --format json` 中可见。
-
----
-
-## 与 Agent 集成
-
-### Claude Code
-
-在项目 `.claude/CLAUDE.md` 中添加以下规则，Claude Code 会自动读写记忆：
-
-```markdown
-## 记忆系统
-
-**任务开始前：**
-运行 `python -m mnemosyne read --scope all`。
-运行 `python -m mnemosyne search "<任务关键词>" --limit 3`。
-
-**任务完成后，遇到以下情况自动写入：**
-- 做了架构决策 → `--type arch_decision`
-- 踩坑或修复 bug → `--type pitfall`
-- 用户纠正了行为 → `--type preference`
-- Codex 返回新发现 → `--type handoff`
-
-写入命令：
-python -m mnemosyne write --type <类型> --importance <50-90> \
-  --source claude-code --force --title "<标题>" --content "<内容>"
-```
-
-### Codex（push + pull 双模式）
-
-Claude Code 委派任务时，在 prompt 末尾附加：
+## Codex 双向通道
 
 ```
-记忆 CLI 可用：python -m mnemosyne search "<关键词>" --format json
-如执行中需要更多上下文，主动搜索。
-完成后在回复末尾附：
-**新发现：** <值得记录的内容，无则省略>
+Claude Code ──┐
+              ├─► codex-prep ──► Codex (prompt 前缀含 core + 相关记忆 + AGENTS.md 指引)
+              │                       │
+              │                       ▼
+              │                  Codex 回复末尾追加 "**新发现:**" 块
+              │                       │
+              └◄─── codex-ingest ◄────┘
+                  (--commit 写入项目记忆,source=codex)
 ```
 
-- **push**：Claude Code 预先检索相关记忆注入 prompt
-- **pull**：Codex 执行中途主动调用 `search` 获取更多上下文
-- **write back**：Claude Code 将 Codex 的 findings 写入 `--type handoff`
+- **`codex-prep TASK`**：拼接 core memory + 任务相关 top-K 记忆 + Mnemosyne CLI 指引 + `**新发现:**` 模板
+- **`codex-ingest`**：从 stdin 读 Codex 全文，正则匹配 `**新发现:**` / `**Findings:**` 块。非法 type / 空 content / 坏 importance 的 finding 会被 stderr warn 后丢弃，不会让 ingest 失败
+- 鲁棒性：parse_findings 入口 lstrip BOM，兼容 PowerShell pipe 工件
 
 ---
 
@@ -238,11 +221,13 @@ Claude Code 委派任务时，在 prompt 末尾附加：
   working/
   archive/YYYY-MM/
 
-your-project/.mnemosyne/   # 项目（架构决策、踩坑、交接）
+your-project/.mnemosyne/   # 项目
   core.md
   config.toml
   working/
   archive/YYYY-MM/
+  .lock                    # 目录级排他锁（maintain 使用）
+  .last_maintain           # 24h 节流标记
 ```
 
 全局存储路径可通过环境变量覆盖：
@@ -250,6 +235,8 @@ your-project/.mnemosyne/   # 项目（架构决策、踩坑、交接）
 ```bash
 export MNEMOSYNE_HOME=/path/to/custom/store
 ```
+
+**并发安全**：所有写入走 `tmp + os.replace` 原子重命名 + portalocker 排他锁。多 Agent 同时跑不冲突。`cmd_search` 的访问统计回写用 timeout=0 try-lock，拿不到锁时跳过统计但搜索结果照常返回。
 
 ---
 
@@ -270,28 +257,30 @@ tags: [auth, xss, security]
 links:
   - id: arch_decision-2026-05-18-9a8341
     rel: caused_by
-canonical_summary: "JWT XSS 漏洞: JWT 存入 localStorage 导致 XSS 可读取 token"
-injection_summary: "JWT XSS 漏洞: JWT 存入 localStorage 导致 XSS 可读取 token，改用 httpOnly cookie + CSRF 双保险。"
+canonical_summary: "JWT XSS 漏洞: 存 localStorage 导致 token 被 XSS 读取"
+injection_summary: "JWT XSS 漏洞: 存 localStorage 导致 token 被 XSS 读取，改 httpOnly cookie + CSRF。"
 status: active
 expires: 认证方案重构时失效
 ---
 
 ## JWT XSS 漏洞
 
-JWT 存入 localStorage 导致 XSS 可读取 token，改用 httpOnly cookie + CSRF 双保险。
+存 localStorage 导致 token 被 XSS 读取，改 httpOnly cookie + CSRF。
 ```
+
+`source` 字段用于追溯写入方（`claude-code` / `codex` / `agent` / `user` 等），可用 `search --format json` 过滤。
 
 ---
 
 ## 配置
 
-`.mnemosyne/config.toml`（Python 3.11+ 才会读取，3.10 静默跳过使用默认值）：
+`.mnemosyne/config.toml`：
 
 ```toml
 [thresholds]
 decay_per_run = 1       # 每次 maintain 衰减量
-bonus_access = 5        # 被搜索命中时强度增量
-bonus_recall = 20       # 从 Archive 被召回时强度增量
+bonus_access = 5        # 搜索命中时强度增量
+bonus_recall = 20       # 从 Archive 召回时强度增量
 core_strength = 80      # Core 晋升候选的强度门槛
 core_access_count = 3   # Core 晋升候选的访问次数门槛
 archive_strength = 30   # 移入 Archive 的强度阈值
