@@ -94,25 +94,44 @@ def build_parser() -> argparse.ArgumentParser:
     link_parser.add_argument("--rel", default="related")
     link_parser.set_defaults(func=cmd_link)
 
+    codex_prep_parser = subparsers.add_parser('codex-prep',
+        help='Generate a prompt prefix for handoff to a non-Claude agent')
+    codex_prep_parser.add_argument('task')
+    codex_prep_parser.add_argument('--limit', type=int, default=5)
+    codex_prep_parser.set_defaults(func=cmd_codex_prep)
+
+    codex_ingest_parser = subparsers.add_parser('codex-ingest',
+        help='Parse Findings blocks from stdin and write them as memories')
+    codex_ingest_parser.add_argument('--source', default='codex')
+    codex_ingest_parser.add_argument('--commit', action='store_true',
+        help='actually write (default: dry-run preview)')
+    codex_ingest_parser.set_defaults(func=cmd_codex_ingest)
+
     return parser
 
 
 def cmd_init(args: argparse.Namespace) -> int:
-    store = Store("project", Path.cwd() / ".mnemosyne")
-    ensure_store(store, template_text("core_project.md"))
-    store.config_path.write_text(DEFAULT_CONFIG_TOML, encoding="utf-8")
-    print("Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.")
-    templates_dir = Path(__file__).resolve().parent.parent / "templates"
-    settings_path = templates_dir / "settings.json"
+    store = Store('project', Path.cwd() / '.mnemosyne')
+    ensure_store(store, template_text('core_project.md'))
+    store.config_path.write_text(DEFAULT_CONFIG_TOML, encoding='utf-8')
+    print('Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.')
+    agents_path = Path.cwd() / 'AGENTS.md'
+    if not agents_path.exists():
+        try:
+            agents_path.write_text(template_text('AGENTS.md'), encoding='utf-8')
+            print(f'Wrote {agents_path}')
+        except FileNotFoundError:
+            pass
+    templates_dir = Path(__file__).resolve().parent.parent / 'templates'
+    settings_path = templates_dir / 'settings.json'
     print()
-    print("Next steps:")
-    print("  1. Ensure mnemosyne is importable from any cwd (recommended):")
-    print("       pip install -e .")
-    print("  2. To enable Claude Code auto-injection, merge this hooks config")
-    print(f"     into ~/.claude/settings.json or .claude/settings.json:")
-    print(f"       {settings_path}")
+    print('Next steps:')
+    print('  1. Ensure mnemosyne is importable from any cwd (recommended):')
+    print('       pip install -e .')
+    print('  2. To enable Claude Code auto-injection, merge this hooks config')
+    print(f'     into ~/.claude/settings.json or .claude/settings.json:')
+    print(f'       {settings_path}')
     return 0
-
 
 def cmd_read(args: argparse.Namespace) -> int:
     for store in stores_for_scope(args.scope):
@@ -301,6 +320,35 @@ def cmd_link(args: argparse.Namespace) -> int:
     write_memory(first_path, first_memory)
     write_memory(second_path, second_memory)
     print(f"Linked {first_memory.id} <-> {second_memory.id} ({args.rel})")
+    return 0
+
+
+def cmd_codex_prep(args: argparse.Namespace) -> int:
+    from mnemosyne.codex import prep
+    print(prep(args.task, max_memories=args.limit))
+    return 0
+
+
+def cmd_codex_ingest(args: argparse.Namespace) -> int:
+    from mnemosyne.codex import ingest
+    text = sys.stdin.read()
+    if not text.strip():
+        print('No input on stdin.', file=sys.stderr)
+        return 2
+    actions = ingest(text, source=args.source, commit=args.commit)
+    if not actions:
+        print('No findings parsed.')
+        return 0
+    verb = 'wrote' if args.commit else 'would write'
+    for action in actions:
+        ident = action.get('id', '<dry-run>')
+        print(f"{verb} {ident} ({action['type']}, importance {action['importance']}): {action['title']}")
+        if action['tags']:
+            print(f"  tags: {', '.join(action['tags'])}")
+        print(f"  preview: {action['content_preview']}")
+    if not args.commit:
+        print()
+        print('(dry-run) Add --commit to actually write.')
     return 0
 
 
