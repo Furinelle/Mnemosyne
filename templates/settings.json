@@ -21,6 +21,13 @@
           { "type": "command", "command": "python -m mnemosyne.hooks.pre_tool_use", "timeout": 5 }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python -m mnemosyne.hooks.stop", "timeout": 5 }
+        ]
+      }
     ]
   }
 }
