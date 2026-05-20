@@ -56,6 +56,22 @@ def hook_safe():
         sys.exit(0)
 
 
+def read_event() -> dict:
+    """Read a JSON event from stdin, tolerating a leading UTF-8 BOM.
+
+    PowerShell 7+ prepends a BOM when piping strings to subprocess stdin,
+    which json.load otherwise rejects. Returns {} when stdin is empty.
+    """
+    import json
+
+    raw = sys.stdin.read()
+    if not raw:
+        return {}
+    if raw.startswith('﻿'):
+        raw = raw[1:]
+    return json.loads(raw)
+
+
 def extract_keywords(text: str, limit: int = 8) -> list[str]:
     tokens = tokenize(text)
     seen: set[str] = set()

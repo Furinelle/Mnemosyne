@@ -7,7 +7,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 
-from mnemosyne.hooks._common import collect_stores, hook_safe
+from mnemosyne.hooks._common import collect_stores, hook_safe, read_event
 from mnemosyne.store import find_project_store, read_core
 
 
@@ -24,8 +24,10 @@ def maybe_run_maintain() -> None:
             last = datetime.fromisoformat(marker.read_text(encoding='utf-8').strip())
         except (ValueError, OSError):
             last = None
-        if last is not None and datetime.now() - last < MAINTAIN_INTERVAL:
-            return
+        if last is not None:
+            now = datetime.now(tz=last.tzinfo) if last.tzinfo else datetime.now()
+            if now - last < MAINTAIN_INTERVAL:
+                return
     kwargs: dict = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
     if sys.platform == 'win32':
         kwargs['creationflags'] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -46,7 +48,7 @@ def maybe_run_maintain() -> None:
 
 def main() -> None:
     with hook_safe():
-        event = json.load(sys.stdin)
+        event = read_event()
         source = event.get('source', 'startup')
         if source in ('resume', 'compact'):
             return

@@ -9,13 +9,14 @@ from mnemosyne.hooks._common import (
     extract_keywords,
     format_for_injection,
     hook_safe,
+    read_event,
     run_search,
 )
 
 
 def main() -> None:
     with hook_safe():
-        event = json.load(sys.stdin)
+        event = read_event()
         prompt = (event.get('prompt') or '').strip()
         if len(prompt) < 10:
             return

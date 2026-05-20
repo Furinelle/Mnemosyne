@@ -6,12 +6,12 @@ import json
 import sys
 from pathlib import Path
 
-from mnemosyne.hooks._common import format_for_injection, hook_safe, run_search
+from mnemosyne.hooks._common import format_for_injection, hook_safe, read_event, run_search
 
 
 def main() -> None:
     with hook_safe():
-        event = json.load(sys.stdin)
+        event = read_event()
         tool_name = event.get('tool_name', '')
         if tool_name not in ('Edit', 'Write'):
             return
