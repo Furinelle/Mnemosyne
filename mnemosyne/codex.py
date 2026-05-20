@@ -70,6 +70,7 @@ def prep(task: str, max_memories: int = 5) -> str:
 
 
 def parse_findings(text: str) -> list[Finding]:
+    text = text.lstrip('﻿')
     header_match = FINDINGS_HEADER_RE.search(text)
     if not header_match:
         return []
