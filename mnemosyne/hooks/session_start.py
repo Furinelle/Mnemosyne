@@ -3,10 +3,45 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
+from datetime import datetime, timedelta
 
 from mnemosyne.hooks._common import collect_stores, hook_safe
-from mnemosyne.store import read_core
+from mnemosyne.store import find_project_store, read_core
+
+
+MAINTAIN_INTERVAL = timedelta(hours=24)
+
+
+def maybe_run_maintain() -> None:
+    project = find_project_store()
+    if project is None:
+        return
+    marker = project.root / '.last_maintain'
+    if marker.exists():
+        try:
+            last = datetime.fromisoformat(marker.read_text(encoding='utf-8').strip())
+        except (ValueError, OSError):
+            last = None
+        if last is not None and datetime.now() - last < MAINTAIN_INTERVAL:
+            return
+    kwargs: dict = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+    if sys.platform == 'win32':
+        kwargs['creationflags'] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs['start_new_session'] = True
+    try:
+        subprocess.Popen(
+            [sys.executable, '-m', 'mnemosyne', 'maintain', '--scope', 'all'],
+            **kwargs,
+        )
+    except OSError:
+        return
+    try:
+        marker.write_text(datetime.now().isoformat(), encoding='utf-8')
+    except OSError:
+        pass
 
 
 def main() -> None:
@@ -21,9 +56,11 @@ def main() -> None:
             if not content:
                 continue
             label = 'Global Core' if store.scope == 'global' else 'Project Core'
-            parts.append(f'### {label}\n{content}')
+            parts.append(f'### {label}')
+            parts.append(content)
         if not parts:
             return
+        maybe_run_maintain()
         output = {
             'hookSpecificOutput': {
                 'hookEventName': 'SessionStart',
