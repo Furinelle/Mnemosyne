@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import os
 import shutil
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+import portalocker
 
 from mnemosyne.schema import Memory, parse_memory, serialize_memory
 
@@ -156,9 +159,25 @@ def load_memories(store: Store, include_archive: bool = False) -> list[tuple[Pat
     return memories
 
 
-def write_memory(path: Path, memory: Memory) -> None:
+def write_memory(path: Path, memory: Memory, lock_timeout: float = 10.0) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(serialize_memory(memory), encoding="utf-8")
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with portalocker.Lock(str(lock_path), mode="a", timeout=lock_timeout):
+        tmp_path.write_text(serialize_memory(memory), encoding="utf-8")
+        os.replace(tmp_path, path)
+    try:
+        lock_path.unlink()
+    except OSError:
+        pass
+
+
+@contextmanager
+def lock_store(store: Store, timeout: float = 30.0):
+    store.root.mkdir(parents=True, exist_ok=True)
+    lock_path = store.root / ".lock"
+    with portalocker.Lock(str(lock_path), mode="a", timeout=timeout):
+        yield
 
 
 def memory_filename(memory: Memory) -> str:

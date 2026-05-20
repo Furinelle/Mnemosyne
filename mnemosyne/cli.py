@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import suppress
 import json
 import os
 import random
@@ -10,10 +11,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import portalocker
+
 from mnemosyne.lifecycle import MaintainSummary, maintain_memory
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
+    lock_store,
     DEFAULT_CONFIG_TOML,
     Store,
     ensure_store,
@@ -199,7 +203,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         is_archive = "archive" in str(path)
         bonus = recall_bonus if is_archive else threshold_bonus
         memory.strength = min(100, memory.strength + bonus)
-        write_memory(path, memory)
+        with suppress(portalocker.exceptions.LockException):
+            write_memory(path, memory, lock_timeout=0)
         output.append(
             {
                 "id": memory.id,
@@ -229,23 +234,24 @@ def cmd_maintain(args: argparse.Namespace) -> int:
     summary = MaintainSummary()
     stores = stores_for_scope(args.scope)
     for store in stores:
-        config = load_config(store)
-        for path, memory in load_memories(store, include_archive=False):
-            summary.processed += 1
-            result, candidate = maintain_memory(
-                store,
-                path,
-                memory,
-                config["thresholds"],
-                dry_run=args.dry_run,
-            )
-            summary.decayed += 1
-            if result == "deprecated":
-                summary.deprecated += 1
-            elif result == "archived":
-                summary.archived += 1
-            elif result == "core_candidate" and candidate is not None:
-                summary.core_candidates.append(candidate)
+        with lock_store(store):
+            config = load_config(store)
+            for path, memory in load_memories(store, include_archive=False):
+                summary.processed += 1
+                result, candidate = maintain_memory(
+                    store,
+                    path,
+                    memory,
+                    config["thresholds"],
+                    dry_run=args.dry_run,
+                )
+                summary.decayed += 1
+                if result == "deprecated":
+                    summary.deprecated += 1
+                elif result == "archived":
+                    summary.archived += 1
+                elif result == "core_candidate" and candidate is not None:
+                    summary.core_candidates.append(candidate)
 
     print(f"processed: {summary.processed}")
     print(f"decayed: {summary.decayed}")

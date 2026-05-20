@@ -1,13 +1,17 @@
 [project]
-name = 'mnemosyne'
-version = '0.1.0'
-description = 'Portable dual-agent memory system for LLM agents'
-requires-python = '>=3.10'
-dependencies = []
+name = "mnemosyne"
+version = "0.1.0"
+description = "File-based memory system for AI coding agents"
+requires-python = ">=3.11"
+dependencies = ["portalocker>=2.8"]
 
 [project.scripts]
-mnemosyne = 'mnemosyne.cli:main'
+mnemosyne = "mnemosyne.cli:main"
 
 [build-system]
-requires = ['hatchling']
-build-backend = 'hatchling.build'
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mnemosyne*"]
