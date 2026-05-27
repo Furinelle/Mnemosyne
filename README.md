@@ -70,14 +70,37 @@ cat path/to/Mnemosyne/templates/settings.json
 
 | 时机 | Hook | 行为 |
 |---|---|---|
-| 会话开始 | `SessionStart` | 注入 global + project core memory；24h 节流跑后台 maintain |
+| 会话开始 | `SessionStart` | 注入 global + project core memory；24h 节流跑后台 maintain；**自动 init**：进入任意 git 项目首次会话时自动创建 `.mnemosyne/` |
 | 用户提交 prompt | `UserPromptSubmit` | 用 prompt 关键词搜 top-3 相关记忆并注入 |
 | Edit / Write 工具前 | `PreToolUse` | 用目标文件名搜 top-2 相关记忆并注入 |
 | 会话结束 | `Stop` | dry-run maintain 提示 Core 晋升候选 |
 
 Claude 何时**主动写入**记忆由 `templates/CLAUDE.md` 模板定义的触发条件控制（踩坑 / 架构决策 / 用户偏好 / 代码库知识 / Codex 交接）。把这份模板加入你的 `~/.claude/CLAUDE.md` 即可。
 
-### 进阶 2：与 Codex 双向协作
+### 进阶 2：全局自动启用
+
+配好 SessionStart hook 后，**进入任意 git 项目第一次开 Claude Code 时，`.mnemosyne/` 会自动创建**——无需手动跑 `mnemosyne init`。
+
+判定逻辑：从 cwd 向上找到 `.git` 目录或文件即视为项目根，且会避开"家目录本身是 git repo"的极端情况（不会与全局 store 冲突）。auto-init 只创建 store 骨架，**不会**在项目根写 `AGENTS.md`——Codex 用全局 `~/.codex/AGENTS.md` 就够了，避免污染你的 repo。
+
+退出方式（按需选一种）：
+
+```bash
+# 单个项目永久退出：在项目根放个空标记文件
+touch your-project/.mnemosyne-disable
+
+# 全局退出（环境变量）：
+export MNEMOSYNE_AUTO_INIT=0
+```
+
+**配合全局 gitignore**：在 `~/.config/git/ignore`（或你的 `core.excludesfile`）里加一行 `.mnemosyne/`，从此所有 repo 都自动忽略生成的记忆文件，不会污染版本控制：
+
+```bash
+echo '.mnemosyne/' >> ~/.config/git/ignore
+echo '.mnemosyne-disable' >> ~/.config/git/ignore
+```
+
+### 进阶 3：与 Codex 双向协作
 
 向 Codex 派任务前，生成含 core memory + 相关历史的 prompt 前缀：
 
@@ -183,7 +206,7 @@ Mnemosyne 提供 5 个 hook 模块，挂载到 Claude Code 后实现读写全自
 
 | 模块 | 触发 event | 行为 | 超时 |
 |---|---|---|---|
-| `mnemosyne.hooks.session_start` | `SessionStart` | 注入 core memory；后台跑 maintain（24h 节流） | 10s |
+| `mnemosyne.hooks.session_start` | `SessionStart` | 注入 core memory；后台跑 maintain（24h 节流）；在 git 项目自动 init `.mnemosyne/` | 10s |
 | `mnemosyne.hooks.user_prompt_submit` | `UserPromptSubmit` | 用 prompt 关键词搜 top-3 注入 | 5s |
 | `mnemosyne.hooks.pre_tool_use` | `PreToolUse` (Edit\|Write) | 用文件名搜 top-2 注入 | 5s |
 | `mnemosyne.hooks.stop` | `Stop` | dry-run maintain，提示 Core 晋升候选 | 5s |

@@ -3,15 +3,61 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from mnemosyne.hooks._common import collect_stores, hook_safe, read_event
-from mnemosyne.store import find_project_store, read_core
+from mnemosyne.store import (
+    Store,
+    ensure_store,
+    find_project_store,
+    global_store,
+    read_core,
+    template_text,
+)
 
 
 MAINTAIN_INTERVAL = timedelta(hours=24)
+
+
+def maybe_auto_init_project() -> None:
+    """Auto-create .mnemosyne/ in the enclosing git project if missing.
+
+    Skipped when MNEMOSYNE_AUTO_INIT is '0'/'false'/'no', when no .git
+    ancestor is found, when a .mnemosyne-disable marker exists in the
+    project root, or when .mnemosyne/ already exists.
+    """
+    if os.environ.get('MNEMOSYNE_AUTO_INIT', '1').lower() in ('0', 'false', 'no'):
+        return
+    current = Path.cwd().resolve()
+    project_root: Path | None = None
+    while True:
+        if (current / '.git').exists():
+            project_root = current
+            break
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    if project_root is None:
+        return
+    if (project_root / '.mnemosyne-disable').exists():
+        return
+    target = project_root / '.mnemosyne'
+    if target.exists():
+        return
+    try:
+        if target.resolve() == global_store().root.resolve():
+            return
+    except OSError:
+        return
+    try:
+        ensure_store(Store('project', target), template_text('core_project.md'))
+    except OSError:
+        pass
 
 
 def maybe_run_maintain() -> None:
@@ -52,6 +98,7 @@ def main() -> None:
         source = event.get('source', 'startup')
         if source in ('resume', 'compact'):
             return
+        maybe_auto_init_project()
         parts: list[str] = []
         for store in collect_stores():
             content = read_core(store).strip()

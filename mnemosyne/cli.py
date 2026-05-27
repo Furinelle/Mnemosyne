@@ -18,7 +18,6 @@ from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
     lock_store,
-    DEFAULT_CONFIG_TOML,
     Store,
     ensure_store,
     find_memory,
@@ -113,7 +112,6 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_init(args: argparse.Namespace) -> int:
     store = Store("project", Path.cwd() / ".mnemosyne")
     ensure_store(store, template_text("core_project.md"))
-    store.config_path.write_text(DEFAULT_CONFIG_TOML, encoding="utf-8")
     print("Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.")
     agents_path = Path.cwd() / "AGENTS.md"
     if not agents_path.exists():
