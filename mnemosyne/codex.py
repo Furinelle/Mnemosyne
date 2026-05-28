@@ -7,15 +7,16 @@ import sys
 from dataclasses import dataclass
 from datetime import date
 
-from mnemosyne.cli import make_memory_id, summarize
+from mnemosyne.cli import make_memory_id, summarize, update_memory_index_file
 from mnemosyne.hooks._common import (
     collect_stores,
     extract_keywords,
     format_for_injection,
     run_search,
 )
+from mnemosyne.index import update_memory_index
 from mnemosyne.schema import Memory
-from mnemosyne.store import project_store, read_core, working_path, write_memory
+from mnemosyne.store import load_config, project_store, read_core, working_path, write_memory
 
 FINDINGS_HEADER_RE = re.compile(r'^\s*\*\*(?:新发现|Findings)[:：]\*\*\s*$', re.MULTILINE)
 FIELD_RE = re.compile(r'^\s*-\s*(\w+)\s*:\s*(.*)$')
@@ -46,8 +47,11 @@ def prep(task: str, max_memories: int = 5) -> str:
     if keywords:
         results = run_search(' '.join(keywords), limit=max_memories, update_access=False)
         if results:
+            stores = collect_stores()
+            config = load_config(stores[-1] if stores else None)
+            max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
             parts.append('### Relevant prior memories')
-            parts.append(format_for_injection(results))
+            parts.append(format_for_injection(results, max_tokens=max_tokens))
             parts.append('')
     parts.append('### Mnemosyne CLI available')
     parts.append('If you need more context mid-task:')
@@ -162,6 +166,9 @@ def parse_findings(text: str) -> list[Finding]:
                     content_indent = None
                 flush()
                 current = None
+            if FINDINGS_HEADER_RE.match(line):
+                index += 1
+                continue
             break
         index += 1
 
@@ -196,6 +203,8 @@ def write_finding(finding: Finding, source: str) -> str:
     )
     path = working_path(store, memory)
     write_memory(path, memory)
+    update_memory_index_file(store, memory)
+    update_memory_index(store, path, memory)
     return memory_id
 
 

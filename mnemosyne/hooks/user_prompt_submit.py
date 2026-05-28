@@ -6,12 +6,14 @@ import json
 import sys
 
 from mnemosyne.hooks._common import (
+    collect_stores,
     extract_keywords,
     format_for_injection,
     hook_safe,
     read_event,
     run_search,
 )
+from mnemosyne.store import load_config
 
 
 def main() -> None:
@@ -26,7 +28,10 @@ def main() -> None:
         results = run_search(' '.join(keywords), limit=3, update_access=True)
         if not results:
             return
-        context = format_for_injection(results)
+        stores = collect_stores()
+        config = load_config(stores[-1] if stores else None)
+        max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
+        context = format_for_injection(results, max_tokens=max_tokens)
         if not context:
             return
         output = {

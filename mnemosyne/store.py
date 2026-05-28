@@ -28,6 +28,12 @@ DEFAULT_CONFIG = {
     "memory": {
         "types": ["arch_decision", "pitfall", "codebase", "preference", "handoff"],
     },
+    "injection": {
+        "max_tokens": 2000,
+    },
+    "search": {
+        "index_enabled": True,
+    },
 }
 
 
@@ -43,6 +49,12 @@ deprecated_strength = 5
 
 [memory]
 types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
+
+[injection]
+max_tokens = 2000
+
+[search]
+index_enabled = true
 """
 
 
@@ -217,6 +229,8 @@ def _deepcopy_default_config() -> dict:
     return {
         "thresholds": dict(DEFAULT_CONFIG["thresholds"]),
         "memory": {"types": list(DEFAULT_CONFIG["memory"]["types"])},
+        "injection": dict(DEFAULT_CONFIG["injection"]),
+        "search": dict(DEFAULT_CONFIG["search"]),
     }
 
 

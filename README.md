@@ -6,9 +6,9 @@
 
 - **文件即接口**：记忆存为 Markdown + YAML frontmatter，任何工具可读可写
 - **分层存储**：全局偏好 + 项目知识，互不污染
-- **BM25 检索**：纯关键词搜索，无需向量数据库
+- **持久检索索引**：SQLite FTS5 + BM25 fallback，无需云端向量库
 - **自动生命周期**：强度衰减、热度晋升、冷数据归档
-- **Claude Code 原生集成**：5 个 hooks 自动注入 / 触发写入 / 后台维护
+- **Claude Code 原生集成**：4 个 hooks 自动注入 / 触发写入 / 后台维护
 - **跨 Agent 协作**：Codex 等外部 Agent 通过 `codex-prep` / `codex-ingest` 双向同步
 
 依赖：Python ≥ 3.11，`portalocker ≥ 2.8`（自动安装，用于并发写锁）。
@@ -54,8 +54,14 @@ python -m mnemosyne write --type pitfall --importance 80 \
 # 搜索
 python -m mnemosyne search "JWT 认证" --limit 3
 
+# 重建持久搜索索引
+python -m mnemosyne reindex
+
 # 维护（衰减、归档）
 python -m mnemosyne maintain
+
+# 诊断本机配置
+python -m mnemosyne doctor
 ```
 
 ### 进阶 1：启用 Claude Code 自动注入
@@ -170,6 +176,8 @@ strength ≥ 80 且 access_count ≥ 3 → 打印为 Core 晋升候选
 | `show ID` | 查看完整记忆（含 frontmatter） |
 | `link ID1 ID2 --rel REL` | 建立双向链接 |
 | `maintain [--scope ...] [--dry-run]` | 衰减、归档、列出 Core 候选 |
+| `reindex [--scope ...] [--no-archive]` | 重建 SQLite FTS5 持久搜索索引 |
+| `doctor [--scope ...]` | 检查依赖、模板、store、FTS5、索引状态 |
 | `codex-prep TASK [--limit 5]` | 生成 Codex handoff prompt 前缀 |
 | `codex-ingest [--source NAME] [--commit]` | 从 stdin 解析 `**新发现:**` 块（默认 dry-run） |
 
@@ -311,7 +319,24 @@ deprecated_strength = 5 # 标记 deprecated 的强度阈值
 
 [memory]
 types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
+
+[injection]
+max_tokens = 2000       # hook 注入记忆的近似 token 上限
+
+[search]
+index_enabled = true    # 优先使用 SQLite FTS5 持久索引，失败时回退内存 BM25
 ```
+
+### 搜索索引
+
+Mnemosyne 会在每个 store 下维护 `index.sqlite`。写入记忆时会增量更新索引；`search`
+在索引不存在时会自动创建。需要全量修复时运行：
+
+```bash
+python -m mnemosyne reindex --scope all
+```
+
+搜索 JSON 输出会包含 `why_matched`，用于解释命中的文本片段。
 
 ---
 

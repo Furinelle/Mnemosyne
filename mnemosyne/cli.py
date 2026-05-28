@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import suppress
+import importlib.util
 import json
 import os
 import random
@@ -14,6 +15,14 @@ from pathlib import Path
 import portalocker
 
 from mnemosyne.lifecycle import MaintainSummary, maintain_memory
+from mnemosyne.index import (
+    fts_available,
+    index_enabled,
+    index_path,
+    reindex_store,
+    search_index,
+    update_memory_index as update_search_index,
+)
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
@@ -82,6 +91,15 @@ def build_parser() -> argparse.ArgumentParser:
     maintain_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
     maintain_parser.add_argument("--dry-run", action="store_true")
     maintain_parser.set_defaults(func=cmd_maintain)
+
+    reindex_parser = subparsers.add_parser("reindex", help="Rebuild persistent search indexes")
+    reindex_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
+    reindex_parser.add_argument("--no-archive", action="store_true", help="exclude archive memories")
+    reindex_parser.set_defaults(func=cmd_reindex)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check Mnemosyne installation health")
+    doctor_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
+    doctor_parser.set_defaults(func=cmd_doctor)
 
     show_parser = subparsers.add_parser("show", help="Show a memory by ID")
     show_parser.add_argument("id")
@@ -194,7 +212,8 @@ def cmd_write(args: argparse.Namespace) -> int:
 
     path = working_path(store, memory)
     write_memory(path, memory)
-    update_memory_index(store, memory)
+    update_memory_index_file(store, memory)
+    update_search_index(store, path, memory)
     print(f"Wrote {memory.id}")
     return 0
 
@@ -202,6 +221,17 @@ def cmd_write(args: argparse.Namespace) -> int:
 def cmd_search(args: argparse.Namespace) -> int:
     stores = stores_for_scope(args.scope)
     config = load_config(stores[-1] if stores else None)
+    if bool(config.get("search", {}).get("index_enabled", True)) and fts_available():
+        indexed_results = search_index(
+            stores,
+            args.query,
+            limit=args.limit,
+            memory_type=args.type,
+            include_archive=args.archive,
+        )
+        if indexed_results:
+            return print_search_results(indexed_results, args.format, config)
+
     documents: list[SearchDocument] = []
     path_lookup: dict[str, tuple[Store, Path, Memory]] = {}
     for store in stores:
@@ -272,13 +302,16 @@ def cmd_maintain(args: argparse.Namespace) -> int:
                     config["thresholds"],
                     dry_run=args.dry_run,
                 )
-                summary.decayed += 1
-                if result == "deprecated":
+                if result == "decayed":
+                    summary.decayed += 1
+                elif result == "deprecated":
                     summary.deprecated += 1
                 elif result == "archived":
                     summary.archived += 1
                 elif result == "core_candidate" and candidate is not None:
                     summary.core_candidates.append(candidate)
+        if index_enabled(store) and index_path(store).exists():
+            reindex_store(store)
 
     print(f"processed: {summary.processed}")
     print(f"decayed: {summary.decayed}")
@@ -289,6 +322,64 @@ def cmd_maintain(args: argparse.Namespace) -> int:
         for memory in summary.core_candidates:
             print(f"- {memory.id}: {memory.injection_summary}")
     return 0
+
+
+def cmd_reindex(args: argparse.Namespace) -> int:
+    if not fts_available():
+        print("SQLite FTS5 is not available in this Python build.", file=sys.stderr)
+        return 1
+    total = 0
+    for store in stores_for_scope(args.scope):
+        count = reindex_store(store, include_archive=not args.no_archive)
+        total += count
+        print(f"{store.scope}: indexed {count} memories at {index_path(store)}")
+    print(f"total: {total}")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    # Read-only health check: never creates stores or files as a side effect.
+    # Tuple is (name, ok, detail, hard) where hard marks installation-level
+    # checks that count toward the non-zero exit code.
+    checks: list[tuple[str, bool, str, bool]] = []
+    checks.append((
+        "portalocker",
+        importlib.util.find_spec("portalocker") is not None,
+        "required for concurrent file locks",
+        True,
+    ))
+    try:
+        template_text("core_project.md")
+        template_text("AGENTS.md")
+        templates_ok = True
+    except OSError:
+        templates_ok = False
+    checks.append(("templates", templates_ok, "required by init and hooks", True))
+    fts_ok = fts_available()
+    checks.append((
+        "fts5",
+        fts_ok,
+        "indexed search enabled" if fts_ok else "unavailable; falls back to in-memory BM25",
+        False,
+    ))
+    for store in stores_for_scope(args.scope):
+        initialized = store.core_path.exists()
+        store_detail = str(store.root) if initialized else f"{store.root} (not initialized; run init)"
+        checks.append((f"{store.scope} store", initialized, store_detail, False))
+        if initialized:
+            checks.append((f"{store.scope} working", store.working_dir.exists(), str(store.working_dir), True))
+            if index_path(store).exists():
+                index_detail = str(index_path(store))
+            else:
+                index_detail = f"{index_path(store)} (not built yet; run reindex)"
+            checks.append((f"{store.scope} index", True, index_detail, False))
+    failed = 0
+    for name, ok, detail, hard in checks:
+        status = "ok" if ok else ("missing" if hard else "info")
+        if not ok and hard:
+            failed += 1
+        print(f"{status:7} {name}: {detail}")
+    return 1 if failed else 0
 
 
 def cmd_show(args: argparse.Namespace) -> int:
@@ -318,6 +409,8 @@ def cmd_link(args: argparse.Namespace) -> int:
     add_link(second_memory, first_memory.id, args.rel)
     write_memory(first_path, first_memory)
     write_memory(second_path, second_memory)
+    update_search_index(first[0], first_path, first_memory)
+    update_search_index(second[0], second_path, second_memory)
     print(f"Linked {first_memory.id} <-> {second_memory.id} ({args.rel})")
     return 0
 
@@ -393,7 +486,7 @@ def duplicate_prompt(store: Store, memory: Memory) -> str | tuple[Path, Memory]:
     return "none"
 
 
-def update_memory_index(store: Store, memory: Memory) -> None:
+def update_memory_index_file(store: Store, memory: Memory) -> None:
     index_path = store.root / "MEMORY.md"
     if not index_path.exists():
         try:
@@ -402,6 +495,49 @@ def update_memory_index(store: Store, memory: Memory) -> None:
             index_path.write_text("# Memory Index\n", encoding="utf-8")
     with index_path.open("a", encoding="utf-8") as handle:
         handle.write(f"\n- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}\n")
+
+
+def print_search_results(indexed_results, output_format: str, config: dict) -> int:
+    threshold_bonus = int(config["thresholds"].get("bonus_access", 5))
+    recall_bonus = int(config["thresholds"].get("bonus_recall", 20))
+    output = []
+    today = date.today().isoformat()
+    for result in indexed_results:
+        memory = result.memory
+        path = result.path
+        memory.access_count += 1
+        memory.last_accessed = today
+        is_archive = "archive" in str(path)
+        bonus = recall_bonus if is_archive else threshold_bonus
+        memory.strength = min(100, memory.strength + bonus)
+        with suppress(portalocker.exceptions.LockException):
+            write_memory(path, memory, lock_timeout=0)
+            update_search_index(result.store, path, memory)
+        output.append(
+            {
+                "id": memory.id,
+                "scope": result.store.scope,
+                "type": memory.type,
+                "score": round(result.score, 4),
+                "strength": memory.strength,
+                "tags": memory.tags,
+                "links": memory.links,
+                "summary": memory.injection_summary,
+                "path": str(path),
+                "why_matched": result.why_matched,
+            }
+        )
+    if output_format == "json":
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        for item in output:
+            print(f"[{item['score']:.4f}] {item['id']} ({item['scope']}/{item['type']})")
+            print(item["summary"])
+            if item.get("why_matched"):
+                print(f"match: {item['why_matched']}")
+            print(f"path: {item['path']}")
+            print()
+    return 0
 
 
 def add_link(memory: Memory, link_id: str, rel: str) -> None:

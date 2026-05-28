@@ -6,7 +6,8 @@ import json
 import sys
 from pathlib import Path
 
-from mnemosyne.hooks._common import format_for_injection, hook_safe, read_event, run_search
+from mnemosyne.hooks._common import collect_stores, format_for_injection, hook_safe, read_event, run_search
+from mnemosyne.store import load_config
 
 
 def main() -> None:
@@ -25,7 +26,10 @@ def main() -> None:
         results = run_search(basename, limit=2, update_access=False)
         if not results:
             return
-        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(results)
+        stores = collect_stores()
+        config = load_config(stores[-1] if stores else None)
+        max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
+        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(results, max_tokens=max_tokens)
         output = {
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',

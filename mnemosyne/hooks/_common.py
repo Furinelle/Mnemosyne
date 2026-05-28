@@ -100,6 +100,14 @@ def run_search(query: str, limit: int = 5, update_access: bool = False) -> list[
     if not query.strip():
         return []
     stores = collect_stores()
+    config = load_config(stores[-1] if stores else None)
+    bonus = int(config['thresholds'].get('bonus_access', 5))
+
+    if bool(config.get('search', {}).get('index_enabled', True)):
+        indexed = _run_search_indexed(stores, query, limit, update_access, bonus)
+        if indexed is not None:
+            return indexed
+
     documents: list[SearchDocument] = []
     path_lookup: dict[str, tuple[Store, Path, object]] = {}
     for store in stores:
@@ -112,8 +120,6 @@ def run_search(query: str, limit: int = 5, update_access: bool = False) -> list[
     results = BM25(documents).search(query, limit)
     if not results:
         return []
-    config = load_config(stores[-1])
-    bonus = int(config['thresholds'].get('bonus_access', 5))
     output: list[dict] = []
     for result in results:
         store, path, memory = path_lookup[result.document.id]
@@ -131,20 +137,94 @@ def run_search(query: str, limit: int = 5, update_access: bool = False) -> list[
             'type': memory.type,
             'tags': list(memory.tags),
             'summary': memory.injection_summary,
+            'strength': int(memory.strength),
             'score': round(result.score, 4),
         })
     return output
 
 
-def format_for_injection(results: list[dict]) -> str:
+def _run_search_indexed(
+    stores: list[Store],
+    query: str,
+    limit: int,
+    update_access: bool,
+    bonus: int,
+) -> list[dict] | None:
+    """Try the persistent FTS index; return None to fall back to in-memory BM25.
+
+    Hooks fire on every prompt and edit, so this is the hot path. The index
+    stats files cheaply instead of re-reading every memory from disk. Any
+    failure (no FTS5 build, locked db, import error) returns None so the
+    caller transparently degrades to the BM25 scan.
+    """
+    try:
+        from mnemosyne.index import fts_available, search_index, update_memory_index
+    except ImportError:
+        return None
+    if not fts_available():
+        return None
+    try:
+        indexed = search_index(stores, query, limit=limit, include_archive=False)
+    except Exception:
+        return None
+    output: list[dict] = []
+    for result in indexed:
+        memory = result.memory
+        if update_access:
+            try:
+                memory.access_count += 1
+                memory.last_accessed = date.today().isoformat()
+                memory.strength = min(100, memory.strength + bonus)
+                write_memory(result.path, memory, lock_timeout=0)
+                update_memory_index(result.store, result.path, memory)
+            except portalocker.exceptions.LockException:
+                pass
+            except Exception:
+                pass
+        output.append({
+            'id': memory.id,
+            'scope': result.store.scope,
+            'type': memory.type,
+            'tags': list(memory.tags),
+            'summary': memory.injection_summary,
+            'strength': int(memory.strength),
+            'score': round(result.score, 4),
+        })
+    return output
+
+
+def format_for_injection(results: list[dict], max_tokens: int | None = None) -> str:
     if not results:
         return ''
     lines: list[str] = ['## Relevant memories from Mnemosyne', '']
-    for item in results:
+    used_tokens = _approx_tokens('\n'.join(lines))
+    sorted_results = sorted(
+        results,
+        key=lambda item: (int(item.get('strength', 0) or 0), float(item.get('score', 0) or 0)),
+        reverse=True,
+    )
+    for item in sorted_results:
         tag_part = f" [{', '.join(item['tags'])}]" if item['tags'] else ''
-        lines.append(f"- ({item['scope']}/{item['type']}) {item['id']}{tag_part}")
         summary = item['summary']
         if len(summary) > 220:
             summary = summary[:217].rstrip() + '...'
-        lines.append(f'  {summary}')
+        item_lines = [
+            f"- ({item['scope']}/{item['type']}) {item['id']}{tag_part}",
+            f'  {summary}',
+        ]
+        item_tokens = _approx_tokens('\n'.join(item_lines))
+        if max_tokens is not None and used_tokens + item_tokens > max_tokens:
+            if not lines[2:]:
+                remaining = max(0, (max_tokens - used_tokens - 8) * 4)
+                if remaining <= 0:
+                    break
+                truncated = summary[:remaining].rstrip() + '...'
+                lines.extend([item_lines[0], f'  {truncated}'])
+            break
+        lines.extend(item_lines)
+        used_tokens += item_tokens
     return '\n'.join(lines)
+
+
+def _approx_tokens(text: str) -> int:
+    return max(1, (len(text) + 3) // 4)

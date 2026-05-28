@@ -11,3 +11,9 @@ mnemosyne = 'mnemosyne.cli:main'
 [build-system]
 requires = ['hatchling']
 build-backend = 'hatchling.build'
+
+[tool.hatch.build.targets.wheel]
+include = ['mnemosyne/**', 'templates/**']
+
+[tool.hatch.build.targets.sdist]
+include = ['mnemosyne/**', 'templates/**', 'tests/**', 'README.md', 'pyproject.toml']
