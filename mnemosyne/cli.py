@@ -131,6 +131,12 @@ def build_parser() -> argparse.ArgumentParser:
     graph_parser.add_argument("--format", choices=["mermaid", "ascii", "json"], default="mermaid")
     graph_parser.set_defaults(func=cmd_graph)
 
+    mcp_parser = subparsers.add_parser("mcp", help="Run the optional MCP server")
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command")
+    mcp_serve_parser = mcp_subparsers.add_parser("serve", help="Serve MCP over stdio")
+    mcp_serve_parser.add_argument("--sse", action="store_true", help="serve optional SSE transport")
+    mcp_serve_parser.set_defaults(func=cmd_mcp_serve)
+
     codex_prep_parser = subparsers.add_parser('codex-prep',
         help='Generate a prompt prefix for handoff to a non-Claude agent')
     codex_prep_parser.add_argument('task')
@@ -450,6 +456,16 @@ def cmd_graph(args: argparse.Namespace) -> int:
         return 1
     print(render_graph(graph, args.format))
     return 0
+
+
+def cmd_mcp_serve(args: argparse.Namespace) -> int:
+    from mnemosyne.mcp.server import MissingMCPDependency, serve
+
+    try:
+        return serve(sse=args.sse)
+    except MissingMCPDependency:
+        print("MCP support is optional; please pip install mnemosyne[mcp].", file=sys.stderr)
+        return 1
 
 
 def cmd_codex_prep(args: argparse.Namespace) -> int:

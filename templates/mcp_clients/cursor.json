@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mnemosyne": {
+      "command": "mnemosyne",
+      "args": ["mcp", "serve"],
+      "env": {"MNEMOSYNE_HOME": "~/.mnemosyne"}
+    }
+  }
+}

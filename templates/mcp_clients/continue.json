@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mnemosyne": {
+      "command": "mnemosyne",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
