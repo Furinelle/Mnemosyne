@@ -1,0 +1,50 @@
+{"query":"认证","expected_ids":["pitfall-cjk-01"],"paraphrase_of":"pitfall-cjk-01"}
+{"query":"连接池","expected_ids":["pitfall-cjk-02"],"paraphrase_of":"pitfall-cjk-02"}
+{"query":"索引","expected_ids":["pitfall-cjk-03"],"paraphrase_of":"pitfall-cjk-03"}
+{"query":"并发锁","expected_ids":["pitfall-cjk-04"],"paraphrase_of":"pitfall-cjk-04"}
+{"query":"令牌","expected_ids":["pitfall-cjk-05"],"paraphrase_of":"pitfall-cjk-05"}
+{"query":"归档","expected_ids":["pitfall-cjk-06"],"paraphrase_of":"pitfall-cjk-06"}
+{"query":"摘要","expected_ids":["pitfall-cjk-07"],"paraphrase_of":"pitfall-cjk-07"}
+{"query":"检索","expected_ids":["pitfall-cjk-08"],"paraphrase_of":"pitfall-cjk-08"}
+{"query":"钩子","expected_ids":["pitfall-cjk-09"],"paraphrase_of":"pitfall-cjk-09"}
+{"query":"迁移","expected_ids":["pitfall-cjk-10"],"paraphrase_of":"pitfall-cjk-10"}
+{"query":"wal timeout","expected_ids":["arch-01"],"paraphrase_of":"arch-01"}
+{"query":"portable markdown","expected_ids":["arch-02"],"paraphrase_of":"arch-02"}
+{"query":"optional vector backend","expected_ids":["arch-03"],"paraphrase_of":"arch-03"}
+{"query":"typed relation expansion","expected_ids":["arch-04"],"paraphrase_of":"arch-04"}
+{"query":"stdio json rpc","expected_ids":["arch-05"],"paraphrase_of":"arch-05"}
+{"query":"token budget injection","expected_ids":["arch-06"],"paraphrase_of":"arch-06"}
+{"query":"archive decay lifecycle","expected_ids":["arch-07"],"paraphrase_of":"arch-07"}
+{"query":"deep merge config","expected_ids":["arch-08"],"paraphrase_of":"arch-08"}
+{"query":"atomic markdown replace","expected_ids":["arch-09"],"paraphrase_of":"arch-09"}
+{"query":"fts trigram fallback","expected_ids":["arch-10"],"paraphrase_of":"arch-10"}
+{"query":"portalocker file lock","expected_ids":["codebase-01"],"paraphrase_of":"codebase-01"}
+{"query":"sqlite metadata table","expected_ids":["codebase-02"],"paraphrase_of":"codebase-02"}
+{"query":"codex findings ingest","expected_ids":["codebase-03"],"paraphrase_of":"codebase-03"}
+{"query":"claude session start","expected_ids":["codebase-04"],"paraphrase_of":"codebase-04"}
+{"query":"search score breakdown","expected_ids":["codebase-05"],"paraphrase_of":"codebase-05"}
+{"query":"float sixteen blob","expected_ids":["codebase-06"],"paraphrase_of":"codebase-06"}
+{"query":"mermaid graph output","expected_ids":["codebase-07"],"paraphrase_of":"codebase-07"}
+{"query":"client template cursor","expected_ids":["codebase-08"],"paraphrase_of":"codebase-08"}
+{"query":"reranker top candidates","expected_ids":["codebase-09"],"paraphrase_of":"codebase-09"}
+{"query":"embedding model identity","expected_ids":["codebase-10"],"paraphrase_of":"codebase-10"}
+{"query":"do not block hooks","expected_ids":["preference-01"],"paraphrase_of":"preference-01"}
+{"query":"keep base install minimal","expected_ids":["preference-02"],"paraphrase_of":"preference-02"}
+{"query":"fallback without traceback","expected_ids":["preference-03"],"paraphrase_of":"preference-03"}
+{"query":"preserve public cli","expected_ids":["preference-04"],"paraphrase_of":"preference-04"}
+{"query":"avoid sqlite extension","expected_ids":["preference-05"],"paraphrase_of":"preference-05"}
+{"query":"default embedding disabled","expected_ids":["preference-06"],"paraphrase_of":"preference-06"}
+{"query":"relation custom opt in","expected_ids":["preference-07"],"paraphrase_of":"preference-07"}
+{"query":"read only doctor","expected_ids":["preference-08"],"paraphrase_of":"preference-08"}
+{"query":"source local degradation","expected_ids":["preference-09"],"paraphrase_of":"preference-09"}
+{"query":"evidence before claims","expected_ids":["preference-10"],"paraphrase_of":"preference-10"}
+{"query":"v02 retrieval handoff","expected_ids":["handoff-01"],"paraphrase_of":"handoff-01"}
+{"query":"mcp integration handoff","expected_ids":["handoff-02"],"paraphrase_of":"handoff-02"}
+{"query":"graph cli handoff","expected_ids":["handoff-03"],"paraphrase_of":"handoff-03"}
+{"query":"backfill embeddings handoff","expected_ids":["handoff-04"],"paraphrase_of":"handoff-04"}
+{"query":"evaluate baseline handoff","expected_ids":["handoff-05"],"paraphrase_of":"handoff-05"}
+{"query":"typed links handoff","expected_ids":["handoff-06"],"paraphrase_of":"handoff-06"}
+{"query":"migration version two handoff","expected_ids":["handoff-07"],"paraphrase_of":"handoff-07"}
+{"query":"client snippets handoff","expected_ids":["handoff-08"],"paraphrase_of":"handoff-08"}
+{"query":"doctor components handoff","expected_ids":["handoff-09"],"paraphrase_of":"handoff-09"}
+{"query":"readme tracks handoff","expected_ids":["handoff-10"],"paraphrase_of":"handoff-10"}

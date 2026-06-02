@@ -158,13 +158,15 @@ def _run_search_indexed(
     caller transparently degrades to the BM25 scan.
     """
     try:
-        from mnemosyne.index import fts_available, search_index, update_memory_index
+        from mnemosyne.fusion import search as fusion_search
+        from mnemosyne.index import fts_available, update_memory_index
     except ImportError:
         return None
     if not fts_available():
         return None
     try:
-        indexed = search_index(stores, query, limit=limit, include_archive=False)
+        config = load_config(stores[-1] if stores else None)
+        indexed = fusion_search(stores, query, limit=limit, include_archive=False, config=config)
     except Exception:
         return None
     output: list[dict] = []

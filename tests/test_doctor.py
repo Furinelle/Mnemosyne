@@ -22,6 +22,9 @@ class DoctorCommandTests(unittest.TestCase):
             self.assertIn("portalocker", text)
             self.assertIn("templates", text)
             self.assertIn("index", text)
+            self.assertIn("embedder", text)
+            self.assertIn("reranker", text)
+            self.assertIn("mcp", text)
 
 
 if __name__ == "__main__":

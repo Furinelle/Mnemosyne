@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import math
-import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
-
-TOKEN_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
+from mnemosyne.tokenizer import tokenize
 
 
 @dataclass
@@ -25,16 +23,19 @@ class SearchResult:
     score: float
 
 
-def tokenize(text: str) -> list[str]:
-    return [match.group(0).lower() for match in TOKEN_RE.finditer(text)]
-
-
 class BM25:
-    def __init__(self, documents: Iterable[SearchDocument], k1: float = 1.5, b: float = 0.75):
+    def __init__(
+        self,
+        documents: Iterable[SearchDocument],
+        k1: float = 1.5,
+        b: float = 0.75,
+        tokenizer: Callable[[str], list[str]] = tokenize,
+    ):
         self.documents = list(documents)
         self.k1 = k1
         self.b = b
-        self.tokens = [tokenize(document.text) for document in self.documents]
+        self.tokenizer = tokenizer
+        self.tokens = [tokenizer(document.text) for document in self.documents]
         self.frequencies = [Counter(tokens) for tokens in self.tokens]
         self.lengths = [len(tokens) for tokens in self.tokens]
         self.average_length = sum(self.lengths) / len(self.lengths) if self.lengths else 0.0
@@ -43,7 +44,7 @@ class BM25:
             self.document_frequency.update(set(tokens))
 
     def search(self, query: str, limit: int = 5) -> list[SearchResult]:
-        query_tokens = tokenize(query)
+        query_tokens = self.tokenizer(query)
         if not query_tokens or not self.documents:
             return []
         scored: list[SearchResult] = []

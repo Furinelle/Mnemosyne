@@ -1,0 +1,50 @@
+{"id":"pitfall-cjk-01","type":"pitfall","text":"调试认证失败令牌过期"}
+{"id":"pitfall-cjk-02","type":"pitfall","text":"数据库连接池泄漏需要排查"}
+{"id":"pitfall-cjk-03","type":"pitfall","text":"向量索引迁移失败需要重建"}
+{"id":"pitfall-cjk-04","type":"pitfall","text":"并发锁超时导致写入失败"}
+{"id":"pitfall-cjk-05","type":"pitfall","text":"访问令牌刷新流程异常"}
+{"id":"pitfall-cjk-06","type":"pitfall","text":"历史归档文件路径错误"}
+{"id":"pitfall-cjk-07","type":"pitfall","text":"注入摘要长度超过预算"}
+{"id":"pitfall-cjk-08","type":"pitfall","text":"混合检索召回结果偏低"}
+{"id":"pitfall-cjk-09","type":"pitfall","text":"钩子异常绝不能阻塞会话"}
+{"id":"pitfall-cjk-10","type":"pitfall","text":"配置迁移必须向后兼容"}
+{"id":"arch-01","type":"arch_decision","text":"wal timeout protects concurrent sqlite writers"}
+{"id":"arch-02","type":"arch_decision","text":"portable markdown remains the source of truth"}
+{"id":"arch-03","type":"arch_decision","text":"optional vector backend stays disabled by default"}
+{"id":"arch-04","type":"arch_decision","text":"typed relation expansion uses semantic weights"}
+{"id":"arch-05","type":"arch_decision","text":"stdio json rpc is the default mcp transport"}
+{"id":"arch-06","type":"arch_decision","text":"token budget injection truncates relevant memories"}
+{"id":"arch-07","type":"arch_decision","text":"archive decay lifecycle keeps working memory small"}
+{"id":"arch-08","type":"arch_decision","text":"deep merge config preserves older project files"}
+{"id":"arch-09","type":"arch_decision","text":"atomic markdown replace avoids partial writes"}
+{"id":"arch-10","type":"arch_decision","text":"fts trigram fallback handles cjk substrings"}
+{"id":"codebase-01","type":"codebase","text":"portalocker file lock guards markdown updates"}
+{"id":"codebase-02","type":"codebase","text":"sqlite metadata table stores persistent index state"}
+{"id":"codebase-03","type":"codebase","text":"codex findings ingest parses repeated report blocks"}
+{"id":"codebase-04","type":"codebase","text":"claude session start hook injects core memory"}
+{"id":"codebase-05","type":"codebase","text":"search score breakdown reports bm25 vectors and links"}
+{"id":"codebase-06","type":"codebase","text":"float sixteen blob keeps embeddings compact"}
+{"id":"codebase-07","type":"codebase","text":"mermaid graph output renders linked memories"}
+{"id":"codebase-08","type":"codebase","text":"client template cursor config starts mcp server"}
+{"id":"codebase-09","type":"codebase","text":"reranker top candidates limits optional inference"}
+{"id":"codebase-10","type":"codebase","text":"embedding model identity invalidates stale vectors"}
+{"id":"preference-01","type":"preference","text":"do not block hooks when optional services fail"}
+{"id":"preference-02","type":"preference","text":"keep base install minimal with optional extras"}
+{"id":"preference-03","type":"preference","text":"fallback without traceback when dependencies are absent"}
+{"id":"preference-04","type":"preference","text":"preserve public cli commands across upgrades"}
+{"id":"preference-05","type":"preference","text":"avoid sqlite extension loading on macos python"}
+{"id":"preference-06","type":"preference","text":"default embedding disabled protects compatibility"}
+{"id":"preference-07","type":"preference","text":"relation custom opt in requires explicit flag"}
+{"id":"preference-08","type":"preference","text":"read only doctor must not create stores"}
+{"id":"preference-09","type":"preference","text":"source local degradation keeps other lanes available"}
+{"id":"preference-10","type":"preference","text":"evidence before claims requires fresh verification"}
+{"id":"handoff-01","type":"handoff","text":"v02 retrieval handoff covers hybrid search"}
+{"id":"handoff-02","type":"handoff","text":"mcp integration handoff exposes memory tools"}
+{"id":"handoff-03","type":"handoff","text":"graph cli handoff documents traversal"}
+{"id":"handoff-04","type":"handoff","text":"backfill embeddings handoff records model changes"}
+{"id":"handoff-05","type":"handoff","text":"evaluate baseline handoff captures recall metrics"}
+{"id":"handoff-06","type":"handoff","text":"typed links handoff explains reverse relations"}
+{"id":"handoff-07","type":"handoff","text":"migration version two handoff preserves metadata"}
+{"id":"handoff-08","type":"handoff","text":"client snippets handoff covers cursor and cline"}
+{"id":"handoff-09","type":"handoff","text":"doctor components handoff reports optional state"}
+{"id":"handoff-10","type":"handoff","text":"readme tracks handoff summarizes version two"}

@@ -16,6 +16,7 @@ import portalocker
 
 from mnemosyne.lifecycle import MaintainSummary, maintain_memory
 from mnemosyne.index import (
+    backfill_embeddings,
     fts_available,
     index_enabled,
     index_path,
@@ -23,6 +24,8 @@ from mnemosyne.index import (
     search_index,
     update_memory_index as update_search_index,
 )
+from mnemosyne.embedding import get_embedder
+from mnemosyne.fusion import search as fusion_search
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
@@ -96,6 +99,15 @@ def build_parser() -> argparse.ArgumentParser:
     reindex_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
     reindex_parser.add_argument("--no-archive", action="store_true", help="exclude archive memories")
     reindex_parser.set_defaults(func=cmd_reindex)
+
+    embed_parser = subparsers.add_parser("embed-backfill", help="Compute embeddings for existing memories")
+    embed_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
+    embed_parser.add_argument("--no-archive", action="store_true", help="exclude archive memories")
+    embed_parser.set_defaults(func=cmd_embed_backfill)
+
+    eval_parser = subparsers.add_parser("eval", help="Run retrieval quality evaluations")
+    eval_parser.add_argument("eval_args", nargs=argparse.REMAINDER)
+    eval_parser.set_defaults(func=cmd_eval)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Mnemosyne installation health")
     doctor_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
@@ -221,28 +233,14 @@ def cmd_write(args: argparse.Namespace) -> int:
 def cmd_search(args: argparse.Namespace) -> int:
     stores = stores_for_scope(args.scope)
     config = load_config(stores[-1] if stores else None)
-    if bool(config.get("search", {}).get("index_enabled", True)) and fts_available():
-        indexed_results = search_index(
-            stores,
-            args.query,
-            limit=args.limit,
-            memory_type=args.type,
-            include_archive=args.archive,
-        )
-        if indexed_results:
-            return print_search_results(indexed_results, args.format, config)
-
-    documents: list[SearchDocument] = []
-    path_lookup: dict[str, tuple[Store, Path, Memory]] = {}
-    for store in stores:
-        for path, memory in load_memories(store, include_archive=args.archive):
-            if args.type and memory.type != args.type:
-                continue
-            document_id = f"{store.scope}:{memory.id}"
-            documents.append(SearchDocument(document_id, memory_search_text(memory), memory))
-            path_lookup[document_id] = (store, path, memory)
-
-    results = BM25(documents).search(args.query, args.limit)
+    results = fusion_search(
+        stores,
+        args.query,
+        limit=args.limit,
+        type_filter=args.type,
+        include_archive=args.archive,
+        config=config,
+    )
     if not results:
         if args.format == "json":
             print("[]")
@@ -250,41 +248,7 @@ def cmd_search(args: argparse.Namespace) -> int:
             print("no results")
         return 0
 
-    threshold_bonus = int(config["thresholds"].get("bonus_access", 5))
-    recall_bonus = int(config["thresholds"].get("bonus_recall", 20))
-    output = []
-    for result in results:
-        store, path, memory = path_lookup[result.document.id]
-        memory.access_count += 1
-        memory.last_accessed = date.today().isoformat()
-        is_archive = "archive" in str(path)
-        bonus = recall_bonus if is_archive else threshold_bonus
-        memory.strength = min(100, memory.strength + bonus)
-        with suppress(portalocker.exceptions.LockException):
-            write_memory(path, memory, lock_timeout=0)
-        output.append(
-            {
-                "id": memory.id,
-                "scope": store.scope,
-                "type": memory.type,
-                "score": round(result.score, 4),
-                "strength": memory.strength,
-                "tags": memory.tags,
-                "links": memory.links,
-                "summary": memory.injection_summary,
-                "path": str(path),
-            }
-        )
-
-    if args.format == "json":
-        print(json.dumps(output, ensure_ascii=False, indent=2))
-    else:
-        for item in output:
-            print(f"[{item['score']:.4f}] {item['id']} ({item['scope']}/{item['type']})")
-            print(item["summary"])
-            print(f"path: {item['path']}")
-            print()
-    return 0
+    return print_search_results(results, args.format, config)
 
 
 def cmd_maintain(args: argparse.Namespace) -> int:
@@ -333,8 +297,34 @@ def cmd_reindex(args: argparse.Namespace) -> int:
         count = reindex_store(store, include_archive=not args.no_archive)
         total += count
         print(f"{store.scope}: indexed {count} memories at {index_path(store)}")
+        embedder = get_embedder(load_config(store))
+        if embedder.model_id != "none":
+            embedded = backfill_embeddings(store, embedder, include_archive=not args.no_archive)
+            print(f"{store.scope}: embedded {embedded} memories with {embedder.model_id}")
     print(f"total: {total}")
     return 0
+
+
+def cmd_embed_backfill(args: argparse.Namespace) -> int:
+    total = 0
+    enabled = False
+    for store in stores_for_scope(args.scope):
+        embedder = get_embedder(load_config(store))
+        if embedder.model_id == "none":
+            print(f"{store.scope}: embedding is disabled", file=sys.stderr)
+            continue
+        enabled = True
+        count = backfill_embeddings(store, embedder, include_archive=not args.no_archive)
+        total += count
+        print(f"{store.scope}: embedded {count} memories with {embedder.model_id}")
+    print(f"total: {total}")
+    return 0 if enabled else 1
+
+
+def cmd_eval(args: argparse.Namespace) -> int:
+    from mnemosyne.eval.__main__ import main as eval_main
+
+    return eval_main(args.eval_args)
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -348,6 +338,25 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "required for concurrent file locks",
         True,
     ))
+    config = load_config()
+    embedding = config.get("embedding", {})
+    embedding_enabled = bool(embedding.get("enabled"))
+    embedding_backend = str(embedding.get("backend", "onnx"))
+    if not embedding_enabled:
+        embedding_detail = "disabled"
+    elif embedding_backend == "onnx":
+        embedding_detail = "configured" if importlib.util.find_spec("onnxruntime") else "configured; install mnemosyne[vector]"
+    else:
+        embedding_detail = "configured" if importlib.util.find_spec("httpx") else "configured; install httpx"
+    checks.append(("embedder", True, embedding_detail, False))
+    rerank = config.get("rerank", {})
+    rerank_enabled = bool(rerank.get("enabled"))
+    rerank_detail = "disabled" if not rerank_enabled else (
+        "configured" if importlib.util.find_spec("onnxruntime") else "configured; install mnemosyne[rerank]"
+    )
+    checks.append(("reranker", True, rerank_detail, False))
+    mcp_available = importlib.util.find_spec("mcp") is not None
+    checks.append(("mcp", True, "available" if mcp_available else "install mnemosyne[mcp] to enable", False))
     try:
         template_text("core_project.md")
         template_text("AGENTS.md")
@@ -525,6 +534,7 @@ def print_search_results(indexed_results, output_format: str, config: dict) -> i
                 "summary": memory.injection_summary,
                 "path": str(path),
                 "why_matched": result.why_matched,
+                "score_breakdown": result.score_breakdown,
             }
         )
     if output_format == "json":

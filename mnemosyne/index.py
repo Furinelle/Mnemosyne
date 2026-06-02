@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import sqlite3
+import math
+import struct
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from mnemosyne.embedding.base import call_with_timeout
 from mnemosyne.schema import Memory, parse_memory
 from mnemosyne.search import memory_search_text, tokenize
 from mnemosyne.store import Store, iter_memory_paths, load_config, load_memories
 
 
 INDEX_FILENAME = "index.sqlite"
+INDEX_VERSION = 2
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -37,6 +41,14 @@ class IndexedSearchResult:
     memory: Memory
     score: float
     why_matched: str
+
+
+@dataclass
+class IndexedEmbedding:
+    store: Store
+    path: Path
+    memory: Memory
+    vector: list[float]
 
 
 def index_path(store: Store) -> Path:
@@ -80,25 +92,27 @@ def ensure_index(store: Store) -> None:
                 strength INTEGER NOT NULL,
                 tags TEXT NOT NULL,
                 summary TEXT NOT NULL,
-                mtime REAL NOT NULL DEFAULT 0
+                mtime REAL NOT NULL DEFAULT 0,
+                embedding BLOB,
+                embedding_model TEXT NOT NULL DEFAULT '',
+                embedding_dim INTEGER NOT NULL DEFAULT 0,
+                embedding_mtime REAL NOT NULL DEFAULT 0
             )
             """
         )
         columns = {row[1] for row in connection.execute("PRAGMA table_info(memories_meta)")}
-        if "mtime" not in columns:
-            connection.execute("ALTER TABLE memories_meta ADD COLUMN mtime REAL NOT NULL DEFAULT 0")
-        connection.execute(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
-                document_id UNINDEXED,
-                title,
-                summary,
-                body,
-                tags,
-                type
-            )
-            """
-        )
+        migrations = {
+            "mtime": "REAL NOT NULL DEFAULT 0",
+            "embedding": "BLOB",
+            "embedding_model": "TEXT NOT NULL DEFAULT ''",
+            "embedding_dim": "INTEGER NOT NULL DEFAULT 0",
+            "embedding_mtime": "REAL NOT NULL DEFAULT 0",
+        }
+        for column, definition in migrations.items():
+            if column not in columns:
+                connection.execute(f"ALTER TABLE memories_meta ADD COLUMN {column} {definition}")
+        _ensure_fts_table(connection)
+        connection.execute(f"PRAGMA user_version={INDEX_VERSION}")
         connection.commit()
 
 
@@ -193,6 +207,8 @@ def search_index(
         with closing(_connect(index_path(store))) as connection:
             connection.row_factory = sqlite3.Row
             rows = _search_rows(connection, expression, limit, memory_type, include_archive)
+            if not rows and any(_needs_like_fallback(token) for token in tokenize(query)):
+                rows = _search_rows_like(connection, tokenize(query), limit, memory_type, include_archive)
         for row in rows:
             path = Path(row["path"])
             try:
@@ -241,13 +257,7 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
             mtime,
         ),
     )
-    connection.execute(
-        """
-        INSERT INTO memories_fts (document_id, title, summary, body, tags, type)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (document_id, memory.title, summary, memory_search_text(memory), tags, memory.type),
-    )
+    _index_fts(connection, document_id, memory, tags, summary)
 
 
 def delete_memory_index(connection: sqlite3.Connection, scope: str, memory_id: str) -> None:
@@ -292,8 +302,191 @@ def _search_rows(
     )
 
 
+def _search_rows_like(
+    connection: sqlite3.Connection,
+    tokens: list[str],
+    limit: int,
+    memory_type: str,
+    include_archive: bool,
+) -> list[sqlite3.Row]:
+    short_tokens = [token for token in tokens if _needs_like_fallback(token)]
+    if not short_tokens:
+        return []
+    fields = ("title", "summary", "body", "tags", "type")
+    token_filters: list[str] = []
+    params: list[object] = []
+    for token in short_tokens:
+        pattern = f"%{_escape_like(token)}%"
+        token_filters.append("(" + " OR ".join(f"memories_fts.{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
+        params.extend([pattern] * len(fields))
+    filters = ["(" + " OR ".join(token_filters) + ")"]
+    if memory_type:
+        filters.append("m.type = ?")
+        params.append(memory_type)
+    if not include_archive:
+        filters.append("m.archived = 0")
+    params.append(limit)
+    where = " AND ".join(filters)
+    return list(
+        connection.execute(
+            f"""
+            SELECT
+                m.path,
+                m.summary,
+                m.type,
+                (m.strength / 1000.0) AS score,
+                m.summary AS why_matched
+            FROM memories_fts
+            JOIN memories_meta m ON m.document_id = memories_fts.document_id
+            WHERE {where}
+            ORDER BY score DESC
+            LIMIT ?
+            """,
+            params,
+        )
+    )
+
+
 def _query_expression(query: str) -> str:
     tokens = tokenize(query)
     if not tokens:
         return ""
     return " OR ".join(f'"{token}"' for token in tokens)
+
+
+def encode_embedding(vector: list[float]) -> bytes:
+    if not vector:
+        return b""
+    return struct.pack(f"<{len(vector)}e", *vector)
+
+
+def decode_embedding(blob: bytes | None, dimensions: int) -> list[float]:
+    if not blob or dimensions <= 0:
+        return []
+    return list(struct.unpack(f"<{dimensions}e", blob))
+
+
+def cosine_similarity(first: list[float], second: list[float]) -> float:
+    if not first or len(first) != len(second):
+        return 0.0
+    dot = sum(left * right for left, right in zip(first, second))
+    first_norm = math.sqrt(sum(value * value for value in first))
+    second_norm = math.sqrt(sum(value * value for value in second))
+    if not first_norm or not second_norm:
+        return 0.0
+    return dot / (first_norm * second_norm)
+
+
+def write_embedding(store: Store, memory_id: str, vector: list[float], model_id: str) -> None:
+    ensure_index(store)
+    with closing(_connect(index_path(store))) as connection:
+        connection.execute(
+            """
+            UPDATE memories_meta
+            SET embedding = ?, embedding_model = ?, embedding_dim = ?, embedding_mtime = mtime
+            WHERE scope = ? AND memory_id = ?
+            """,
+            (encode_embedding(vector), model_id, len(vector), store.scope, memory_id),
+        )
+        connection.commit()
+
+
+def iter_embeddings(
+    stores: Iterable[Store],
+    model_id: str,
+    dimensions: int,
+    include_archive: bool = False,
+) -> Iterable[IndexedEmbedding]:
+    for store in stores:
+        sync_index(store, include_archive=include_archive)
+        with closing(_connect(index_path(store))) as connection:
+            connection.row_factory = sqlite3.Row
+            filters = ["embedding IS NOT NULL", "embedding_model = ?", "embedding_dim = ?"]
+            params: list[object] = [model_id, dimensions]
+            if not include_archive:
+                filters.append("archived = 0")
+            rows = connection.execute(
+                f"SELECT path, embedding, embedding_dim FROM memories_meta WHERE {' AND '.join(filters)}",
+                params,
+            ).fetchall()
+        for row in rows:
+            path = Path(row["path"])
+            try:
+                memory = parse_memory(path.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+            yield IndexedEmbedding(
+                store=store,
+                path=path,
+                memory=memory,
+                vector=decode_embedding(row["embedding"], int(row["embedding_dim"])),
+            )
+
+
+def backfill_embeddings(store: Store, embedder, include_archive: bool = True) -> int:
+    sync_index(store, include_archive=include_archive)
+    memories = load_memories(store, include_archive=include_archive)
+    vectors = call_with_timeout(
+        lambda: embedder.embed([memory_search_text(memory) for _, memory in memories]),
+        timeout=30.0,
+        fallback=[],
+    )
+    count = 0
+    for (_path, memory), vector in zip(memories, vectors):
+        if vector is None:
+            continue
+        write_embedding(store, memory.id, vector, embedder.model_id)
+        count += 1
+    return count
+
+
+def _ensure_fts_table(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memories_fts'"
+    ).fetchone()
+    if row is not None and "trigram" not in (row[0] or "").lower():
+        connection.execute("DROP TABLE memories_fts")
+        row = None
+    if row is None:
+        connection.execute(
+            """
+            CREATE VIRTUAL TABLE memories_fts USING fts5(
+                document_id UNINDEXED,
+                title,
+                summary,
+                body,
+                tags,
+                type,
+                tokenize='trigram'
+            )
+            """
+        )
+        _rebuild_fts_from_meta(connection)
+
+
+def _rebuild_fts_from_meta(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("SELECT document_id, path, tags, summary FROM memories_meta").fetchall()
+    for document_id, path_text, tags, summary in rows:
+        try:
+            memory = parse_memory(Path(path_text).read_text(encoding="utf-8"))
+        except OSError:
+            continue
+        _index_fts(connection, document_id, memory, tags, summary)
+
+
+def _index_fts(connection: sqlite3.Connection, document_id: str, memory: Memory, tags: str, summary: str) -> None:
+    connection.execute(
+        """
+        INSERT INTO memories_fts (document_id, title, summary, body, tags, type)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (document_id, memory.title, summary, memory_search_text(memory), tags, memory.type),
+    )
+
+
+def _needs_like_fallback(token: str) -> bool:
+    return len(token) < 3 and any("\u4e00" <= character <= "\u9fff" for character in token)
+
+
+def _escape_like(token: str) -> str:
+    return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
