@@ -26,6 +26,7 @@ from mnemosyne.index import (
 )
 from mnemosyne.embedding import get_embedder
 from mnemosyne.fusion import search as fusion_search
+from mnemosyne.relations import PREDEFINED, reverse
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
@@ -121,7 +122,14 @@ def build_parser() -> argparse.ArgumentParser:
     link_parser.add_argument("id1")
     link_parser.add_argument("id2")
     link_parser.add_argument("--rel", default="related")
+    link_parser.add_argument("--allow-custom", action="store_true")
     link_parser.set_defaults(func=cmd_link)
+
+    graph_parser = subparsers.add_parser("graph", help="Render linked memories as a graph")
+    graph_parser.add_argument("id")
+    graph_parser.add_argument("--depth", type=int, default=1)
+    graph_parser.add_argument("--format", choices=["mermaid", "ascii", "json"], default="mermaid")
+    graph_parser.set_defaults(func=cmd_graph)
 
     codex_prep_parser = subparsers.add_parser('codex-prep',
         help='Generate a prompt prefix for handoff to a non-Claude agent')
@@ -413,14 +421,34 @@ def cmd_link(args: argparse.Namespace) -> int:
         return 1
     _, first_path, first_memory = first
     _, second_path, second_memory = second
+    allow_custom = bool(args.allow_custom or load_config(first[0]).get("relations", {}).get("allow_custom"))
+    if args.rel not in PREDEFINED and not allow_custom:
+        choices = ", ".join(sorted(PREDEFINED))
+        print(
+            f"Unknown relation: {args.rel}. Choose one of: {choices}; use --allow-custom to opt in.",
+            file=sys.stderr,
+        )
+        return 2
 
     add_link(first_memory, second_memory.id, args.rel)
-    add_link(second_memory, first_memory.id, args.rel)
+    add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
     write_memory(first_path, first_memory)
     write_memory(second_path, second_memory)
     update_search_index(first[0], first_path, first_memory)
     update_search_index(second[0], second_path, second_memory)
     print(f"Linked {first_memory.id} <-> {second_memory.id} ({args.rel})")
+    return 0
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    from mnemosyne.graph import build_graph, render_graph
+
+    try:
+        graph = build_graph(args.id, stores_for_scope("all"), depth=args.depth)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(render_graph(graph, args.format))
     return 0
 
 
