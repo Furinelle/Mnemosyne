@@ -20,11 +20,45 @@ Markdown 文件，让 Claude Code、Codex 等能调用 Shell/Python 的 Agent �
 | 文件即接口 | 每条记忆都是 Markdown + YAML frontmatter，任何编辑器都能读写。 |
 | 全局 + 项目分层 | `~/.mnemosyne/` 保存跨项目偏好，项目内 `.mnemosyne/` 保存项目知识。 |
 | 持久搜索索引 | 优先使用 SQLite FTS5 的 `index.sqlite`，不可用时回退到内存 BM25。 |
+| 混合检索 | CJK bigram、可选向量 lane、RRF 融合、关系扩展和可选 reranker。 |
+| MCP 服务 | 通过 stdio 或可选 SSE 向 Cursor、Cline、Continue、Windsurf 等客户端暴露记忆工具。 |
+| 关系图谱 | typed links、关系权重扩展，以及 Mermaid、ASCII、JSON 三种 graph 输出。 |
 | 生命周期管理 | 记忆会按强度衰减、归档、召回，并提示可晋升到 core memory 的候选。 |
 | Claude Code hooks | 支持 SessionStart、UserPromptSubmit、PreToolUse、Stop 四个自动注入点。 |
 | Codex 交接 | 提供 `codex-prep` 和 `codex-ingest`，也可通过 `AGENTS.md` 让 Codex 直接读写。 |
 
-依赖：Python 3.11+，`portalocker>=2.8`。
+基础依赖：Python 3.11+，`portalocker>=2.8`。
+
+## v0.2 三轨升级
+
+### 检索质量
+
+v0.2 把连续 CJK 文本拆成 bigram，因此查询“认证”可以召回“调试认证失败”。FTS5
+索引使用 trigram tokenizer；遇到 SQLite trigram 无法覆盖的两字 CJK 查询时，会自动
+走受控的 substring 回退。英文和数字 token 仍保持原来的 BM25 行为。
+
+向量检索和 cross-encoder rerank 都是可选能力，默认关闭。启用 embedding 后，
+Mnemosyne 会把 float16 向量保存到 SQLite 元数据表，并用 RRF 融合 BM25 与 vector
+候选；`mnemosyne eval run` 可以在固定 50 条语料上输出可复现的 recall、MRR 和延迟。
+
+### MCP 服务化
+
+`mnemosyne mcp serve` 把搜索、写入、读取 core、查看、链接、图谱、维护和
+`codex-prep` 暴露为 MCP tools。默认传输是 stdio，适合本地编辑器和 Agent；
+`mnemosyne mcp serve --sse` 可用于调试或远程接入。
+
+MCP SDK 是可选 extra。没有安装时，原有 CLI 和 hooks 完全不受影响；只有启动 MCP
+server 时会提示安装 `mnemosyne[mcp]`。仓库内的 `templates/mcp_clients/` 提供
+Cursor、Cline、Continue 和 Windsurf 的配置片段。
+
+### 关系图谱
+
+`link` 现在支持 `caused_by`、`refines`、`supersedes`、`contradicts`、`related`
+五种预定义关系。非对称关系会自动写入对应的反向语义，例如
+`A --rel supersedes B` 会让 B 指向 A 的关系变成 `superseded_by`。
+
+搜索会按关系类型对链接记忆加权扩展。`graph ID` 可以从任意记忆做 BFS，并输出
+Mermaid、ASCII 或 JSON；自定义关系默认拒绝，需要显式加 `--allow-custom`。
 
 ## 快速开始
 
@@ -35,6 +69,14 @@ git clone https://github.com/Furinelle/Mnemosyne
 cd Mnemosyne
 python3 -m pip install -e .
 python3 -m mnemosyne doctor
+```
+
+按需安装可选能力：
+
+```bash
+python3 -m pip install -e ".[vector]"   # numpy + onnxruntime
+python3 -m pip install -e ".[rerank]"   # cross-encoder runtime
+python3 -m pip install -e ".[mcp]"      # MCP server SDK
 ```
 
 安装后推荐继续使用 `python3 -m mnemosyne ...`，这样不依赖 shell 是否能找到
@@ -173,6 +215,18 @@ touch .mnemosyne-disable
 export MNEMOSYNE_AUTO_INIT=0
 ```
 
+### MCP 客户端
+
+先安装 MCP extra，再选择客户端模板：
+
+```bash
+python3 -m pip install -e ".[mcp]"
+cat templates/mcp_clients/cursor.json
+```
+
+模板默认启动 `mnemosyne mcp serve`。把对应 JSON 片段合并到 Cursor、Cline、
+Continue 或 Windsurf 的 MCP 配置后，客户端即可发现 8 个 `mnemosyne_*` tools。
+
 ## 记忆模型
 
 ### Core、Working、Archive
@@ -207,11 +261,16 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 | `write --type T --importance N ...` | 写入一条记忆。 |
 | `search QUERY --format json` | 搜索记忆；优先使用 SQLite FTS5，回退到内存 BM25。 |
 | `show ID` | 查看一条完整记忆，包括 frontmatter。 |
-| `link ID1 ID2 --rel REL` | 给两条记忆建立双向链接。 |
+| `link ID1 ID2 --rel REL` | 用 typed relation 链接两条记忆；自定义关系需 `--allow-custom`。 |
+| `graph ID --format mermaid` | BFS 展开关系图，支持 `mermaid`、`ascii`、`json`。 |
 | `maintain --dry-run` | 预览衰减、归档和 core 晋升候选。 |
 | `maintain --scope all` | 维护全局和项目记忆。 |
 | `reindex --scope all` | 全量重建搜索索引。 |
-| `doctor --scope all` | 检查依赖、模板、store、FTS5 和索引状态。 |
+| `embed-backfill --scope all` | 为已有记忆计算或刷新 embedding。 |
+| `eval run --corpus FILE` | 输出固定语料的 recall、MRR 和延迟基线。 |
+| `eval compare --baseline A --variant B` | 对比两份配置的检索指标。 |
+| `mcp serve` | 启动 MCP stdio server；加 `--sse` 使用 SSE。 |
+| `doctor --scope all` | 检查依赖、模板、store、FTS5、索引和可选组件状态。 |
 | `codex-prep TASK` | 生成给 Codex 的 prompt 前缀。 |
 | `codex-ingest --commit` | 从 stdin 解析 `**新发现:**` / `**Findings:**` 并写入记忆。 |
 
@@ -243,6 +302,36 @@ max_tokens = 2000
 
 [search]
 index_enabled = true
+
+[embedding]
+enabled = false
+backend = "onnx"
+model = "BAAI/bge-small-zh-v1.5"
+onnx_path = ""
+dimensions = 384
+
+[rerank]
+enabled = false
+backend = "cross_encoder"
+model = "BAAI/bge-reranker-base"
+onnx_path = ""
+top_n = 5
+
+[fusion]
+rrf_k = 60
+link_expansion = true
+link_expansion_max_hops = 1
+
+[relations]
+allow_custom = false
+
+[mcp]
+default_search_limit = 5
+
+[mcp.sse]
+enabled = false
+host = "127.0.0.1"
+port = 3700
 ```
 
 说明：
@@ -251,6 +340,10 @@ index_enabled = true
 - `memory.types` 是允许的记忆类型清单。写入其它类型会提示 warning。
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
+- `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
+- `fusion.link_expansion` 控制 typed links 是否参与召回扩展。
+- `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
+- `mcp.sse` 控制可选 SSE 地址；stdio 始终是 `mcp serve` 默认值。
 
 全局 store 默认在 `~/.mnemosyne/`，可以覆盖：
 
@@ -273,7 +366,12 @@ your-project/.mnemosyne/index.sqlite
 python3 -m mnemosyne reindex --scope all
 ```
 
-`search --format json` 会输出 `why_matched`，方便看清楚命中了哪段文本。
+`search --format json` 会输出 `why_matched` 和 `score_breakdown`，方便区分 BM25、
+vector、link boost 与 reranker 的贡献。切换 embedding 模型后，运行：
+
+```bash
+python3 -m mnemosyne embed-backfill --scope all
+```
 
 ## 文件格式
 
@@ -350,6 +448,8 @@ python3 -m mnemosyne doctor --scope all
 | Codex 没自动读记忆 | 确认 `~/.codex/AGENTS.md` 或项目 `AGENTS.md` 中有 Mnemosyne 指令。 |
 | 搜索结果旧或缺失 | 跑 `python3 -m mnemosyne reindex --scope all`。 |
 | FTS5 不可用 | `doctor` 会提示回退到内存 BM25；换带 SQLite FTS5 的 Python 可恢复持久索引。 |
+| `mcp serve` 提示缺依赖 | 安装 `python3 -m pip install -e ".[mcp]"`。 |
+| 切换 embedding 模型后向量未命中 | 跑 `python3 -m mnemosyne embed-backfill --scope all`。 |
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
 | `codex-ingest` 没写入 | 确认传入文本有 `**新发现:**` 块，并且命令带了 `--commit`。 |
 
