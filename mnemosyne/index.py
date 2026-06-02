@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import math
 import struct
+import time
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,7 +31,17 @@ def _connect(path: Path) -> sqlite3.Connection:
     """
     connection = sqlite3.connect(str(path), timeout=5.0)
     connection.execute("PRAGMA busy_timeout=5000")
-    connection.execute("PRAGMA journal_mode=WAL")
+    if str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "wal":
+        deadline = time.monotonic() + 5.0
+        while True:
+            try:
+                connection.execute("PRAGMA journal_mode=WAL")
+                break
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or time.monotonic() >= deadline:
+                    connection.close()
+                    raise
+                time.sleep(0.05)
     return connection
 
 

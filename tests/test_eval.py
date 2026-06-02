@@ -45,6 +45,32 @@ class EvalTests(unittest.TestCase):
         self.assertIn("backend: bm25-only", output.getvalue())
         self.assertIn("bigram recall@5 delta=+", output.getvalue())
 
+    def test_eval_compare_cli_prints_delta(self) -> None:
+        corpus = Path(__file__).resolve().parents[1] / "mnemosyne" / "eval" / "default_corpus.jsonl"
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "baseline.toml"
+            variant = Path(tmp) / "variant.toml"
+            baseline.write_text("[embedding]\nenabled = false\n", encoding="utf-8")
+            variant.write_text("[embedding]\nenabled = false\n", encoding="utf-8")
+
+            with redirect_stdout(output):
+                code = main(
+                    [
+                        "eval",
+                        "compare",
+                        "--baseline",
+                        str(baseline),
+                        "--variant",
+                        str(variant),
+                        "--corpus",
+                        str(corpus),
+                    ]
+                )
+
+        self.assertEqual(0, code)
+        self.assertIn("delta recall@5=", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

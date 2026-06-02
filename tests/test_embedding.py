@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 import types
 import unittest
 from unittest.mock import patch
@@ -73,6 +74,32 @@ class EmbeddingTests(unittest.TestCase):
         self.assertEqual(2, len(posts))
         self.assertEqual("https://example.test/v1/embeddings", posts[0]["url"])
         self.assertEqual(10.0, calls[0]["init"]["timeout"])
+
+    def test_wordpiece_encoder_uses_vocab_ids_and_padding(self) -> None:
+        from mnemosyne.embedding.onnx import _encode_text
+
+        vocab = {"[PAD]": 0, "[UNK]": 1, "[CLS]": 2, "[SEP]": 3, "认": 4, "证": 5, "api": 6}
+
+        input_ids, attention = _encode_text("认证 api", vocab, max_length=8)
+
+        self.assertEqual([2, 4, 5, 6, 3, 0, 0, 0], input_ids)
+        self.assertEqual([1, 1, 1, 1, 1, 0, 0, 0], attention)
+
+    def test_wordpiece_encoder_uses_unknown_token(self) -> None:
+        from mnemosyne.embedding.onnx import _encode_text
+
+        vocab = {"[PAD]": 0, "[UNK]": 1, "[CLS]": 2, "[SEP]": 3}
+
+        input_ids, _attention = _encode_text("missing", vocab, max_length=4)
+
+        self.assertEqual([2, 1, 3, 0], input_ids)
+
+    def test_optional_backend_timeout_returns_fallback(self) -> None:
+        from mnemosyne.embedding.base import call_with_timeout
+
+        result = call_with_timeout(lambda: time.sleep(0.02), timeout=0.001, fallback="fallback")
+
+        self.assertEqual("fallback", result)
 
 
 if __name__ == "__main__":
