@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from copy import deepcopy
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,44 @@ DEFAULT_CONFIG = {
     "search": {
         "index_enabled": True,
     },
+    "embedding": {
+        "enabled": False,
+        "backend": "onnx",
+        "model": "BAAI/bge-small-zh-v1.5",
+        "onnx_path": "",
+        "api_base": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+        "dimensions": 384,
+        "batch_size": 32,
+    },
+    "rerank": {
+        "enabled": False,
+        "backend": "cross_encoder",
+        "model": "BAAI/bge-reranker-base",
+        "onnx_path": "",
+        "top_n": 5,
+    },
+    "fusion": {
+        "rrf_k": 60,
+        "link_expansion": True,
+        "link_expansion_decay_fallback": 0.5,
+        "link_expansion_max_hops": 1,
+        "bm25_pool_size": 50,
+        "vec_pool_size": 50,
+    },
+    "relations": {
+        "allow_custom": False,
+    },
+    "mcp": {
+        "expose_global": True,
+        "expose_project": True,
+        "default_search_limit": 5,
+        "sse": {
+            "enabled": False,
+            "port": 3700,
+            "host": "127.0.0.1",
+        },
+    },
 }
 
 
@@ -55,6 +94,44 @@ max_tokens = 2000
 
 [search]
 index_enabled = true
+
+[embedding]
+enabled = false
+backend = "onnx"
+model = "BAAI/bge-small-zh-v1.5"
+onnx_path = ""
+api_base = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+dimensions = 384
+batch_size = 32
+
+[rerank]
+enabled = false
+backend = "cross_encoder"
+model = "BAAI/bge-reranker-base"
+onnx_path = ""
+top_n = 5
+
+[fusion]
+rrf_k = 60
+link_expansion = true
+link_expansion_decay_fallback = 0.5
+link_expansion_max_hops = 1
+bm25_pool_size = 50
+vec_pool_size = 50
+
+[relations]
+allow_custom = false
+
+[mcp]
+expose_global = true
+expose_project = true
+default_search_limit = 5
+
+[mcp.sse]
+enabled = false
+port = 3700
+host = "127.0.0.1"
 """
 
 
@@ -226,12 +303,7 @@ def template_text(name: str) -> str:
 
 
 def _deepcopy_default_config() -> dict:
-    return {
-        "thresholds": dict(DEFAULT_CONFIG["thresholds"]),
-        "memory": {"types": list(DEFAULT_CONFIG["memory"]["types"])},
-        "injection": dict(DEFAULT_CONFIG["injection"]),
-        "search": dict(DEFAULT_CONFIG["search"]),
-    }
+    return deepcopy(DEFAULT_CONFIG)
 
 
 def _merge_config(config: dict, loaded: dict) -> None:
