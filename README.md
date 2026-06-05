@@ -137,7 +137,7 @@ python3 -m mnemosyne show pitfall-2026-05-28-xxxxxx
 | `arch_decision` | 架构选择，以及为什么没有选其它方案。 |
 | `handoff` | 一个 Agent 给下一个 Agent 的交接摘要。 |
 
-## 让 Claude Code 和 Codex 共享记忆
+## 让 Claude Code、Codex 和 Hermes 共享记忆
 
 Mnemosyne 的共享方式很朴素：Claude Code 和 Codex 都读写同一套
 `~/.mnemosyne/` 与项目 `.mnemosyne/` 文件。
@@ -226,6 +226,21 @@ cat templates/mcp_clients/cursor.json
 
 模板默认启动 `mnemosyne mcp serve`。把对应 JSON 片段合并到 Cursor、Cline、
 Continue 或 Windsurf 的 MCP 配置后，客户端即可发现 8 个 `mnemosyne_*` tools。
+
+### Hermes
+
+让 Hermes（`~/.hermes` 桌面/网关 Agent）也共享同一套 Mnemosyne 记忆：
+
+```bash
+python3 -m mnemosyne install-hermes
+```
+
+这会把 provider 装进 `~/.hermes/plugins/mnemosyne/`，并就地改写 `config.yaml`
+（改前自动备份），设置 `memory.provider: mnemosyne`。重启 Hermes 后，它会自动
+注入 core 记忆、每轮检索，并通过 `mnemosyne` 工具（search/write/show/link/graph）
+读写共享 store；写入带 `--source hermes`。`--dry-run` 可先预览改动。
+
+详见 `mnemosyne/integrations/hermes/README.md`。
 
 ## 记忆模型
 
