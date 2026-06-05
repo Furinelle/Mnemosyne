@@ -150,6 +150,20 @@ def build_parser() -> argparse.ArgumentParser:
         help='actually write (default: dry-run preview)')
     codex_ingest_parser.set_defaults(func=cmd_codex_ingest)
 
+    install_hermes_parser = subparsers.add_parser(
+        "install-hermes", help="Install the Mnemosyne memory provider into Hermes")
+    install_hermes_parser.add_argument("--python", default=None,
+                                       help="bridge python that can import mnemosyne")
+    install_hermes_parser.add_argument("--hermes-home", default=None,
+                                       help="HERMES_HOME (default: $HERMES_HOME or ~/.hermes)")
+    install_hermes_parser.add_argument("--force", action="store_true",
+                                       help="overwrite an existing plugin dir")
+    install_hermes_parser.add_argument("--no-config", action="store_true",
+                                       help="do not edit config.yaml")
+    install_hermes_parser.add_argument("--dry-run", action="store_true",
+                                       help="preview without writing")
+    install_hermes_parser.set_defaults(func=cmd_install_hermes)
+
     return parser
 
 
@@ -613,6 +627,40 @@ def merge_memory(existing: Memory, incoming: Memory) -> None:
         existing.canonical_summary = (existing.canonical_summary + " " + incoming.canonical_summary).strip()
     if incoming.injection_summary and incoming.injection_summary not in existing.injection_summary:
         existing.injection_summary = (existing.injection_summary + " " + incoming.injection_summary).strip()
+
+
+def cmd_install_hermes(args: argparse.Namespace) -> int:
+    import os
+    from pathlib import Path
+    from mnemosyne.integrations.hermes import _install
+
+    home = args.hermes_home or os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes")
+    try:
+        result = _install.install_hermes(
+            hermes_home=Path(home),
+            python_path=args.python,
+            force=args.force,
+            write_config=not args.no_config,
+            dry_run=args.dry_run,
+        )
+    except FileExistsError as exc:
+        print(f"error: {exc}")
+        return 1
+    if args.dry_run:
+        print("[dry-run] would install to", result["plugin_dir"])
+        print("[dry-run] bridge python:", result["python"])
+        if "config_preview" in result:
+            print("[dry-run] config.yaml after edit:\n")
+            print(result["config_preview"])
+    else:
+        print("Installed Mnemosyne provider to", result["plugin_dir"])
+        print("Bridge python:", result["python"])
+        if result["config_written"]:
+            print("Updated config.yaml (backup:", result["backup"], ")")
+            print("Restart Hermes to activate (memory.provider: mnemosyne).")
+        else:
+            print("Skipped config.yaml — set memory.provider: mnemosyne manually.")
+    return 0
 
 
 if __name__ == "__main__":
