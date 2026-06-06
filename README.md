@@ -3,12 +3,12 @@
 > 希腊记忆女神，缪斯九姐妹之母。
 
 Mnemosyne 是一个面向本地 LLM Agent 的共享记忆层。它把长期记忆保存为
-Markdown 文件，让 Claude Code、Codex 等能调用 Shell/Python 的 Agent 可以在不同
-会话、不同工具之间读取同一份项目知识、用户偏好和交接记录。
+Markdown 文件，让 Claude Code、Codex、Hermes 等能调用 Shell/Python 的 Agent
+可以在不同会话、不同工具之间读取同一份项目知识、用户偏好和交接记录。
 
 它最适合解决这类问题：
 
-- Claude Code 和 Codex 桌面版之间缺少同一套长期记忆。
+- Claude Code、Codex 桌面版和 Hermes 之间缺少同一套长期记忆。
 - Agent 每次开新会话都要重新解释项目约束、踩坑和偏好。
 - 项目记忆需要能被人直接查看、审计、编辑，而不是锁在某个产品里。
 - 希望全局偏好和项目知识分开保存，避免互相污染。
@@ -26,6 +26,7 @@ Markdown 文件，让 Claude Code、Codex 等能调用 Shell/Python 的 Agent �
 | 生命周期管理 | 记忆会按强度衰减、归档、召回，并提示可晋升到 core memory 的候选。 |
 | Claude Code hooks | 支持 SessionStart、UserPromptSubmit、PreToolUse、Stop 四个自动注入点。 |
 | Codex 交接 | 提供 `codex-prep` 和 `codex-ingest`，也可通过 `AGENTS.md` 让 Codex 直接读写。 |
+| Hermes 原生集成 | `install-hermes` 一键安装原生 MemoryProvider 插件，重启后自动注入与检索。 |
 
 基础依赖：Python 3.11+，`portalocker>=2.8`。
 
@@ -229,16 +230,36 @@ Continue 或 Windsurf 的 MCP 配置后，客户端即可发现 8 个 `mnemosyne
 
 ### Hermes
 
-让 Hermes（`~/.hermes` 桌面/网关 Agent）也共享同一套 Mnemosyne 记忆：
+让 Hermes 桌面/网关 Agent 也共享同一套 Mnemosyne 记忆：
 
 ```bash
 python3 -m mnemosyne install-hermes
 ```
 
-这会把 provider 装进 `~/.hermes/plugins/mnemosyne/`，并就地改写 `config.yaml`
-（改前自动备份），设置 `memory.provider: mnemosyne`。重启 Hermes 后，它会自动
-注入 core 记忆、每轮检索，并通过 `mnemosyne` 工具（search/write/show/link/graph）
-读写共享 store；写入带 `--source hermes`。`--dry-run` 可先预览改动。
+这条命令会做三件事：
+
+1. 把原生 MemoryProvider 插件写入 `~/.hermes/plugins/mnemosyne/`。
+2. 自动备份原有 `config.yaml`，然后在其中设置 `memory.provider: mnemosyne`。
+3. 打印安装摘要，提示下一步。
+
+**重启 Hermes** 后，集成立即生效。启用后 Hermes 会自动做这些事：
+
+| 时机 | 行为 |
+|---|---|
+| 会话开始 | 读取 global + project `core.md`，注入上下文。 |
+| 每轮对话前 | 按当前 prompt 搜索相关 working 记忆，追加到上下文。 |
+| 工具调用 / 写操作 | 写入记忆时自动带 `--source hermes`，写入共享 store。 |
+
+Hermes 侧暴露的记忆工具与 Claude Code 相同：`search`、`write`、`show`、`link`、`graph`，
+均操作同一份 `~/.mnemosyne/` 和项目 `.mnemosyne/` 文件。
+
+**预览不写入**：
+
+```bash
+python3 -m mnemosyne install-hermes --dry-run
+```
+
+**卸载**：删除 `~/.hermes/plugins/mnemosyne/` 并将 `config.yaml` 回滚到备份即可。
 
 详见 `mnemosyne/integrations/hermes/README.md`。
 
@@ -445,7 +466,7 @@ your-project/.mnemosyne/   # 项目记忆
 
 - Markdown 写入使用临时文件 + `os.replace` 原子替换。
 - 维护任务使用 `portalocker` 加锁。
-- SQLite 索引使用 WAL 和 `busy_timeout`，适合 Claude Code 与 Codex 同时读写。
+- SQLite 索引使用 WAL 和 `busy_timeout`，适合 Claude Code、Codex 与 Hermes 同时读写。
 
 ## 排障
 
@@ -467,6 +488,7 @@ python3 -m mnemosyne doctor --scope all
 | 切换 embedding 模型后向量未命中 | 跑 `python3 -m mnemosyne embed-backfill --scope all`。 |
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
 | `codex-ingest` 没写入 | 确认传入文本有 `**新发现:**` 块，并且命令带了 `--commit`。 |
+| Hermes provider 不生效 | 确认已运行 `install-hermes` 且重启了 Hermes；用 `--dry-run` 预览安装内容。 |
 
 ## License
 
