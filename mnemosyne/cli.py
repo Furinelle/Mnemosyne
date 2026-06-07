@@ -7,7 +7,7 @@ from contextlib import suppress
 import importlib.util
 import json
 import os
-import random
+import uuid
 import sys
 from datetime import date
 from pathlib import Path
@@ -26,7 +26,7 @@ from mnemosyne.index import (
 )
 from mnemosyne.embedding import get_embedder
 from mnemosyne.fusion import search as fusion_search
-from mnemosyne.relations import PREDEFINED, reverse
+from mnemosyne.relations import PREDEFINED, is_demoting, reverse
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
@@ -225,7 +225,7 @@ def cmd_write(args: argparse.Namespace) -> int:
         id=memory_id,
         type=args.type,
         source=args.source,
-        strength=min(100, args.importance),
+        strength=max(0, min(100, args.importance)),
         created=today,
         last_accessed=today,
         access_count=0,
@@ -429,6 +429,11 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+# Strength penalty applied to the target of a demoting relation (e.g. the
+# memory that gets superseded). Activates the demote_target relation semantics.
+DEMOTE_ON_SUPERSEDE = 20
+
+
 def cmd_link(args: argparse.Namespace) -> int:
     stores = stores_for_scope("all")
     first = find_memory(args.id1, stores, include_archive=True)
@@ -452,6 +457,8 @@ def cmd_link(args: argparse.Namespace) -> int:
 
     add_link(first_memory, second_memory.id, args.rel)
     add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
+    if is_demoting(args.rel):
+        second_memory.strength = max(0, second_memory.strength - DEMOTE_ON_SUPERSEDE)
     write_memory(first_path, first_memory)
     write_memory(second_path, second_memory)
     update_search_index(first[0], first_path, first_memory)
@@ -512,7 +519,10 @@ def cmd_codex_ingest(args: argparse.Namespace) -> int:
 
 
 def make_memory_id(memory_type: str, day: str) -> str:
-    suffix = "".join(random.choice("0123456789abcdef") for _ in range(6))
+    # 8 hex chars (32 bits) instead of 6 (24 bits): the old space made silent
+    # filename collisions (and os.replace overwrites) plausible across many
+    # same-day writes. uuid4 is a stronger entropy source than random.choice.
+    suffix = uuid.uuid4().hex[:8]
     return f"{memory_type}-{day}-{suffix}"
 
 

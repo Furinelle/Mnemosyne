@@ -4,7 +4,7 @@ import sqlite3
 import unittest
 from contextlib import closing
 
-from mnemosyne.cli import main
+from mnemosyne.cli import main, make_memory_id
 from mnemosyne.index import (
     INDEX_VERSION,
     _connect,
@@ -15,6 +15,7 @@ from mnemosyne.index import (
     index_path,
     iter_embeddings,
     search_index,
+    update_memory_index,
     write_embedding,
 )
 from mnemosyne.store import load_memories, project_store
@@ -114,6 +115,68 @@ class IndexV2Tests(unittest.TestCase):
 
             self.assertEqual(1, len(results))
             self.assertIn("认证", results[0].memory.body)
+
+    def test_embedding_survives_metadata_reindex(self) -> None:
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            self.assertEqual(
+                0,
+                main(
+                    [
+                        "write",
+                        "--type",
+                        "codebase",
+                        "--importance",
+                        "70",
+                        "--force",
+                        "--content",
+                        "vector survives reindex",
+                    ]
+                ),
+            )
+            store = project_store()
+            path, memory = load_memories(store)[0]
+            write_embedding(store, memory.id, [1.0, 0.0], "hash-v1")
+
+            # A search bumps strength/access and re-indexes the metadata row.
+            memory.strength = min(100, memory.strength + 5)
+            update_memory_index(store, path, memory)
+
+            rows = list(iter_embeddings([store], "hash-v1", 2))
+            self.assertEqual(1, len(rows))
+            self.assertEqual(memory.id, rows[0].memory.id)
+
+    def test_decode_embedding_rejects_length_mismatch(self) -> None:
+        blob = encode_embedding([1.0, 0.0, 0.5])  # 3 dims, 6 bytes
+        self.assertEqual([], decode_embedding(blob, 4))  # claims 4 dims
+        self.assertEqual(3, len(decode_embedding(blob, 3)))
+
+    def test_negative_importance_clamped_to_zero(self) -> None:
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            self.assertEqual(
+                0,
+                main(
+                    [
+                        "write",
+                        "--type",
+                        "pitfall",
+                        "--importance=-50",
+                        "--force",
+                        "--content",
+                        "clamp me",
+                    ]
+                ),
+            )
+            memory = load_memories(project_store())[0][1]
+            self.assertEqual(0, memory.strength)
+
+    def test_make_memory_id_uses_long_unique_suffix(self) -> None:
+        sample = make_memory_id("pitfall", "2026-06-07")
+        self.assertTrue(sample.startswith("pitfall-2026-06-07-"))
+        self.assertEqual(8, len(sample.rsplit("-", 1)[1]))
+        ids = {make_memory_id("pitfall", "2026-06-07") for _ in range(2000)}
+        self.assertEqual(2000, len(ids))
 
 
 if __name__ == "__main__":

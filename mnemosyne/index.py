@@ -187,8 +187,12 @@ def update_memory_index(store: Store, path: Path, memory: Memory) -> None:
     if not index_enabled(store):
         return
     ensure_index(store)
+    document_id = f"{store.scope}:{memory.id}"
     with closing(_connect(index_path(store))) as connection:
-        delete_memory_index(connection, store.scope, memory.id)
+        # Refresh only the FTS row; index_memory upserts the metadata row and
+        # preserves its embedding columns. Deleting the meta row here would drop
+        # the stored embedding on every refresh.
+        connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
         index_memory(connection, store, path, memory)
         connection.commit()
 
@@ -249,11 +253,25 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
         mtime = path.stat().st_mtime
     except OSError:
         mtime = 0.0
+    # UPSERT (not INSERT OR REPLACE) so the embedding columns are preserved on
+    # update. INSERT OR REPLACE deletes the row and re-inserts it, which would
+    # reset embedding/embedding_model/embedding_dim/embedding_mtime to their
+    # schema defaults on every metadata refresh (e.g. a search access bump).
     connection.execute(
         """
-        INSERT OR REPLACE INTO memories_meta (
+        INSERT INTO memories_meta (
             document_id, scope, memory_id, path, type, archived, strength, tags, summary, mtime
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(document_id) DO UPDATE SET
+            scope=excluded.scope,
+            memory_id=excluded.memory_id,
+            path=excluded.path,
+            type=excluded.type,
+            archived=excluded.archived,
+            strength=excluded.strength,
+            tags=excluded.tags,
+            summary=excluded.summary,
+            mtime=excluded.mtime
         """,
         (
             document_id,
@@ -373,6 +391,11 @@ def encode_embedding(vector: list[float]) -> bytes:
 
 def decode_embedding(blob: bytes | None, dimensions: int) -> list[float]:
     if not blob or dimensions <= 0:
+        return []
+    # Half-float ('e') is 2 bytes; a mismatch means the stored dim and blob have
+    # diverged (corruption, partial write, model change). Skip rather than raise
+    # struct.error, which would otherwise crash the whole vector lane / reindex.
+    if len(blob) != dimensions * 2:
         return []
     return list(struct.unpack(f"<{dimensions}e", blob))
 

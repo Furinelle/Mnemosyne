@@ -229,4 +229,15 @@ def format_for_injection(results: list[dict], max_tokens: int | None = None) -> 
 
 
 def _approx_tokens(text: str) -> int:
-    return max(1, (len(text) + 3) // 4)
+    # CJK text packs far more tokens per character than Latin text (~1 token per
+    # 1.5 chars vs ~1 per 4). A flat len//4 underestimates CJK budgets by ~2.5x,
+    # which silently overflows the injection token cap for Chinese/Japanese/Korean.
+    cjk = sum(
+        1
+        for ch in text
+        if "一" <= ch <= "鿿"  # CJK unified ideographs
+        or "぀" <= ch <= "ヿ"  # Hiragana + Katakana
+        or "가" <= ch <= "힣"  # Hangul syllables
+    )
+    other = len(text) - cjk
+    return max(1, round(cjk * 0.6 + other / 4))

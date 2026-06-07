@@ -23,7 +23,7 @@ Markdown 文件，让 Claude Code、Codex、Hermes 等能调用 Shell/Python 的
 | 混合检索 | CJK bigram、可选向量 lane、RRF 融合、关系扩展和可选 reranker。 |
 | MCP 服务 | 通过 stdio 或可选 SSE 向 Cursor、Cline、Continue、Windsurf 等客户端暴露记忆工具。 |
 | 关系图谱 | typed links、关系权重扩展，以及 Mermaid、ASCII、JSON 三种 graph 输出。 |
-| 生命周期管理 | 记忆会按强度衰减、归档、召回，并提示可晋升到 core memory 的候选。 |
+| 生命周期管理 | 记忆会按强度衰减、归档、召回，过期（`expires`）记忆自动归档，并提示可晋升到 core memory 的候选。 |
 | Claude Code hooks | 支持 SessionStart、UserPromptSubmit、PreToolUse、Stop 四个自动注入点。 |
 | Codex 交接 | 提供 `codex-prep` 和 `codex-ingest`，也可通过 `AGENTS.md` 让 Codex 直接读写。 |
 | Hermes 原生集成 | `install-hermes` 一键安装原生 MemoryProvider 插件，重启后自动注入与检索。 |
@@ -56,7 +56,7 @@ Cursor、Cline、Continue 和 Windsurf 的配置片段。
 
 `link` 现在支持 `caused_by`、`refines`、`supersedes`、`contradicts`、`related`
 五种预定义关系。非对称关系会自动写入对应的反向语义，例如
-`A --rel supersedes B` 会让 B 指向 A 的关系变成 `superseded_by`。
+`A --rel supersedes B` 会让 B 指向 A 的关系变成 `superseded_by`，并降低被取代记忆 B 的强度。
 
 搜索会按关系类型对链接记忆加权扩展。`graph ID` 可以从任意记忆做 BFS，并输出
 Mermaid、ASCII 或 JSON；自定义关系默认拒绝，需要显式加 `--allow-custom`。
@@ -489,6 +489,10 @@ python3 -m mnemosyne doctor --scope all
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
 | `codex-ingest` 没写入 | 确认传入文本有 `**新发现:**` 块，并且命令带了 `--commit`。 |
 | Hermes provider 不生效 | 确认已运行 `install-hermes` 且重启了 Hermes；用 `--dry-run` 预览安装内容。 |
+
+## 更新日志
+
+详见 [CHANGELOG.md](CHANGELOG.md)。最新的 0.2.1 修复了混合检索向量在搜索后被清空、CJK token 预算低估、`expires` 字段未生效等问题，并移除了无操作的 `eval compare` 子命令。
 
 ## License
 

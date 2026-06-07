@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -176,9 +177,10 @@ def parse_value(value: str) -> Any:
         if not inner:
             return []
         return [parse_value(part.strip()) for part in inner.split(",")]
-    if (value.startswith("'") and value.endswith("'")) or (
-        value.startswith('"') and value.endswith('"')
-    ):
+    if value.startswith('"') and value.endswith('"'):
+        # Reverse the \\ / \" escaping applied by _format_scalar.
+        return re.sub(r"\\(.)", r"\1", value[1:-1])
+    if value.startswith("'") and value.endswith("'"):
         return value[1:-1]
     lowered = value.lower()
     if lowered == "true":
@@ -244,7 +246,10 @@ def _format_scalar(value: Any) -> str:
     if text == "":
         return ""
     if any(ch in text for ch in [":", "#", "[", "]", "{", "}", ","]) or text != text.strip():
-        escaped = text.replace('"', '\\"')
+        # Escape backslashes before quotes so the value round-trips through
+        # parse_value (which unescapes \\ and \"). Escaping quotes alone would
+        # mangle any literal backslash in the value.
+        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{escaped}"'
     return text
 

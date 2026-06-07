@@ -49,6 +49,16 @@ def maintain_memory(
     core_strength = int(thresholds.get("core_strength", 80))
     core_access_count = int(thresholds.get("core_access_count", 3))
 
+    # Enforce the expires field: a memory past its expiry date is archived
+    # immediately, regardless of strength. Previously --expires was stored but
+    # never read, so expired memories were injected forever.
+    if memory.expires and memory.expires < date.today().isoformat():
+        if not dry_run:
+            yyyy_mm = (memory.last_accessed or memory.created or date.today().isoformat())[:7]
+            write_memory(path, memory)
+            move_to_archive(store, path, memory, yyyy_mm)
+        return "archived", None
+
     decay(memory, decay_per_run)
 
     if memory.strength < deprecated_strength:
