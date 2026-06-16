@@ -24,3 +24,30 @@ def test_corpus_loads_legacy_lines_without_new_fields(tmp_path):
     )
     loaded = load_corpus(path)
     assert loaded[0].instance_id == ""
+
+
+from pathlib import Path
+
+from mnemosyne.eval.adapters.longmemeval import convert
+
+FIXTURE = Path("mnemosyne/eval/fixtures/longmemeval_sample.json")
+
+
+def test_convert_produces_seed_and_corpus(tmp_path):
+    convert(FIXTURE, tmp_path)
+    corpus = load_corpus(tmp_path / "corpus.jsonl")
+    assert len(corpus) == 2
+    q1 = next(i for i in corpus if i.instance_id == "q1")
+    assert q1.expected_ids == ["lme-q1-s1"]
+    assert q1.question_type == "single-session-user"
+    seed_lines = (tmp_path / "seed_memories.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(seed_lines) == 4  # 2 instances x 2 sessions
+    import json
+
+    ids = {json.loads(line)["id"] for line in seed_lines}
+    assert "lme-q1-s1" in ids and "lme-q2-s4" in ids
+
+
+def test_convert_respects_max_instances(tmp_path):
+    convert(FIXTURE, tmp_path, max_instances=1)
+    assert len(load_corpus(tmp_path / "corpus.jsonl")) == 1

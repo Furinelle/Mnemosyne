@@ -1,0 +1,30 @@
+[
+  {
+    "question_id": "q1",
+    "question_type": "single-session-user",
+    "question": "我偏好用哪个 Python 格式化工具?",
+    "answer": "ruff",
+    "question_date": "2026-03-02",
+    "haystack_session_ids": ["s1", "s2"],
+    "haystack_dates": ["2026-03-01", "2026-03-01"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "以后 Python 项目统一用 ruff 格式化"}],
+      [{"role": "user", "content": "今天午饭吃了拉面"}]
+    ],
+    "answer_session_ids": ["s1"]
+  },
+  {
+    "question_id": "q2",
+    "question_type": "multi-session",
+    "question": "数据库连接池为什么会泄漏?",
+    "answer": "finally 未 close",
+    "question_date": "2026-03-05",
+    "haystack_session_ids": ["s3", "s4"],
+    "haystack_dates": ["2026-03-03", "2026-03-04"],
+    "haystack_sessions": [
+      [{"role": "assistant", "content": "连接池泄漏的根因是 finally 中没有 close 连接"}],
+      [{"role": "user", "content": "周末天气不错"}]
+    ],
+    "answer_session_ids": ["s3"]
+  }
+]
