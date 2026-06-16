@@ -189,8 +189,8 @@ cat templates/settings.json
 - 全局：`~/.claude/settings.json`
 - 项目：`.claude/settings.json`
 
-模板中默认命令是 `python -m mnemosyne...`。如果你的机器没有 `python` 命令，
-把模板里的 `python` 改成 `python3` 或 `which python3` 输出的绝对路径。
+模板中默认命令是 `python3 -m mnemosyne...`。如果你的机器需要固定解释器，
+可以把模板里的 `python3` 改成 `which python3` 输出的绝对路径。
 
 启用后 Claude Code 会自动做这些事：
 
@@ -199,7 +199,7 @@ cat templates/settings.json
 | 会话开始 | `SessionStart` | 注入 global + project core memory，后台维护记忆，并按需自动创建 `.mnemosyne/`。 |
 | 用户提交 prompt | `UserPromptSubmit` | 根据 prompt 搜索相关记忆并注入上下文。 |
 | Edit / Write 前 | `PreToolUse` | 根据目标文件名搜索相关记忆并注入。 |
-| 会话结束 | `Stop` | dry-run 维护，提示可晋升到 core memory 的候选。 |
+| 会话结束 | `Stop` | dry-run 维护，提示可晋升到 core memory 的候选；若 `[distill].enabled = true`，自动从 transcript 蒸馏并写入记忆。 |
 
 再把 `templates/CLAUDE.md` 的规则加入你的 `~/.claude/CLAUDE.md`，Claude Code 就会在
 遇到踩坑、架构决策、用户偏好、代码库知识或交接信息时主动写入记忆。
@@ -233,6 +233,9 @@ echo "$CODEX_OUTPUT" | python3 -m mnemosyne codex-ingest --source codex --commit
 ```
 
 不加 `--commit` 时只是 dry-run 预览，不会真正写入。
+
+如果项目或全局 `AGENTS.md` 末尾输出了 `**新发现:**` 块，`codex-ingest --commit`
+就是 Codex 侧的自动记忆形成入口；它会解析块内容并写入共享 store。
 
 ### 全局自动启用
 
@@ -282,6 +285,7 @@ python3 -m mnemosyne install-hermes
 | 会话开始 | 读取 global + project `core.md`，注入上下文。 |
 | 每轮对话前 | 按当前 prompt 搜索相关 working 记忆，追加到上下文。 |
 | 工具调用 / 写操作 | 写入记忆时自动带 `--source hermes`，写入共享 store。 |
+| 会话结束 | 若 `[distill].enabled = true`，通过 `on_session_end` 自动调用 `distill --stdin --commit --source hermes`。 |
 
 Hermes 侧暴露的记忆工具与 Claude Code 相同：`search`、`write`、`show`、`link`、`graph`，
 均操作同一份 `~/.mnemosyne/` 和项目 `.mnemosyne/` 文件。

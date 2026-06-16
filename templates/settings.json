@@ -3,14 +3,14 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m mnemosyne.hooks.session_start", "timeout": 10 }
+          { "type": "command", "command": "python3 -m mnemosyne.hooks.session_start", "timeout": 10 }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m mnemosyne.hooks.user_prompt_submit", "timeout": 5 }
+          { "type": "command", "command": "python3 -m mnemosyne.hooks.user_prompt_submit", "timeout": 5 }
         ]
       }
     ],
@@ -18,14 +18,14 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "python -m mnemosyne.hooks.pre_tool_use", "timeout": 5 }
+          { "type": "command", "command": "python3 -m mnemosyne.hooks.pre_tool_use", "timeout": 5 }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "python -m mnemosyne.hooks.stop", "timeout": 5 }
+          { "type": "command", "command": "python3 -m mnemosyne.hooks.stop", "timeout": 5 }
         ]
       }
     ]

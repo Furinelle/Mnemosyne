@@ -9,11 +9,11 @@
 - **Edit/Write 时**，与目标文件 basename 相关的 memory 已由 `PreToolUse` hook 自动注入。
 
 如需主动查更多上下文：
-    python -m mnemosyne search "<keywords>" --format json --limit 5
+    python3 -m mnemosyne search "<keywords>" --format json --limit 5
 
 ## 任务结束前 — 主动写入触发条件
 
-遇到以下情况，**任务结束前必须**调用 `python -m mnemosyne write --force`：
+遇到以下情况，**任务结束前必须**调用 `python3 -m mnemosyne write --force`：
 
 ### 1. 踩坑 / Bug 修复（`--type pitfall`，importance 70-85）
 触发条件：debug 花了 >5 分钟，根因和修复方案值得记录。
@@ -33,11 +33,11 @@
 
 ### 5. Codex 交接（`--type handoff`，importance 60-80）
 触发条件：调用 Codex 后从 `**新发现:**` 段落得到信息。
-注意：如果用了 `python -m mnemosyne codex-ingest` 会自动写，此时**不要**手动再写。
+注意：如果用了 `python3 -m mnemosyne codex-ingest` 会自动写，此时**不要**手动再写。
 
 ## 写入命令模板
 
-    python -m mnemosyne write \
+    python3 -m mnemosyne write \
       --type <type> --importance <n> --source claude-code --force \
       --title "<≤80 字>" \
       --tags "<逗号分隔>" \

@@ -6,7 +6,7 @@ When you receive a task, the prompt prefix already includes:
 
 If you need more context during the task:
 
-    python -m mnemosyne search "<keywords>" --format json --limit 3
+    python3 -m mnemosyne search "<keywords>" --format json --limit 3
 
 ## When you finish - report new findings
 
@@ -24,7 +24,7 @@ at the END of your reply (multiple blocks allowed; skip if there is nothing):
 
 Claude Code will automatically ingest these via:
 
-    python -m mnemosyne codex-ingest --source codex --commit
+    python3 -m mnemosyne codex-ingest --source codex --commit
 
 ## Do NOT report
 
@@ -36,7 +36,7 @@ Claude Code will automatically ingest these via:
 ## Auto-distill
 
 For Codex, emitting the `**新发现:**` block above and running
-`python -m mnemosyne codex-ingest --commit` is the Codex-side auto-distill path.
+`python3 -m mnemosyne codex-ingest --commit` is the Codex-side auto-distill path.
 Hermes does this natively after `install-hermes`: its MemoryProvider's
 `on_session_end()` hook auto-distills the finished conversation when
 `[distill].enabled = true` in the shared Mnemosyne config — no manual block needed.
