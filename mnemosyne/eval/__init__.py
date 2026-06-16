@@ -174,7 +174,6 @@ def _full_pipeline_searcher(grouped: dict[str, list]) -> Callable[[str, str, int
             return store
         store = Store("project", tmp_root / (instance_id or "_default"))
         ensure_store(store)
-        config = load_config(store)
         for doc in grouped.get(instance_id, []):
             memory = Memory(
                 id=doc.id,
