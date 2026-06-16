@@ -1,4 +1,5 @@
-from mnemosyne.distill import Turn, parse_claude_transcript
+from mnemosyne.codex import Finding
+from mnemosyne.distill import Turn, classify_against_store, jaccard, parse_claude_transcript
 from mnemosyne.distill.heuristic import HeuristicExtractor
 
 
@@ -49,3 +50,19 @@ def test_heuristic_respects_max_findings():
     turns = [Turn(role="user", text=f"不要用 a{i}，改用 b{i}") for i in range(10)]
     findings = HeuristicExtractor(confidence_threshold=0.6, max_findings=3).extract(turns)
     assert len(findings) == 3
+
+
+def test_jaccard_basic():
+    assert jaccard(["a", "b", "c"], ["a", "b"]) == 2 / 3
+    assert jaccard([], []) == 0.0
+
+
+def test_classify_new_when_store_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)  # isolate from the repo's real .mnemosyne
+    finding = Finding("pitfall", 70, "全新的坑", ["x"], "一段独特内容 zzz")
+    verdict, target = classify_against_store(
+        finding, dedup_threshold=0.85, subject_threshold=0.5
+    )
+    assert verdict == "new"
+    assert target is None

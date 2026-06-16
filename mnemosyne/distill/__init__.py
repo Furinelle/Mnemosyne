@@ -6,6 +6,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from mnemosyne.codex import Finding
+from mnemosyne.hooks._common import run_search
+from mnemosyne.search import tokenize
+
 
 @dataclass(frozen=True)
 class Turn:
@@ -54,3 +58,37 @@ def parse_claude_transcript(path: Path) -> list[Turn]:
 
 def turns_to_text(turns: list[Turn]) -> str:
     return "\n\n".join(f"[{turn.role}] {turn.text}" for turn in turns)
+
+
+def jaccard(a: list[str], b: list[str]) -> float:
+    set_a, set_b = set(a), set(b)
+    if not set_a or not set_b:
+        return 0.0
+    union = set_a | set_b
+    return len(set_a & set_b) / len(union)
+
+
+def classify_against_store(
+    finding: Finding,
+    *,
+    dedup_threshold: float = 0.85,
+    subject_threshold: float = 0.5,
+) -> tuple[str, str | None]:
+    """Return ('new'|'duplicate'|'supersede', target_memory_id_or_None).
+
+    duplicate  -> content nearly identical to an existing memory; skip writing.
+    supersede  -> same subject, materially different content; write new + link.
+    """
+    text = f"{finding.title} {finding.content}".strip()
+    results = run_search(text, limit=3, update_access=False)
+    if not results:
+        return ("new", None)
+    top = results[0]
+    summary_tokens = tokenize(top.get("summary", ""))
+    content_sim = jaccard(tokenize(text), summary_tokens)
+    subject_sim = jaccard(tokenize(finding.title), summary_tokens)
+    if content_sim >= dedup_threshold:
+        return ("duplicate", top["id"])
+    if subject_sim >= subject_threshold:
+        return ("supersede", top["id"])
+    return ("new", None)
