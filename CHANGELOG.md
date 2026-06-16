@@ -2,6 +2,13 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.3.0] - 2026-06-16
+
+### 新增 (Added)
+
+- **跨 agent 自动记忆形成（`distill`）**：可选能力，默认关闭。新增 `mnemosyne/distill/` 核心，支持启发式（stdlib，默认）、可选 LLM（`engine = "llm"`，需配置 API key）和 host（解析 agent 输出的 `**新发现:**` 块）三种引擎；写入前会经过去重/supersede 护栏，避免重复或过时记忆入库。新增 `mnemosyne distill` 子命令（`--transcript PATH | --stdin`、`--source`、`--commit`；默认 dry-run，不加 `--commit` 不会写入）。项目 `config.toml` 新增 `[distill]` 配置块（`enabled`、`engine`、`confidence_threshold`、`max_findings_per_session`、`dedup_threshold`、`subject_threshold`，以及 `[distill.llm]` 子表）。三处触发点：Claude Code 的 Stop hook 在 `[distill].enabled = true` 时自动对会话 transcript 执行 distill（已防御 `stop_hook_active` 重入）；Codex 通过 `**新发现:**` 配合 `codex-ingest --commit`；Hermes 通过 provider 的 `on_session_end`。新增可选 extra `mnemosyne[distill]`。
+- **LongMemEval 检索基准**：新增 `mnemosyne eval convert longmemeval --raw FILE --out DIR`（适配器 `mnemosyne/eval/adapters/longmemeval.py`）和 `mnemosyne eval fetch longmemeval --variant {s,m}`（下载器；官方 URL 目前仍是占位符，会以清晰的报错提示手动下载）。`mnemosyne eval run --longmemeval [--by-type] [--pipeline {bm25,full}]` 输出 per-instance 隔离评分的 recall@1/5/10 与 MRR，支持按问题类型拆分；`full` pipeline 会通过真实的 FTS5 + fusion 检索栈打分。`EvalItem` 新增可选字段 `instance_id`、`question_type`。
+
 ## [0.2.1] - 2026-06-07
 
 ### 修复 (Fixed)

@@ -27,6 +27,8 @@ Markdown 文件，让 Claude Code、Codex、Hermes 等能调用 Shell/Python 的
 | Claude Code hooks | 支持 SessionStart、UserPromptSubmit、PreToolUse、Stop 四个自动注入点。 |
 | Codex 交接 | 提供 `codex-prep` 和 `codex-ingest`，也可通过 `AGENTS.md` 让 Codex 直接读写。 |
 | Hermes 原生集成 | `install-hermes` 一键安装原生 MemoryProvider 插件，重启后自动注入与检索。 |
+| 跨 agent 自动记忆形成 | 可选的 `distill` 引擎（heuristic/LLM/host）从会话 transcript 中抽取记忆，默认关闭，写入前会去重/supersede。 |
+| LongMemEval 基准 | `eval convert/fetch longmemeval` 和 `eval run --longmemeval` 提供 per-instance recall/MRR 与按问题类型拆分。 |
 
 基础依赖：Python 3.11+，`portalocker>=2.8`。
 
@@ -60,6 +62,37 @@ Cursor、Cline、Continue 和 Windsurf 的配置片段。
 
 搜索会按关系类型对链接记忆加权扩展。`graph ID` 可以从任意记忆做 BFS，并输出
 Mermaid、ASCII 或 JSON；自定义关系默认拒绝，需要显式加 `--allow-custom`。
+
+## v0.3 自动记忆形成与基准
+
+### 跨 agent 自动记忆形成（distill）
+
+`distill` 可以从会话 transcript 里抽取值得长期保留的记忆，默认关闭（opt-in）。
+启用方式是把项目 `config.toml` 里的 `[distill].enabled` 设为 `true`，并选择引擎：
+`heuristic`（默认，纯 stdlib 启发式，无额外依赖）、`llm`（调用 `[distill.llm]`
+配置的 API）或 `host`（解析 agent 输出里的 `**新发现:**` 块）。写入前会先做
+去重和 supersede 判定，避免和已有记忆冲突或重复。三个触发点：Claude Code 的
+Stop hook、Codex 的 `codex-ingest --commit`、Hermes provider 的
+`on_session_end`。也可以手动调用：
+
+```bash
+python3 -m mnemosyne distill --transcript /path/to/transcript.jsonl --commit
+```
+
+不加 `--commit` 时是 dry-run，只打印将要写入的候选记忆。
+
+### LongMemEval 基准
+
+```bash
+python3 -m mnemosyne eval convert longmemeval --raw raw.json --out ./longmemeval
+python3 -m mnemosyne eval run --longmemeval --by-type --pipeline full
+```
+
+`convert` 把官方 LongMemEval 数据转换成 Mnemosyne 的 seed memories + corpus；
+`fetch` 尝试直接下载（官方地址目前是占位符，下载失败会提示手动获取）。
+`eval run --longmemeval` 按 instance 隔离评分，输出 recall@1/5/10 和 MRR，
+`--by-type` 按问题类型拆分，`--pipeline full` 会经过真实的 FTS5 + RRF
+fusion 检索栈而不是 toy BM25。
 
 ## 快速开始
 
@@ -304,11 +337,14 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 | `reindex --scope all` | 全量重建搜索索引。 |
 | `embed-backfill --scope all` | 为已有记忆计算或刷新 embedding。 |
 | `eval run --corpus FILE` | 输出固定语料的 recall、MRR 和延迟基线。 |
-| `eval compare --baseline A --variant B` | 对比两份配置的检索指标。 |
+| `eval convert longmemeval --raw FILE --out DIR` | 把 LongMemEval 原始数据转换成 seed memories + corpus。 |
+| `eval fetch longmemeval --variant {s,m}` | 下载 LongMemEval 数据集（官方地址未确认前会提示手动下载）。 |
+| `eval run --longmemeval [--by-type] [--pipeline {bm25,full}]` | per-instance 隔离评分，输出 recall@1/5/10、MRR，可按问题类型拆分，`full` 走真实 FTS5+fusion 检索栈。 |
 | `mcp serve` | 启动 MCP stdio server；加 `--sse` 使用 SSE。 |
 | `doctor --scope all` | 检查依赖、模板、store、FTS5、索引和可选组件状态。 |
 | `codex-prep TASK` | 生成给 Codex 的 prompt 前缀。 |
 | `codex-ingest --commit` | 从 stdin 解析 `**新发现:**` / `**Findings:**` 并写入记忆。 |
+| `distill --transcript PATH \| --stdin --commit` | 从会话 transcript 抽取记忆；默认 dry-run，加 `--commit` 写入。 |
 
 查看任意命令的完整参数：
 
@@ -353,6 +389,20 @@ model = "BAAI/bge-reranker-base"
 onnx_path = ""
 top_n = 5
 
+[distill]
+enabled = false
+engine = "heuristic"
+confidence_threshold = 0.6
+max_findings_per_session = 5
+dedup_threshold = 0.85
+subject_threshold = 0.5
+
+[distill.llm]
+backend = "openai"
+model = ""
+api_base = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+
 [fusion]
 rrf_k = 60
 link_expansion = true
@@ -377,6 +427,7 @@ port = 3700
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
+- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。
 - `fusion.link_expansion` 控制 typed links 是否参与召回扩展。
 - `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
 - `mcp.sse` 控制可选 SSE 地址；stdio 始终是 `mcp serve` 默认值。
