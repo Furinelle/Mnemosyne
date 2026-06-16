@@ -109,6 +109,36 @@ def _make_extractor(config: dict):
     return HeuristicExtractor(confidence_threshold=threshold, max_findings=max_findings)
 
 
+def _parse_role_lines(text: str) -> list[Turn]:
+    """Parse '[role] text' lines (as produced by `turns_to_text`) back into turns.
+
+    Continuation lines of a multi-line turn are accumulated into the current
+    turn rather than each physical line becoming its own turn. Without this, a
+    multi-line user turn loses its `[user]` marker on every line after the
+    first, so those lines get misclassified as assistant text and role-gated
+    rules (e.g. the preference heuristic) silently drop them.
+    """
+    turns: list[Turn] = []
+    role: str | None = None
+    buffer: list[str] = []
+
+    def flush() -> None:
+        if role is not None:
+            body = "\n".join(buffer).strip()
+            if body:
+                turns.append(Turn(role=role, text=body))
+
+    for line in text.splitlines():
+        if line.startswith("[user] ") or line.startswith("[assistant] "):
+            flush()
+            role = "user" if line.startswith("[user] ") else "assistant"
+            buffer = [line.split("] ", 1)[1]]
+        elif role is not None:
+            buffer.append(line)
+    flush()
+    return turns
+
+
 def _findings_from_text(text: str, config: dict) -> list[Finding]:
     distill_cfg = config.get("distill", {})
     engine = distill_cfg.get("engine", "heuristic")
@@ -116,12 +146,7 @@ def _findings_from_text(text: str, config: dict) -> list[Finding]:
         from mnemosyne.codex import parse_findings
 
         return parse_findings(text)
-    turns = [
-        Turn(role="user" if line.startswith("[user]") else "assistant",
-             text=line.split("] ", 1)[-1])
-        for line in text.splitlines()
-        if line.strip()
-    ]
+    turns = _parse_role_lines(text)
     if not turns:
         turns = [Turn(role="assistant", text=text)]
     return _make_extractor(config).extract(turns)

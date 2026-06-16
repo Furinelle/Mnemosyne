@@ -102,3 +102,22 @@ def test_parse_llm_json_extracts_findings():
 def test_parse_llm_json_drops_unknown_type():
     payload = '[{"type":"nonsense","importance":50,"title":"X","tags":[],"content":"Y"}]'
     assert _parse_llm_json(payload) == []
+
+
+def test_parse_role_lines_preserves_multiline_turn():
+    from mnemosyne.distill import _parse_role_lines, turns_to_text
+
+    turns = [Turn(role="user", text="先说背景\n不要用 print，改用 logging")]
+    # round-trip through the flat text format used by every distill entry point
+    assert _parse_role_lines(turns_to_text(turns)) == turns
+
+
+def test_findings_from_text_multiline_user_turn_keeps_preference():
+    from mnemosyne.distill import _findings_from_text, turns_to_text
+
+    # the preference phrase lands on a continuation line; it must still be
+    # attributed to the user turn and produce a preference finding.
+    text = turns_to_text([Turn(role="user", text="背景说明\n不要用 print，改用 logging")])
+    findings = _findings_from_text(text, {})
+    assert len(findings) == 1
+    assert findings[0].type == "preference"
