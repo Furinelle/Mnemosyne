@@ -71,3 +71,29 @@ def test_run_longmemeval_reports_multiple_k(tmp_path):
     report = run_longmemeval(tmp_path / "corpus.jsonl")
     for key in ("recall@1", "recall@5", "recall@10", "MRR"):
         assert key in report
+
+
+from mnemosyne.eval.__main__ import main as eval_main
+
+
+def test_cli_convert_then_run(tmp_path, capsys):
+    rc = eval_main(["convert", "longmemeval", "--raw", str(FIXTURE), "--out", str(tmp_path)])
+    assert rc == 0
+    rc = eval_main(["run", "--corpus", str(tmp_path / "corpus.jsonl"), "--longmemeval", "--by-type"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "recall@5" in out
+    assert "single-session-user" in out
+
+
+def test_run_longmemeval_full_pipeline(tmp_path):
+    from mnemosyne.index import fts_available
+
+    if not fts_available():
+        import pytest
+
+        pytest.skip("SQLite FTS5 not available in this Python build")
+    convert(FIXTURE, tmp_path)
+    report = run_longmemeval(tmp_path / "corpus.jsonl", pipeline="full")
+    assert report["recall@5"] == 1.0
+    assert "by_type" in report
