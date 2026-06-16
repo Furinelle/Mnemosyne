@@ -9,6 +9,7 @@ from pathlib import Path
 from mnemosyne.codex import Finding
 from mnemosyne.hooks._common import run_search
 from mnemosyne.search import tokenize
+from mnemosyne.store import find_memory, load_config, stores_for_scope
 
 
 @dataclass(frozen=True)
@@ -92,3 +93,85 @@ def classify_against_store(
     if subject_sim >= subject_threshold:
         return ("supersede", top["id"])
     return ("new", None)
+
+
+def _make_extractor(config: dict):
+    distill_cfg = config.get("distill", {})
+    engine = distill_cfg.get("engine", "heuristic")
+    threshold = float(distill_cfg.get("confidence_threshold", 0.6))
+    max_findings = int(distill_cfg.get("max_findings_per_session", 5))
+    if engine == "llm":
+        from mnemosyne.distill.llm import LLMExtractor
+
+        return LLMExtractor(config, max_findings=max_findings)
+    from mnemosyne.distill.heuristic import HeuristicExtractor
+
+    return HeuristicExtractor(confidence_threshold=threshold, max_findings=max_findings)
+
+
+def _findings_from_text(text: str, config: dict) -> list[Finding]:
+    distill_cfg = config.get("distill", {})
+    engine = distill_cfg.get("engine", "heuristic")
+    if engine == "host":
+        from mnemosyne.codex import parse_findings
+
+        return parse_findings(text)
+    turns = [
+        Turn(role="user" if line.startswith("[user]") else "assistant",
+             text=line.split("] ", 1)[-1])
+        for line in text.splitlines()
+        if line.strip()
+    ]
+    if not turns:
+        turns = [Turn(role="assistant", text=text)]
+    return _make_extractor(config).extract(turns)
+
+
+def distill_text(text: str, *, source: str = "claude-code", commit: bool = False) -> list[dict]:
+    """Extract findings from conversation text, dedup, and (optionally) persist."""
+    config = load_config()
+    findings = _findings_from_text(text, config)
+    distill_cfg = config.get("distill", {})
+    dedup = float(distill_cfg.get("dedup_threshold", 0.85))
+    subject = float(distill_cfg.get("subject_threshold", 0.5))
+    actions: list[dict] = []
+    for finding in findings:
+        verdict, target = classify_against_store(
+            finding, dedup_threshold=dedup, subject_threshold=subject
+        )
+        record = {
+            "verdict": verdict,
+            "type": finding.type,
+            "title": finding.title,
+            "target": target,
+        }
+        if commit and verdict != "duplicate":
+            from mnemosyne.codex import write_finding
+
+            new_id = write_finding(finding, source)
+            record["id"] = new_id
+            if verdict == "supersede" and target:
+                _apply_supersedes(new_id, target)
+        actions.append(record)
+    return actions
+
+
+def _apply_supersedes(new_id: str, old_id: str) -> None:
+    from mnemosyne.cli import DEMOTE_ON_SUPERSEDE, add_link, update_search_index
+    from mnemosyne.relations import reverse
+    from mnemosyne.store import write_memory
+
+    stores = stores_for_scope("all")
+    new = find_memory(new_id, stores, include_archive=False)
+    old = find_memory(old_id, stores, include_archive=True)
+    if new is None or old is None:
+        return
+    new_store, new_path, new_memory = new
+    old_store, old_path, old_memory = old
+    add_link(new_memory, old_memory.id, "supersedes")
+    add_link(old_memory, new_memory.id, reverse("supersedes") or "superseded_by")
+    old_memory.strength = max(0, old_memory.strength - DEMOTE_ON_SUPERSEDE)
+    write_memory(new_path, new_memory)
+    write_memory(old_path, old_memory)
+    update_search_index(new_store, new_path, new_memory)
+    update_search_index(old_store, old_path, old_memory)

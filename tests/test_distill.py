@@ -1,5 +1,5 @@
 from mnemosyne.codex import Finding
-from mnemosyne.distill import Turn, classify_against_store, jaccard, parse_claude_transcript
+from mnemosyne.distill import Turn, classify_against_store, distill_text, jaccard, parse_claude_transcript
 from mnemosyne.distill.heuristic import HeuristicExtractor
 
 
@@ -66,3 +66,25 @@ def test_classify_new_when_store_empty(tmp_path, monkeypatch):
     )
     assert verdict == "new"
     assert target is None
+
+
+def test_distill_text_dry_run_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    transcript = "[user] 不要用 print 调试，改用 logging"
+    actions = distill_text(transcript, source="claude-code", commit=False)
+    assert len(actions) == 1
+    assert actions[0]["verdict"] == "new"
+    assert "id" not in actions[0]  # dry-run: not persisted
+
+
+def test_distill_text_commit_persists(tmp_path, monkeypatch):
+    from mnemosyne.store import ensure_store, project_store
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    ensure_store(project_store())
+    transcript = "[user] 不要用 print 调试，改用 logging"
+    actions = distill_text(transcript, source="claude-code", commit=True)
+    assert actions[0]["verdict"] == "new"
+    assert actions[0]["id"].startswith("preference-")

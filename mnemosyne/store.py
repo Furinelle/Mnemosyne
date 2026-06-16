@@ -52,6 +52,20 @@ DEFAULT_CONFIG = {
         "onnx_path": "",
         "top_n": 5,
     },
+    "distill": {
+        "enabled": False,
+        "engine": "heuristic",
+        "confidence_threshold": 0.6,
+        "max_findings_per_session": 5,
+        "dedup_threshold": 0.85,
+        "subject_threshold": 0.5,
+        "llm": {
+            "backend": "openai",
+            "model": "",
+            "api_base": "https://api.openai.com/v1",
+            "api_key_env": "OPENAI_API_KEY",
+        },
+    },
     "fusion": {
         "rrf_k": 60,
         "link_expansion": True,
@@ -111,6 +125,20 @@ backend = "cross_encoder"
 model = "BAAI/bge-reranker-base"
 onnx_path = ""
 top_n = 5
+
+[distill]
+enabled = false
+engine = "heuristic"
+confidence_threshold = 0.6
+max_findings_per_session = 5
+dedup_threshold = 0.85
+subject_threshold = 0.5
+
+[distill.llm]
+backend = "openai"
+model = ""
+api_base = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
 
 [fusion]
 rrf_k = 60

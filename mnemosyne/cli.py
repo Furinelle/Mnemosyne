@@ -164,6 +164,14 @@ def build_parser() -> argparse.ArgumentParser:
                                        help="preview without writing")
     install_hermes_parser.set_defaults(func=cmd_install_hermes)
 
+    distill_parser = subparsers.add_parser("distill", help="Extract memories from a conversation transcript")
+    distill_group = distill_parser.add_mutually_exclusive_group(required=True)
+    distill_group.add_argument("--transcript", type=Path, help="Path to a Claude Code JSONL transcript")
+    distill_group.add_argument("--stdin", action="store_true", help="Read plain transcript text from stdin")
+    distill_parser.add_argument("--source", default="claude-code")
+    distill_parser.add_argument("--commit", action="store_true", help="Persist findings (default: dry-run)")
+    distill_parser.set_defaults(func=cmd_distill)
+
     return parser
 
 
@@ -670,6 +678,23 @@ def cmd_install_hermes(args: argparse.Namespace) -> int:
             print("Restart Hermes to activate (memory.provider: mnemosyne).")
         else:
             print("Skipped config.yaml — set memory.provider: mnemosyne manually.")
+    return 0
+
+
+def cmd_distill(args: argparse.Namespace) -> int:
+    from mnemosyne.distill import distill_text, parse_claude_transcript, turns_to_text
+
+    if args.stdin:
+        text = sys.stdin.read()
+    else:
+        text = turns_to_text(parse_claude_transcript(args.transcript))
+    actions = distill_text(text, source=args.source, commit=args.commit)
+    if not actions:
+        print("No findings extracted.")
+        return 0
+    for action in actions:
+        marker = action.get("id", "(dry-run)")
+        print(f"[{action['verdict']}] {action['type']}: {action['title']} -> {marker}")
     return 0
 
 
