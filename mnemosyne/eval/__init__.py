@@ -198,6 +198,12 @@ def _full_pipeline_searcher(grouped: dict[str, list]) -> Callable[[str, str, int
         results = fusion_search([store], query, limit=limit, include_archive=False, config=config)
         return [result.memory.id for result in results]
 
+    # Keep the TemporaryDirectory object alive for as long as the returned
+    # searcher is reachable. The closures only capture `tmp_root` (a Path), so
+    # without this binding `_tmpdir` would be GC'd — and its directory deleted —
+    # the moment this function returns, leaving the search path relying on
+    # ensure_store re-creating the tree on every call.
+    _search._tmpdir = _tmpdir  # type: ignore[attr-defined]
     return _search
 
 
