@@ -38,3 +38,60 @@ class InjectionFormattingTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+import io
+import json
+
+from mnemosyne.hooks import stop
+from mnemosyne.store import ensure_store, load_memories, project_store
+
+
+def test_stop_hook_distills_when_enabled(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    store = project_store()
+    ensure_store(store)
+    # enable distill in project config
+    store.config_path.write_text(
+        store.config_path.read_text(encoding="utf-8").replace(
+            "enabled = false\nengine", "enabled = true\nengine"
+        ),
+        encoding="utf-8",
+    )
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(
+        '{"type":"user","message":{"role":"user","content":"不要用 print 调试，改用 logging"}}',
+        encoding="utf-8",
+    )
+    event = {"transcript_path": str(transcript), "stop_hook_active": False}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event)))
+
+    stop.main()
+
+    saved = load_memories(store)
+    assert any(m.type == "preference" for _, m in saved)
+
+
+def test_stop_hook_skips_when_stop_hook_active(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    store = project_store()
+    ensure_store(store)
+    store.config_path.write_text(
+        store.config_path.read_text(encoding="utf-8").replace(
+            "enabled = false\nengine", "enabled = true\nengine"
+        ),
+        encoding="utf-8",
+    )
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(
+        '{"type":"user","message":{"role":"user","content":"不要用 print，改用 logging"}}',
+        encoding="utf-8",
+    )
+    event = {"transcript_path": str(transcript), "stop_hook_active": True}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event)))
+
+    stop.main()
+
+    assert load_memories(store) == []
+
