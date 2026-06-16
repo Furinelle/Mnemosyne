@@ -1,4 +1,5 @@
 from mnemosyne.distill import Turn, parse_claude_transcript
+from mnemosyne.distill.heuristic import HeuristicExtractor
 
 
 def test_parse_claude_transcript_extracts_role_and_text(tmp_path):
@@ -16,3 +17,35 @@ def test_parse_claude_transcript_extracts_role_and_text(tmp_path):
         Turn(role="user", text="用 ruff 不要用 flake8"),
         Turn(role="assistant", text="好的，已切换"),
     ]
+
+
+def test_heuristic_extracts_preference_from_user_correction():
+    turns = [Turn(role="user", text="不要用 print 调试，改用 logging 模块")]
+    findings = HeuristicExtractor(confidence_threshold=0.6).extract(turns)
+    assert len(findings) == 1
+    assert findings[0].type == "preference"
+    assert "logging" in findings[0].content
+
+
+def test_heuristic_extracts_pitfall_from_error_plus_fix():
+    turns = [
+        Turn(
+            role="assistant",
+            text="出现 Traceback，根因是连接池未释放，修复为在 finally 中 close()",
+        )
+    ]
+    findings = HeuristicExtractor(confidence_threshold=0.6).extract(turns)
+    assert len(findings) == 1
+    assert findings[0].type == "pitfall"
+
+
+def test_heuristic_drops_below_confidence_threshold():
+    turns = [Turn(role="user", text="今天天气不错")]
+    findings = HeuristicExtractor(confidence_threshold=0.6).extract(turns)
+    assert findings == []
+
+
+def test_heuristic_respects_max_findings():
+    turns = [Turn(role="user", text=f"不要用 a{i}，改用 b{i}") for i in range(10)]
+    findings = HeuristicExtractor(confidence_threshold=0.6, max_findings=3).extract(turns)
+    assert len(findings) == 3
