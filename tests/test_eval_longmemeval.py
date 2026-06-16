@@ -51,3 +51,23 @@ def test_convert_produces_seed_and_corpus(tmp_path):
 def test_convert_respects_max_instances(tmp_path):
     convert(FIXTURE, tmp_path, max_instances=1)
     assert len(load_corpus(tmp_path / "corpus.jsonl")) == 1
+
+
+from mnemosyne.eval import run_longmemeval
+
+
+def test_run_longmemeval_isolates_instances(tmp_path):
+    convert(FIXTURE, tmp_path)
+    report = run_longmemeval(tmp_path / "corpus.jsonl")
+    # s1 holds the ruff answer for q1; isolation means q1's query only sees q1 docs.
+    assert report["recall@5"] == 1.0
+    assert "by_type" in report
+    assert "single-session-user" in report["by_type"]
+    assert report["by_type"]["single-session-user"]["recall@5"] == 1.0
+
+
+def test_run_longmemeval_reports_multiple_k(tmp_path):
+    convert(FIXTURE, tmp_path)
+    report = run_longmemeval(tmp_path / "corpus.jsonl")
+    for key in ("recall@1", "recall@5", "recall@10", "MRR"):
+        assert key in report
