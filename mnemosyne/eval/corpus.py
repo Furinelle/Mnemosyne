@@ -11,8 +11,10 @@ from pathlib import Path
 class EvalItem:
     query: str
     expected_ids: list[str]
-    paraphrase_of: str
+    paraphrase_of: str = ""
     notes: str = ""
+    instance_id: str = ""
+    question_type: str = ""
 
 
 def load_corpus(path: Path) -> list[EvalItem]:
