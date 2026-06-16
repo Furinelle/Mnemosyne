@@ -9,6 +9,7 @@ dependencies = ['portalocker>=2.8']
 vector = ['numpy>=1.26', 'onnxruntime>=1.17']
 rerank = ['numpy>=1.26', 'onnxruntime>=1.17']
 mcp = ['mcp>=0.4,<1']
+distill = []
 
 [project.scripts]
 mnemosyne = 'mnemosyne.cli:main'

@@ -32,3 +32,11 @@ Claude Code will automatically ingest these via:
 - Speculative or unverified content
 - Anything already in core memory
 - Restatements of the task itself
+
+## Auto-distill
+
+For Codex, emitting the `**新发现:**` block above and running
+`python -m mnemosyne codex-ingest --commit` is the Codex-side auto-distill path.
+Hermes does this natively after `install-hermes`: its MemoryProvider's
+`on_session_end()` hook auto-distills the finished conversation when
+`[distill].enabled = true` in the shared Mnemosyne config — no manual block needed.

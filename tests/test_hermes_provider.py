@@ -164,5 +164,42 @@ class ProviderToolTests(unittest.TestCase):
             self.assertGreaterEqual(s["count"], 1)
 
 
+class ProviderSessionEndTests(unittest.TestCase):
+    def test_on_session_end_noop_when_distill_disabled(self):
+        with isolated_workspace() as (project, _home):
+            _seed_core()
+            p = _provider()
+            p.initialize("sess-1")
+            p.on_session_end([
+                {"role": "user", "content": "不要用 print 调试，改用 logging"},
+            ])
+            s = json.loads(p.handle_tool_call("mnemosyne", {"action": "search", "query": "logging print"}))
+            self.assertEqual(s["count"], 0)
+
+    def test_on_session_end_distills_when_enabled(self):
+        with isolated_workspace() as (project, _home):
+            _seed_core()
+            from mnemosyne.store import ensure_store, project_store
+
+            ensure_store(project_store())
+            (project / ".mnemosyne" / "config.toml").write_text(
+                "[distill]\nenabled = true\n", encoding="utf-8"
+            )
+            p = _provider()
+            p.initialize("sess-1")
+            p.on_session_end([
+                {"role": "user", "content": "不要用 print 调试，改用 logging"},
+            ])
+            s = json.loads(p.handle_tool_call("mnemosyne", {"action": "search", "query": "logging print"}))
+            self.assertGreaterEqual(s["count"], 1)
+
+    def test_on_session_end_empty_messages_noop(self):
+        with isolated_workspace():
+            _seed_core()
+            p = _provider()
+            p.initialize("sess-1")
+            p.on_session_end([])  # should not raise
+
+
 if __name__ == "__main__":
     unittest.main()

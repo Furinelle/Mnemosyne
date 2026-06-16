@@ -28,3 +28,7 @@ This copies the provider into `$HERMES_HOME/plugins/mnemosyne/` and sets
 - Each turn: recalls top matches (`mnemosyne search`).
 - Tool `mnemosyne`: search / write / show / link / graph against the shared store.
 - Writes are tagged `--source hermes[:<profile>]`.
+- Session end: if `[distill].enabled = true` in the shared Mnemosyne config,
+  `on_session_end()` bridges to `mnemosyne distill --stdin --commit --source hermes[:<profile>]`
+  to auto-extract durable memories from the finished conversation (same pipeline
+  Claude Code's Stop hook uses). Off by default; no-op when disabled.

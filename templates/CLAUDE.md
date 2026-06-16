@@ -50,3 +50,9 @@
 - 已经在 core.md 里的常识
 - 不确定能否复用的内容
 - 跟其它已有 memory 高度重复（先 `search` 一下确认）
+
+## 关于自动蒸馏（`[distill].enabled = true`）
+
+若 `.mnemosyne/config.toml` 中 `[distill].enabled = true`，Stop hook 会在会话结束时
+自动从对话中提炼并保存记忆（启发式或可选的 LLM 引擎，见 `engine` 配置项）。
+开启此功能后，上面的手动 `write` 仅用于补充自动蒸馏漏掉的内容，不必每次任务都手动调用。

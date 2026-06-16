@@ -32,6 +32,31 @@ except Exception:  # standalone / tests
         return json.dumps({"error": msg})
 
 
+def _message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text", "")))
+        return "\n".join(p for p in parts if p).strip()
+    return ""
+
+
+def _messages_to_text(messages: Optional[List[Dict[str, Any]]]) -> str:
+    """Render OpenAI-style messages as ``[role] text`` lines for distill_text."""
+    lines: List[str] = []
+    for message in messages or []:
+        role = message.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        text = _message_text(message.get("content"))
+        if text:
+            lines.append(f"[{role}] {text}")
+    return "\n\n".join(lines)
+
+
 MNEMOSYNE_TOOL: Dict[str, Any] = {
     "name": "mnemosyne",
     "description": (
@@ -110,7 +135,7 @@ class MnemosyneMemoryProvider(MemoryProvider):
         self._python = None
         return None
 
-    def _run(self, args: List[str], *, json_out: bool = False):
+    def _run(self, args: List[str], *, json_out: bool = False, input_text: Optional[str] = None):
         empty = [] if json_out else ""
         py = self._resolve_python()
         if not py:
@@ -118,6 +143,7 @@ class MnemosyneMemoryProvider(MemoryProvider):
         try:
             proc = subprocess.run(
                 [py, "-m", "mnemosyne", *args],
+                input=input_text,
                 capture_output=True, text=True,
                 timeout=self._timeout, cwd=os.getcwd(),
             )
@@ -244,6 +270,51 @@ class MnemosyneMemoryProvider(MemoryProvider):
         self._run(["write", "--force", "--source", self._source, "--scope", "global",
                    "--type", mtype, "--importance", "60",
                    "--title", content[:60], "--content", content])
+
+    def _distill_enabled(self) -> bool:
+        """Check ``[distill].enabled`` via the resolved bridge python.
+
+        No CLI subcommand exposes config values, so this shells out a small
+        inline script through the same python used for every other bridge
+        call (kept consistent with ``_python_has_mnemosyne``).
+        """
+        py = self._resolve_python()
+        if not py:
+            return False
+        script = (
+            "import json,sys;"
+            "from mnemosyne.store import load_config;"
+            "print(json.dumps(bool(load_config().get('distill',{}).get('enabled'))))"
+        )
+        try:
+            proc = subprocess.run(
+                [py, "-c", script],
+                capture_output=True, text=True,
+                timeout=self._timeout, cwd=os.getcwd(),
+            )
+        except Exception:
+            return False
+        if proc.returncode != 0:
+            return False
+        try:
+            return bool(json.loads(proc.stdout.strip() or "false"))
+        except Exception:
+            return False
+
+    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+        """Auto-distill durable memories from the finished conversation.
+
+        Gated on ``[distill].enabled`` in the shared Mnemosyne config (off by
+        default). Bridges through the same ``mnemosyne distill --stdin --commit``
+        CLI path used elsewhere in this provider, tagged ``source="hermes"``.
+        """
+        if not self._distill_enabled():
+            return
+        text = _messages_to_text(messages)
+        if not text.strip():
+            return
+        self._run(["distill", "--stdin", "--commit", "--source", self._source],
+                   input_text=text)
 
     def shutdown(self) -> None:
         pass

@@ -1,6 +1,7 @@
 from mnemosyne.codex import Finding
 from mnemosyne.distill import Turn, classify_against_store, distill_text, jaccard, parse_claude_transcript
 from mnemosyne.distill.heuristic import HeuristicExtractor
+from mnemosyne.distill.llm import LLMExtractor, _parse_llm_json
 
 
 def test_parse_claude_transcript_extracts_role_and_text(tmp_path):
@@ -88,3 +89,16 @@ def test_distill_text_commit_persists(tmp_path, monkeypatch):
     actions = distill_text(transcript, source="claude-code", commit=True)
     assert actions[0]["verdict"] == "new"
     assert actions[0]["id"].startswith("preference-")
+
+
+def test_parse_llm_json_extracts_findings():
+    payload = '[{"type":"pitfall","importance":80,"title":"X","tags":["a"],"content":"because Y"}]'
+    findings = _parse_llm_json(payload)
+    assert len(findings) == 1
+    assert findings[0].type == "pitfall"
+    assert findings[0].importance == 80
+
+
+def test_parse_llm_json_drops_unknown_type():
+    payload = '[{"type":"nonsense","importance":50,"title":"X","tags":[],"content":"Y"}]'
+    assert _parse_llm_json(payload) == []
