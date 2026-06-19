@@ -121,3 +121,45 @@ def test_findings_from_text_multiline_user_turn_keeps_preference():
     findings = _findings_from_text(text, {})
     assert len(findings) == 1
     assert findings[0].type == "preference"
+
+
+def test_classify_dedup_compares_full_body_not_truncated_summary(tmp_path, monkeypatch):
+    """Regression: long findings were re-written because dedup compared the new
+    finding against the stored memory's ~220-char summary, never reaching the
+    threshold. Dedup must compare against the full body (observed: 9 copies)."""
+    from mnemosyne.codex import Finding, write_finding
+    from mnemosyne.store import ensure_store, project_store
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    ensure_store(project_store())
+    steps = [
+        "检查防火墙规则是否放行所需的端口范围以及来源地址白名单配置",
+        "确认证书申请使用的域名解析记录已经生效并指向目标服务器公网地址",
+        "安装服务端组件并写入完整的配置文件监听参数与认证密码字段",
+        "启用守护进程单元文件并设置开机自启动同时检查日志输出是否正常",
+        "在客户端导入订阅链接之后测量往返延迟抖动以及丢包率是否可接受",
+        "若初次握手失败则排查两端时间同步偏差与混淆插件密码一致性问题",
+        "处理链路上的最大传输单元分片把数值逐步降低到合适区间反复重试",
+        "确认回程路由的三网优化策略是否真正命中各运营商精品线路出口",
+        "记录每一次变更的前后状态以便在出现异常时快速回滚到稳定版本",
+    ]
+    content = "。".join(steps) + "。"  # > 220 chars, diverse vocab -> summary truncates
+    finding = Finding("pitfall", 70, "长内容去重回归用例", ["regression"], content)
+    write_finding(finding, "test")
+
+    verdict, target = classify_against_store(finding)
+    assert verdict == "duplicate"
+    assert target is not None
+
+
+def test_find_project_store_ignores_global_dir(tmp_path, monkeypatch):
+    """Regression: cwd==$HOME made find_project_store return the global store
+    dir as a 'project', so project-scoped writes polluted the global store."""
+    from mnemosyne.store import find_project_store
+
+    home_like = tmp_path / "home"
+    (home_like / ".mnemosyne").mkdir(parents=True)
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(home_like / ".mnemosyne"))
+
+    assert find_project_store(home_like) is None

@@ -194,9 +194,13 @@ def find_project_store(start: Path | None = None) -> Store | None:
     current = (start or Path.cwd()).resolve()
     if current.is_file():
         current = current.parent
+    global_root = global_store().root.resolve()
     while True:
         candidate = current / ".mnemosyne"
-        if candidate.exists():
+        # Never treat the global store dir as a project store: when cwd is $HOME
+        # (and ~/.mnemosyne is the global store), this used to mislabel global as
+        # a project, so project-scoped writes silently mutated the global store.
+        if candidate.exists() and candidate.resolve() != global_root:
             return Store("project", candidate)
         if (current / ".git").exists():
             return None
