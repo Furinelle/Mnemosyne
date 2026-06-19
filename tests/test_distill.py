@@ -163,3 +163,29 @@ def test_find_project_store_ignores_global_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("MNEMOSYNE_HOME", str(home_like / ".mnemosyne"))
 
     assert find_project_store(home_like) is None
+
+
+def test_heuristic_skips_long_instructional_turn():
+    """Regression: step/phase instructions were captured as pitfalls (the
+    SSH/Hysteria2 junk). High-precision rule must reject them."""
+    junk = Turn(
+        role="assistant",
+        text=("好，进 **阶段 3：装 Hysteria2 + 自动申请证书**。确保你现在 ssh 在 VPS 里。"
+              "第一步检查防火墙，第二步申请证书，万一配错了还有救，原因是顺序错了。" * 2),
+    )
+    assert HeuristicExtractor(confidence_threshold=0.6).extract([junk]) == []
+
+
+def test_heuristic_skips_scattered_markers_in_long_turn():
+    """A long explanation that merely mentions an error and a cause far apart
+    is not a crisp pitfall."""
+    far = "错误" + ("。这里是一大段与根因无关的解释说明文字铺垫上下文" * 12) + "原因是配置写错了"
+    assert HeuristicExtractor(confidence_threshold=0.6).extract([Turn(role="assistant", text=far)]) == []
+
+
+def test_heuristic_still_captures_concise_pitfall():
+    """The tightening must not regress the genuine case: error and fix stated
+    together in a short turn."""
+    turn = Turn(role="assistant", text="出现 Traceback，根因是连接池未释放，修复为在 finally 中 close()")
+    findings = HeuristicExtractor(confidence_threshold=0.6).extract([turn])
+    assert len(findings) == 1 and findings[0].type == "pitfall"
