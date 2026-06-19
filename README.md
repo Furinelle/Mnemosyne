@@ -431,7 +431,7 @@ port = 3700
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
-- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。
+- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。
 - `fusion.link_expansion` 控制 typed links 是否参与召回扩展。
 - `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
 - `mcp.sse` 控制可选 SSE 地址；stdio 始终是 `mcp serve` 默认值。
@@ -547,7 +547,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。最新的 0.2.1 修复了混合检索向量在搜索后被清空、CJK token 预算低估、`expires` 字段未生效等问题，并移除了无操作的 `eval compare` 子命令。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.3.1：0.3.0 引入跨 agent 自动记忆形成（`distill`，opt-in）与 LongMemEval 检索基准；0.3.1 修复了 `distill` 去重比对截断摘要导致的重复写入、`find_project_store` 把全局库误当项目库的污染问题，并收紧了启发式抽取精度。
 
 ## License
 
