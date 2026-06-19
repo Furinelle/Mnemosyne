@@ -9,6 +9,7 @@
 - **distill 去重失效导致重复写入**：`classify_against_store` 此前用新 finding 的完整文本去和库中记忆的**截断 `injection_summary`**（约 220 字）算 Jaccard 相似度，长内容因摘要丢失尾部 token 永远达不到 `dedup_threshold`，于是同一条记忆每次会话被重复写入（实测全局库出现 45 条重复）。现改为遍历 top-k 候选并比对**完整 body**。
 - **全局库被误当项目库写入**：`find_project_store` 在 cwd 为 `$HOME`（且 `~/.mnemosyne` 即全局库）时会把全局库目录当作"项目库"返回，导致项目作用域的写入静默污染全局库。现在 `find_project_store` 会跳过全局根目录；`write_finding` 在没有真实项目时显式回退到 `global_store()`（正确的 global 作用域）。
 - **启发式抽取精度过低**：pitfall 规则此前只要 assistant turn 中**任意位置**同时出现"错误"类与"修复"类词就捕获，导致长篇 SSH/permission 解释和分步指令被当作 pitfall 写入（清理出的垃圾绝大多数来自此）。现要求：turn 较短（≤280 字）、错误与修复标记**相邻**（间距 ≤50 字）、且非"第 N 步/阶段 N"指令式内容；preference 限制在 ≤200 字。
+- **`__version__` 与 `pyproject` 不同步**：`mnemosyne/__init__.py` 的 `__version__` 此前停留在 `0.2.0`（0.3.0 bump 时漏改），现同步到 `0.3.1`。
 
 ## [0.3.0] - 2026-06-16
 
