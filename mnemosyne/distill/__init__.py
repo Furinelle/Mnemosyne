@@ -84,14 +84,25 @@ def classify_against_store(
     results = run_search(text, limit=3, update_access=False)
     if not results:
         return ("new", None)
-    top = results[0]
-    summary_tokens = tokenize(top.get("summary", ""))
-    content_sim = jaccard(tokenize(text), summary_tokens)
-    subject_sim = jaccard(tokenize(finding.title), summary_tokens)
-    if content_sim >= dedup_threshold:
-        return ("duplicate", top["id"])
-    if subject_sim >= subject_threshold:
-        return ("supersede", top["id"])
+    stores = stores_for_scope("all")
+    text_tokens = tokenize(text)
+    title_tokens = tokenize(finding.title)
+    supersede_target: str | None = None
+    for hit in results:
+        located = find_memory(hit["id"], stores, include_archive=False)
+        if located is None:
+            continue
+        # Compare against the full stored body, not the truncated summary.
+        # summarize() caps at ~220 chars, so long findings lost their tail
+        # tokens and never reached dedup_threshold -> the same memory was
+        # rewritten on every session (observed: 9 identical copies).
+        body_tokens = tokenize(located[2].body or "")
+        if jaccard(text_tokens, body_tokens) >= dedup_threshold:
+            return ("duplicate", hit["id"])
+        if supersede_target is None and jaccard(title_tokens, body_tokens) >= subject_threshold:
+            supersede_target = hit["id"]
+    if supersede_target is not None:
+        return ("supersede", supersede_target)
     return ("new", None)
 
 

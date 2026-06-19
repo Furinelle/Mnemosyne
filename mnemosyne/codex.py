@@ -16,7 +16,14 @@ from mnemosyne.hooks._common import (
 )
 from mnemosyne.index import update_memory_index
 from mnemosyne.schema import Memory
-from mnemosyne.store import load_config, project_store, read_core, working_path, write_memory
+from mnemosyne.store import (
+    find_project_store,
+    global_store,
+    load_config,
+    read_core,
+    working_path,
+    write_memory,
+)
 
 FINDINGS_HEADER_RE = re.compile(r'^\s*\*\*(?:新发现|Findings)[:：]\*\*\s*$', re.MULTILINE)
 FIELD_RE = re.compile(r'^\s*-\s*(\w+)\s*:\s*(.*)$')
@@ -181,7 +188,10 @@ def parse_findings(text: str) -> list[Finding]:
 
 
 def write_finding(finding: Finding, source: str) -> str:
-    store = project_store()
+    # Write to the real project store, or the global store when there is no
+    # project (e.g. Hermes running from $HOME). Previously project_store()
+    # mislabeled the global dir as a project and polluted it.
+    store = find_project_store() or global_store()
     today = date.today().isoformat()
     memory_id = make_memory_id(finding.type, today)
     summary = summarize(finding.title, finding.content)
