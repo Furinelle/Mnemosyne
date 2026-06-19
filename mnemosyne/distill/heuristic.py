@@ -12,9 +12,28 @@ _PREFERENCE_RE = re.compile(r"(不要用|别用|不用|改用|下次用|下次�
 # Pitfall: an error signal co-occurs with a resolution signal in one turn.
 _ERROR_RE = re.compile(r"(错误|报错|Traceback|Exception|Error|failed|失败)", re.IGNORECASE)
 _FIX_RE = re.compile(r"(根因|原因是|修复|改成|改为|fixed|the fix|因为)", re.IGNORECASE)
+# Step-by-step / phased instructions are guidance, not discovered pitfalls.
+_INSTRUCTION_RE = re.compile(r"(第[一二三四五六七八九十百\d]+步|阶段\s*[一二三四五六七八九十\d]+|##\s*阶段|Step\s*\d)")
 
 _PREFERENCE_CONFIDENCE = 0.6
 _PITFALL_CONFIDENCE = 0.7
+# High-precision caps: auto-distilled findings must be short and focused.
+# Long assistant turns are explanations/instructions, not crisp memories.
+_MAX_PREFERENCE_CHARS = 200
+_MAX_PITFALL_CHARS = 280
+_MARKER_PROXIMITY = 50
+
+
+def _is_pitfall(text: str) -> bool:
+    """A pitfall states an error and its resolution close together, in a short,
+    non-instructional turn. The previous 'both markers anywhere in the turn'
+    rule captured long conversational prose (SSH/permission explanations) as junk.
+    """
+    if len(text) > _MAX_PITFALL_CHARS or _INSTRUCTION_RE.search(text):
+        return False
+    err = _ERROR_RE.search(text)
+    fix = _FIX_RE.search(text)
+    return bool(err and fix and abs(err.start() - fix.start()) <= _MARKER_PROXIMITY)
 
 
 class HeuristicExtractor:
@@ -40,7 +59,7 @@ class HeuristicExtractor:
         text = turn.text.strip()
         if not text:
             return None
-        if turn.role == "user" and _PREFERENCE_RE.search(text):
+        if turn.role == "user" and len(text) <= _MAX_PREFERENCE_CHARS and _PREFERENCE_RE.search(text):
             return (
                 Finding(
                     type="preference",
@@ -51,7 +70,7 @@ class HeuristicExtractor:
                 ),
                 _PREFERENCE_CONFIDENCE,
             )
-        if turn.role == "assistant" and _ERROR_RE.search(text) and _FIX_RE.search(text):
+        if turn.role == "assistant" and _is_pitfall(text):
             return (
                 Finding(
                     type="pitfall",
