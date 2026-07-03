@@ -61,6 +61,93 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class ConsolidateTests(unittest.TestCase):
+    def _seed(self):
+        self.assertEqual(0, main(["init"]))
+        for importance, content in (("80", "use httpOnly cookie for JWT tokens"),
+                                    ("60", "use httpOnly cookie for JWT auth tokens")):
+            self.assertEqual(0, main([
+                "write", "--type", "pitfall", "--importance", importance, "--force",
+                "--allow-duplicate", "--title", "JWT cookie storage",
+                "--content", content,
+            ]))
+
+    def test_consolidate_dry_run_lists_pairs_without_changes(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        with isolated_workspace():
+            self._seed()
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                code = main(["consolidate", "--scope", "project"])
+
+            self.assertEqual(0, code)
+            self.assertIn("would merge", output.getvalue())
+            self.assertEqual(2, len(load_memories(project_store())))
+
+    def test_consolidate_commit_merges_weaker_into_stronger(self) -> None:
+        with isolated_workspace():
+            self._seed()
+
+            self.assertEqual(0, main(["consolidate", "--scope", "project", "--commit"]))
+
+            memories = load_memories(project_store())
+            self.assertEqual(1, len(memories))
+            survivor = memories[0][1]
+            self.assertEqual(80, survivor.strength)
+            self.assertIn("auth tokens", survivor.body)
+
+
+class SupersededRetrievalTests(unittest.TestCase):
+    def _write_pair(self):
+        self.assertEqual(0, main(["init"]))
+        self.assertEqual(0, main([
+            "write", "--type", "arch_decision", "--importance", "60", "--force",
+            "--title", "JWT storage decision", "--content", "use localStorage for JWT",
+        ]))
+        store = project_store()
+        old_id = load_memories(store)[0][1].id
+        self.assertEqual(0, main([
+            "write", "--type", "arch_decision", "--importance", "60", "--force",
+            "--title", "JWT storage decision",
+            "--content", "switch to httpOnly cookie for JWT storage",
+        ]))
+        new_id = next(m.id for _, m in load_memories(store) if m.id != old_id)
+        return store, old_id, new_id
+
+    def test_superseded_memory_is_marked_and_filtered(self) -> None:
+        from mnemosyne.fusion import search as fusion_search
+
+        with isolated_workspace():
+            store, old_id, new_id = self._write_pair()
+            memories = {m.id: m for _, m in load_memories(store)}
+            self.assertEqual("superseded", memories[old_id].status)
+            self.assertEqual(new_id, memories[old_id].extra.get("invalidated_by"))
+
+            default_ids = [r.memory.id for r in fusion_search([store], "JWT storage", limit=5)]
+            self.assertNotIn(old_id, default_ids)
+            self.assertIn(new_id, default_ids)
+
+            all_ids = [
+                r.memory.id
+                for r in fusion_search([store], "JWT storage", limit=5, include_superseded=True)
+            ]
+            self.assertIn(old_id, all_ids)
+
+    def test_cli_search_include_superseded_flag(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        with isolated_workspace():
+            store, old_id, _new_id = self._write_pair()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                main(["search", "JWT storage", "--format", "json", "--include-superseded"])
+            self.assertIn(old_id, output.getvalue())
+
+
 class WriteDedupTests(unittest.TestCase):
     def test_force_write_skips_exact_duplicate(self) -> None:
         import io

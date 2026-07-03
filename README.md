@@ -338,6 +338,7 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 | `link ID1 ID2 --rel REL` | 用 typed relation 链接两条记忆；自定义关系需 `--allow-custom`。 |
 | `graph ID --format mermaid` | BFS 展开关系图，支持 `mermaid`、`ascii`、`json`。 |
 | `maintain --dry-run` | 预览衰减、归档和 core 晋升候选。 |
+| `consolidate [--commit]` | 合并近重复 working 记忆（同类型、相似度 ≥0.8）；默认 dry-run 预览。 |
 | `maintain --scope all` | 维护全局和项目记忆。 |
 | `reindex --scope all` | 全量重建搜索索引。 |
 | `embed-backfill --scope all` | 为已有记忆计算或刷新 embedding。 |
@@ -461,6 +462,10 @@ your-project/.mnemosyne/index.sqlite
 python3 -m mnemosyne reindex --scope all
 ```
 
+被 `supersedes` 取代的记忆默认不出现在搜索结果中（失效不删除），用
+`search --include-superseded` 回看历史结论；旧记忆 frontmatter 带
+`invalidated_by` 指向取代者。
+
 `search --format json` 会输出 `why_matched` 和 `score_breakdown`，方便区分 BM25、
 vector、link boost 与 reranker 的贡献。切换 embedding 模型后，运行：
 
@@ -555,7 +560,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.5.0：蒸馏增量化（Stop hook 只处理新增轮次）、Finding 溯源 `evidence` 字段、新增 `session_summary` 会话摘要类型（LLM 引擎 opt-in）、`write` 统一查重（`--force` 不再跳过判定，新增 `--allow-duplicate`）。0.4.0 带来会话级注入去重、progressive disclosure 注入与 embedding 增量 backfill；0.3.2 修复了全局衰减放大等四个 P0 问题。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.0：被取代记忆默认退出检索（失效不删除，`--include-superseded` 回看）、新增 `consolidate` 近重复整合命令（dry-run 默认）、`eval run --min-recall` 检索质量门槛 + GitHub Actions CI。0.5.0 带来蒸馏增量化、`evidence` 溯源、`session_summary` 类型与 `write` 统一查重；0.4.0 带来注入去重与 progressive disclosure；0.3.2 修复四个 P0 问题。
 
 ## License
 

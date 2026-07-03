@@ -50,6 +50,7 @@ def search(
     limit: int = 5,
     type_filter: str = "",
     include_archive: bool = False,
+    include_superseded: bool = False,
     config: dict | None = None,
     embedder=None,
     reranker=None,
@@ -93,6 +94,10 @@ def search(
     reranker = reranker or get_reranker(config)
     if reranker.model_id != "none":
         results = _rerank(query, results, reranker, int(config.get("rerank", {}).get("top_n", 5)))
+    if not include_superseded:
+        # Invalidation, not deletion: superseded facts stay on disk and are
+        # recallable with include_superseded, but must not win default recall.
+        results = [result for result in results if result.memory.status != "superseded"]
     return results[:limit]
 
 

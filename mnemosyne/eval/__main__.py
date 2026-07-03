@@ -27,6 +27,12 @@ def main(argv: list[str] | None = None) -> int:
         default="bm25",
         help="Scoring backend; 'full' routes through mnemosyne.fusion.search (only with --longmemeval)",
     )
+    run_parser.add_argument(
+        "--min-recall",
+        type=float,
+        default=None,
+        help="Exit non-zero if bm25 recall@5 falls below this threshold (CI regression gate)",
+    )
 
     convert_parser = subparsers.add_parser("convert")
     convert_parser.add_argument("dataset", choices=["longmemeval"])
@@ -64,6 +70,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(format_metrics("legacy-bm25", legacy))
     print(format_metrics("bm25-only", current))
     print(f"bigram recall@5 delta={current['recall@5'] - legacy['recall@5']:+.3f}")
+    if args.min_recall is not None and current["recall@5"] < args.min_recall:
+        print(f"FAIL: recall@5 {current['recall@5']:.3f} < required {args.min_recall:.3f}")
+        return 1
     return 0
 
 

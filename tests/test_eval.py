@@ -48,3 +48,10 @@ class EvalTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_eval_run_min_recall_gate():
+    from mnemosyne.eval.__main__ import main as eval_main
+
+    assert eval_main(["run", "--min-recall", "1.01"]) == 1
+    assert eval_main(["run", "--min-recall", "0.5"]) == 0

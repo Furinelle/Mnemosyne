@@ -2,6 +2,14 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.6.0] - 2026-07-04
+
+### 新增 (Added)
+
+- **失效不删除（superseded 检索过滤）**：被 `supersedes` 取代的记忆标记 `status = "superseded"` 并写入 `invalidated_by` 指向取代者；默认检索不再返回，`search --include-superseded` 可回看历史结论。`write` 自动 supersede 与手动 `link --rel supersedes` 两条路径行为一致。
+- **`consolidate` 整合命令**（sleep-time 式维护的保守 v1）：合并同类型、相似度 ≥ 阈值（默认 0.8）的近重复 working 记忆——弱者并入强者（strength 取 max、tags/body 合并）、删除弱者文件与索引行、重写 MEMORY.md。默认 dry-run，`--commit` 生效；纯启发式，无 LLM 依赖。
+- **检索质量 CI 门槛**：`eval run --min-recall X` 在固定 50 条语料的 recall@5 低于阈值时以非零码退出；新增 GitHub Actions workflow（Python 3.11-3.13 跑 pytest + `--min-recall 0.95` 回归门槛）。
+
 ## [0.5.0] - 2026-07-04
 
 ### 新增 (Added)
