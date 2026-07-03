@@ -102,5 +102,46 @@ class EmbeddingTests(unittest.TestCase):
         self.assertEqual("fallback", result)
 
 
+class IncrementalBackfillTests(unittest.TestCase):
+    class CountingEmbedder:
+        model_id = "hash-v1"
+        dimensions = 2
+
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+
+        def embed(self, texts: list[str]) -> list[list[float]]:
+            self.calls.append(len(texts))
+            return [[1.0, 0.0] for _ in texts]
+
+        def embed_one(self, text: str) -> list[float]:
+            return [1.0, 0.0]
+
+    def test_backfill_only_embeds_stale_memories(self) -> None:
+        from mnemosyne.index import backfill_embeddings, reindex_store
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, project_store, working_path, write_memory
+        from tests.helpers import isolated_workspace
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            paths = {}
+            for name in ("alpha", "beta"):
+                memory = Memory(id=name, type="codebase", strength=70, body=f"## {name}\n\n{name} body")
+                path = working_path(store, memory)
+                write_memory(path, memory)
+                paths[name] = path
+            reindex_store(store)
+            embedder = self.CountingEmbedder()
+
+            self.assertEqual(2, backfill_embeddings(store, embedder))
+            self.assertEqual(0, backfill_embeddings(store, embedder), "fresh embeddings must be skipped")
+
+            bumped = time.time() + 5
+            os.utime(paths["alpha"], (bumped, bumped))
+            self.assertEqual(1, backfill_embeddings(store, embedder), "edited memory must be re-embedded")
+
+
 if __name__ == "__main__":
     unittest.main()

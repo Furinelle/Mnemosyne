@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
 from mnemosyne.schema import Memory
 from mnemosyne.store import Store, move_to_archive, write_memory
+
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def is_date_expiry(value: str) -> bool:
+    """Only ISO dates take part in expiry archival; anything else is a
+    human-readable note (e.g. '认证方案重构时失效') and must never compare
+    lexically against today's date."""
+    return bool(_ISO_DATE_RE.match(value.strip()))
 
 
 @dataclass
@@ -52,7 +63,7 @@ def maintain_memory(
     # Enforce the expires field: a memory past its expiry date is archived
     # immediately, regardless of strength. Previously --expires was stored but
     # never read, so expired memories were injected forever.
-    if memory.expires and memory.expires < date.today().isoformat():
+    if memory.expires and is_date_expiry(memory.expires) and memory.expires.strip() < date.today().isoformat():
         if not dry_run:
             yyyy_mm = (memory.last_accessed or memory.created or date.today().isoformat())[:7]
             write_memory(path, memory)

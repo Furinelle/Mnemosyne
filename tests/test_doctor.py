@@ -27,5 +27,23 @@ class DoctorCommandTests(unittest.TestCase):
             self.assertIn("mcp", text)
 
 
+    def test_doctor_reports_corrupt_files(self) -> None:
+        from mnemosyne.store import ensure_store, project_store
+
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            store = project_store()
+            ensure_store(store)
+            (store.working_dir / "junk.md").write_bytes(b"\xff\xfe not utf8")
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                main(["doctor", "--scope", "project"])
+
+            text = output.getvalue()
+            self.assertIn("corrupt files", text)
+            self.assertIn("junk.md", text)
+
+
 if __name__ == "__main__":
     unittest.main()

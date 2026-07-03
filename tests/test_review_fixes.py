@@ -61,5 +61,116 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class MemoryIndexRewriteTests(unittest.TestCase):
+    def test_maintain_rewrites_memory_index(self) -> None:
+        from mnemosyne.cli import update_memory_index_file
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            keep = Memory(id="keep-1", type="codebase", strength=90,
+                          injection_summary="stays", body="## keep\n\nstays")
+            drop = Memory(id="drop-1", type="pitfall", strength=25,
+                          injection_summary="archived away", body="## drop\n\ngoes")
+            for memory in (keep, drop):
+                write_memory(working_path(store, memory), memory)
+                update_memory_index_file(store, memory)
+
+            main(["maintain", "--scope", "project"])
+
+            content = (store.root / "MEMORY.md").read_text(encoding="utf-8")
+            self.assertIn("keep-1", content)
+            self.assertNotIn("drop-1", content, "archived memories must leave MEMORY.md")
+
+
+class ExpiresSemanticsTests(unittest.TestCase):
+    _THRESHOLDS = {
+        "decay_per_run": 1,
+        "archive_strength": 30,
+        "deprecated_strength": 5,
+        "core_strength": 200,
+        "core_access_count": 99,
+    }
+
+    def _memory(self, expires: str):
+        from mnemosyne.schema import Memory
+
+        return Memory(id="m-1", type="pitfall", strength=80, expires=expires, body="## t\n\nbody")
+
+    def test_free_text_expires_never_archives(self) -> None:
+        from pathlib import Path
+
+        from mnemosyne.store import Store
+
+        result, _ = maintain_memory(
+            Store("project", Path(".")), Path("m-1.md"), self._memory("认证方案重构时失效"),
+            self._THRESHOLDS, dry_run=True,
+        )
+
+        self.assertEqual("decayed", result)
+
+    def test_iso_expires_archives_past_date(self) -> None:
+        from pathlib import Path
+
+        from mnemosyne.store import Store
+
+        result, _ = maintain_memory(
+            Store("project", Path(".")), Path("m-1.md"), self._memory("2020-01-01"),
+            self._THRESHOLDS, dry_run=True,
+        )
+
+        self.assertEqual("archived", result)
+
+    def test_is_date_expiry(self) -> None:
+        from mnemosyne.lifecycle import is_date_expiry
+
+        self.assertTrue(is_date_expiry("2026-12-31"))
+        self.assertFalse(is_date_expiry("认证方案重构时失效"))
+        self.assertFalse(is_date_expiry("2026-1-1"))
+
+
+class CorruptFileToleranceTests(unittest.TestCase):
+    def test_parse_memory_tolerates_non_numeric_counters(self) -> None:
+        from mnemosyne.schema import parse_memory
+
+        text = "---\nid: bad-1\ntype: pitfall\nstrength: high\naccess_count: many\n---\n\n## t\n\nbody\n"
+
+        memory = parse_memory(text)
+
+        self.assertEqual(0, memory.strength)
+        self.assertEqual(0, memory.access_count)
+        self.assertEqual("bad-1", memory.id)
+
+    def test_load_memories_skips_undecodable_file(self) -> None:
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            good = Memory(id="good-1", type="codebase", strength=70, body="## ok\n\nfine")
+            write_memory(working_path(store, good), good)
+            (store.working_dir / "junk.md").write_bytes(b"\xff\xfe\x00 not utf8")
+
+            memories = load_memories(store)
+
+            self.assertEqual(["good-1"], [memory.id for _, memory in memories])
+
+    def test_corrupt_memory_paths_reports_bad_files(self) -> None:
+        from mnemosyne.store import corrupt_memory_paths, ensure_store
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            (store.working_dir / "junk.md").write_bytes(b"\xff\xfe\x00 not utf8")
+            (store.working_dir / "no_id.md").write_text("---\ntype: pitfall\n---\n\nbody\n", encoding="utf-8")
+
+            bad = corrupt_memory_paths(store)
+
+            self.assertEqual({"junk.md", "no_id.md"}, {path.name for path in bad})
+
+
 if __name__ == "__main__":
     unittest.main()

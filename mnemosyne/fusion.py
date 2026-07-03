@@ -8,7 +8,13 @@ from typing import Iterable
 
 from mnemosyne.embedding import get_embedder
 from mnemosyne.embedding.base import call_with_timeout
-from mnemosyne.index import cosine_similarity, fts_available, iter_embeddings, search_index
+from mnemosyne.index import (
+    cosine_similarity,
+    fts_available,
+    iter_embeddings,
+    lookup_indexed_memory,
+    search_index,
+)
 from mnemosyne.relations import warns, weight
 from mnemosyne.rerank import get_reranker
 from mnemosyne.schema import Memory
@@ -102,6 +108,18 @@ def expand_links(
     max_hops = max(0, int(fusion_config.get("link_expansion_max_hops", 1)))
     frontier = list(candidates.values())
     visited_sources: set[str] = set()
+
+    # Resolve link targets through the SQLite meta table (with a per-call
+    # memo) instead of re-scanning every memory file for every link.
+    resolved: dict[str, tuple[Store, Path, Memory] | None] = {}
+
+    def resolve(target_id: str) -> tuple[Store, Path, Memory] | None:
+        if target_id not in resolved:
+            found = lookup_indexed_memory(stores, target_id)
+            if found is None:
+                found = find_memory(target_id, stores, include_archive=True)
+            resolved[target_id] = found
+        return resolved[target_id]
     for hop in range(max_hops):
         next_frontier: list[FusionSearchResult] = []
         for source in frontier:
@@ -111,7 +129,7 @@ def expand_links(
             for link in source.memory.links:
                 target_id = str(link.get("id", ""))
                 relation = str(link.get("rel", ""))
-                found = find_memory(target_id, stores, include_archive=True)
+                found = resolve(target_id)
                 if found is None:
                     continue
                 target_store, target_path, target_memory = found
@@ -228,7 +246,10 @@ def _rerank(query: str, results: list[FusionSearchResult], reranker, top_n: int)
     for result, score in zip(selected, scores):
         result.score = float(score)
         result.score_breakdown["rerank"] = float(score)
-    return _sorted_results(results)
+    # Reranked candidates always precede the un-reranked tail: reranker scores
+    # and BM25/RRF scores live on different scales, so a global sort would let
+    # a raw-score tail entry outrank a reranked head entry.
+    return _sorted_results(selected) + results[count:]
 
 
 def _sorted_results(results: Iterable[FusionSearchResult]) -> list[FusionSearchResult]:

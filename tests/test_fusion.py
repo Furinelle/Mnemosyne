@@ -38,6 +38,21 @@ class PreferSecondReranker:
 
 
 class FusionTests(unittest.TestCase):
+    def test_rerank_keeps_unreranked_tail_behind_reranked_head(self) -> None:
+        from mnemosyne.fusion import _rerank
+        from mnemosyne.store import Store
+
+        store = Store("project", Path("."))
+        results = [
+            FusionSearchResult(store=store, path=Path("a.md"), memory=_memory("first", "first doc"), score=6.0),
+            FusionSearchResult(store=store, path=Path("b.md"), memory=_memory("second", "second doc"), score=5.0),
+            FusionSearchResult(store=store, path=Path("c.md"), memory=_memory("third", "third doc"), score=4.0),
+        ]
+
+        reranked = _rerank("query", results, PreferSecondReranker(), top_n=1)
+
+        self.assertEqual(["second", "first", "third"], [item.memory.id for item in reranked])
+
     def test_rrf_matches_reference_formula(self) -> None:
         scores = rrf([["a", "b"], ["b", "c"]], k=60)
 

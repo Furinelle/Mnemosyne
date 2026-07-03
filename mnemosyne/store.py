@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     },
     "injection": {
         "max_tokens": 2000,
+        "summary_chars": 120,
     },
     "search": {
         "index_enabled": True,
@@ -105,6 +106,7 @@ types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
 
 [injection]
 max_tokens = 2000
+summary_chars = 120
 
 [search]
 index_enabled = true
@@ -275,9 +277,25 @@ def load_memories(store: Store, include_archive: bool = False) -> list[tuple[Pat
     for path in iter_memory_paths(store, include_archive=include_archive):
         try:
             memories.append((path, parse_memory(path.read_text(encoding="utf-8"))))
-        except OSError:
+        except (OSError, ValueError):
+            # ValueError covers UnicodeDecodeError: memories are hand-editable
+            # files, and one corrupt file must not take down the whole store.
             continue
     return memories
+
+
+def corrupt_memory_paths(store: Store, include_archive: bool = True) -> list[Path]:
+    """Memory files that cannot be used: unreadable, undecodable, or missing an id."""
+    bad: list[Path] = []
+    for path in iter_memory_paths(store, include_archive=include_archive):
+        try:
+            memory = parse_memory(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            bad.append(path)
+            continue
+        if not memory.id:
+            bad.append(path)
+    return bad
 
 
 def write_memory(path: Path, memory: Memory, lock_timeout: float = 10.0) -> None:

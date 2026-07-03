@@ -375,6 +375,7 @@ types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
 
 [injection]
 max_tokens = 2000
+summary_chars = 120
 
 [search]
 index_enabled = true
@@ -429,6 +430,7 @@ port = 3700
 - `thresholds` 控制记忆衰减、召回和晋升阈值。
 - `memory.types` 是允许的记忆类型清单。写入其它类型会提示 warning。
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
+- `injection.summary_chars` 控制注入摘要的单条截断长度（默认 120）。注入是"目录"而非全文：每条记忆一行，完整内容用 `python3 -m mnemosyne show ID` 按需获取。同一会话内已注入过的记忆不会重复注入。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
 - `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。
@@ -495,6 +497,9 @@ localStorage 中的 token 会被 XSS 读取，改用 httpOnly cookie 并补 CSRF
 `source` 用来追溯写入方，如 `claude-code`、`codex`、`user`。需要查看完整字段时用
 `python3 -m mnemosyne show ID`。
 
+`expires` 支持两种写法：ISO 日期（`2026-12-31`，maintain 到期自动归档）或自由文本
+条件注记（如 `认证方案重构时失效`，仅供人和 agent 阅读，不参与自动归档）。
+
 ## 存储结构
 
 ```text
@@ -542,12 +547,13 @@ python3 -m mnemosyne doctor --scope all
 | `mcp serve` 提示缺依赖 | 安装 `python3 -m pip install -e ".[mcp]"`。 |
 | 切换 embedding 模型后向量未命中 | 跑 `python3 -m mnemosyne embed-backfill --scope all`。 |
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
+| 同一会话里记忆没有再次注入 | 会话级去重的预期行为；需要全文时用 `python3 -m mnemosyne show ID`。 |
 | `codex-ingest` 没写入 | 确认传入文本有 `**新发现:**` 块，并且命令带了 `--commit`。 |
 | Hermes provider 不生效 | 确认已运行 `install-hermes` 且重启了 Hermes；用 `--dry-run` 预览安装内容。 |
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.3.1：0.3.0 引入跨 agent 自动记忆形成（`distill`，opt-in）与 LongMemEval 检索基准；0.3.1 修复了 `distill` 去重比对截断摘要导致的重复写入、`find_project_store` 把全局库误当项目库的污染问题，并收紧了启发式抽取精度。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.4.0：新增会话级注入去重、单行注入 + `show` 按需拉全文（progressive disclosure）、embedding 增量 backfill；注入排序改为相关性优先，link expansion 走 SQLite，maintain 对账重写 MEMORY.md。0.3.2 修复了全局库衰减随活跃项目数放大、rerank 分数刻度混排、损坏文件拖垮整库、`expires` 语义分裂四个问题。
 
 ## License
 

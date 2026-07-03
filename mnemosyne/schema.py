@@ -73,6 +73,15 @@ class Memory:
         return data
 
 
+def _to_int(value: Any, default: int = 0) -> int:
+    """Frontmatter is hand-editable markdown; a mangled counter must not make
+    the whole memory (and with it every search/maintain/hook) unreadable."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return default
+
+
 def parse_memory(text: str) -> Memory:
     frontmatter, body = split_frontmatter(text)
     data = parse_frontmatter(frontmatter)
@@ -81,10 +90,10 @@ def parse_memory(text: str) -> Memory:
         id=str(known.get("id", "")),
         type=str(known.get("type", "codebase")),
         source=str(known.get("source", "agent")),
-        strength=int(known.get("strength", 0) or 0),
+        strength=_to_int(known.get("strength")),
         created=str(known.get("created", "")),
         last_accessed=str(known.get("last_accessed", "")),
-        access_count=int(known.get("access_count", 0) or 0),
+        access_count=_to_int(known.get("access_count")),
         tags=[str(item) for item in known.get("tags", []) or []],
         links=_normalize_links(known.get("links", []) or []),
         canonical_summary=str(known.get("canonical_summary", "")),

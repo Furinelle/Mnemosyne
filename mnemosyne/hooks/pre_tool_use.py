@@ -6,7 +6,15 @@ import json
 import sys
 from pathlib import Path
 
-from mnemosyne.hooks._common import collect_stores, format_for_injection, hook_safe, read_event, run_search
+from mnemosyne.hooks._common import (
+    collect_stores,
+    format_for_injection,
+    hook_safe,
+    load_injected_ids,
+    read_event,
+    record_injected_ids,
+    run_search,
+)
 from mnemosyne.store import load_config
 
 
@@ -23,13 +31,22 @@ def main() -> None:
         basename = Path(file_path).name
         if not basename:
             return
-        results = run_search(basename, limit=2, update_access=False)
+        session_id = str(event.get('session_id') or '')
+        already = load_injected_ids(session_id)
+        results = [
+            item for item in run_search(basename, limit=2, update_access=False)
+            if item['id'] not in already
+        ]
         if not results:
             return
         stores = collect_stores()
         config = load_config(stores[-1] if stores else None)
         max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
-        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(results, max_tokens=max_tokens)
+        summary_chars = int(config.get('injection', {}).get('summary_chars', 120))
+        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(
+            results, max_tokens=max_tokens, summary_chars=summary_chars
+        )
+        record_injected_ids(session_id, [item['id'] for item in results])
         output = {
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',

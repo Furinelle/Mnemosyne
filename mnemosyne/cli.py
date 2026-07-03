@@ -14,7 +14,7 @@ from pathlib import Path
 
 import portalocker
 
-from mnemosyne.lifecycle import MaintainSummary, maintain_memory
+from mnemosyne.lifecycle import MaintainSummary, is_date_expiry, maintain_memory
 from mnemosyne.index import (
     backfill_embeddings,
     fts_available,
@@ -32,6 +32,7 @@ from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
     lock_store,
     Store,
+    corrupt_memory_paths,
     ensure_store,
     find_memory,
     global_store,
@@ -246,6 +247,12 @@ def cmd_write(args: argparse.Namespace) -> int:
         expires=args.expires,
     )
 
+    if args.expires and not is_date_expiry(args.expires):
+        print(
+            "Warning: --expires is not an ISO date (YYYY-MM-DD); kept as a note, will not auto-archive.",
+            file=sys.stderr,
+        )
+
     if not args.force and sys.stdin.isatty():
         duplicate = duplicate_prompt(store, memory)
         if duplicate == "cancel":
@@ -310,6 +317,8 @@ def cmd_maintain(args: argparse.Namespace) -> int:
                     summary.archived += 1
                 elif result == "core_candidate" and candidate is not None:
                     summary.core_candidates.append(candidate)
+        if not args.dry_run:
+            rewrite_memory_index_file(store)
         if index_enabled(store) and index_path(store).exists():
             reindex_store(store)
 
@@ -418,6 +427,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             else:
                 index_detail = f"{index_path(store)} (not built yet; run reindex)"
             checks.append((f"{store.scope} index", True, index_detail, False))
+            bad = corrupt_memory_paths(store)
+            if bad:
+                names = ", ".join(path.name for path in bad[:3])
+                more = f" (+{len(bad) - 3} more)" if len(bad) > 3 else ""
+                checks.append((f"{store.scope} corrupt files", False, f"{names}{more}; fix or delete, they are skipped", False))
+            else:
+                checks.append((f"{store.scope} corrupt files", True, "none", False))
     failed = 0
     for name, ok, detail, hard in checks:
         status = "ok" if ok else ("missing" if hard else "info")
@@ -580,6 +596,23 @@ def update_memory_index_file(store: Store, memory: Memory) -> None:
             index_path.write_text("# Memory Index\n", encoding="utf-8")
     with index_path.open("a", encoding="utf-8") as handle:
         handle.write(f"\n- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}\n")
+
+
+def rewrite_memory_index_file(store: Store) -> None:
+    """Regenerate MEMORY.md from active working memories.
+
+    The write path appends for cheapness; maintain reconciles so entries for
+    archived or superseded memories do not accumulate forever.
+    """
+    try:
+        header = template_text("MEMORY.md").rstrip()
+    except (FileNotFoundError, OSError):
+        header = "# Memory Index"
+    lines = [header, ""]
+    memories = sorted(load_memories(store), key=lambda pair: pair[1].strength, reverse=True)
+    for _path, memory in memories:
+        lines.append(f"- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}")
+    (store.root / "MEMORY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def print_search_results(indexed_results, output_format: str, config: dict) -> int:

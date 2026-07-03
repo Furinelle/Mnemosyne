@@ -60,20 +60,26 @@ def maybe_auto_init_project() -> None:
         pass
 
 
-def maybe_run_maintain() -> None:
-    project = find_project_store()
-    if project is None:
-        return
-    marker = project.root / '.last_maintain'
-    if marker.exists():
-        try:
-            last = datetime.fromisoformat(marker.read_text(encoding='utf-8').strip())
-        except (ValueError, OSError):
-            last = None
-        if last is not None:
-            now = datetime.now(tz=last.tzinfo) if last.tzinfo else datetime.now()
-            if now - last < MAINTAIN_INTERVAL:
-                return
+def _maintain_due(root: Path) -> bool:
+    marker = root / '.last_maintain'
+    if not marker.exists():
+        return True
+    try:
+        last = datetime.fromisoformat(marker.read_text(encoding='utf-8').strip())
+    except (ValueError, OSError):
+        return True
+    now = datetime.now(tz=last.tzinfo) if last.tzinfo else datetime.now()
+    return now - last >= MAINTAIN_INTERVAL
+
+
+def _mark_maintained(root: Path) -> None:
+    try:
+        (root / '.last_maintain').write_text(datetime.now().isoformat(), encoding='utf-8')
+    except OSError:
+        pass
+
+
+def _spawn_maintain(scope: str) -> bool:
     kwargs: dict = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
     if sys.platform == 'win32':
         kwargs['creationflags'] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -81,15 +87,30 @@ def maybe_run_maintain() -> None:
         kwargs['start_new_session'] = True
     try:
         subprocess.Popen(
-            [sys.executable, '-m', 'mnemosyne', 'maintain', '--scope', 'all'],
+            [sys.executable, '-m', 'mnemosyne', 'maintain', '--scope', scope],
             **kwargs,
         )
     except OSError:
-        return
-    try:
-        marker.write_text(datetime.now().isoformat(), encoding='utf-8')
-    except OSError:
-        pass
+        return False
+    return True
+
+
+def maybe_run_maintain() -> None:
+    """Run background maintenance, throttled per store.
+
+    The throttle marker lives in each store's own root: the global store
+    decays once per interval no matter how many projects open sessions that
+    day. A project-level marker gating `--scope all` used to multiply global
+    decay by the number of active projects.
+    """
+    project = find_project_store()
+    if project is not None and _maintain_due(project.root):
+        if _spawn_maintain('project'):
+            _mark_maintained(project.root)
+    global_root = global_store().root
+    if global_root.exists() and _maintain_due(global_root):
+        if _spawn_maintain('global'):
+            _mark_maintained(global_root)
 
 
 def main() -> None:

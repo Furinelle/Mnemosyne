@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import math
 import struct
+import sys
 import time
 from contextlib import closing
 from dataclasses import dataclass
@@ -295,6 +296,35 @@ def delete_memory_index(connection: sqlite3.Connection, scope: str, memory_id: s
     connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
 
 
+def lookup_indexed_memory(
+    stores: Iterable[Store], memory_id: str
+) -> tuple[Store, Path, Memory] | None:
+    """Resolve a memory id via the persistent index instead of scanning files.
+
+    Link expansion resolves every linked id of every candidate; a linear
+    re-read of the whole store per link makes search O(candidates x links x N).
+    """
+    for store in stores:
+        if not index_path(store).exists():
+            continue
+        try:
+            with closing(_connect(index_path(store))) as connection:
+                row = connection.execute(
+                    "SELECT path FROM memories_meta WHERE memory_id = ? LIMIT 1",
+                    (memory_id,),
+                ).fetchone()
+        except sqlite3.Error:
+            continue
+        if row is None:
+            continue
+        path = Path(row[0])
+        try:
+            return store, path, parse_memory(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def _search_rows(
     connection: sqlite3.Connection,
     expression: str,
@@ -457,20 +487,61 @@ def iter_embeddings(
             )
 
 
-def backfill_embeddings(store: Store, embedder, include_archive: bool = True) -> int:
+def backfill_embeddings(
+    store: Store,
+    embedder,
+    include_archive: bool = True,
+    batch_size: int | None = None,
+) -> int:
+    """Embed memories whose vector is missing, from another model, or stale.
+
+    Incremental: fresh embeddings (embedding_mtime >= file mtime, same model)
+    are skipped. Batching gives every chunk its own timeout, so one slow or
+    failing call skips that chunk with a warning instead of silently writing
+    zero embeddings for the whole store, which is what a single whole-run
+    timeout used to do.
+    """
     sync_index(store, include_archive=include_archive)
-    memories = load_memories(store, include_archive=include_archive)
-    vectors = call_with_timeout(
-        lambda: embedder.embed([memory_search_text(memory) for _, memory in memories]),
-        timeout=30.0,
-        fallback=[],
-    )
+    if batch_size is None:
+        batch_size = int(load_config(store).get("embedding", {}).get("batch_size", 32))
+    batch_size = max(1, batch_size)
+    filters = ["(embedding IS NULL OR embedding_model != ? OR embedding_mtime < mtime)"]
+    params: list[object] = [embedder.model_id]
+    if not include_archive:
+        filters.append("archived = 0")
+    if not index_path(store).exists():
+        return 0
+    with closing(_connect(index_path(store))) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            f"SELECT memory_id, path FROM memories_meta WHERE {' AND '.join(filters)}",
+            params,
+        ).fetchall()
     count = 0
-    for (_path, memory), vector in zip(memories, vectors):
-        if vector is None:
+    for start in range(0, len(rows), batch_size):
+        chunk = rows[start : start + batch_size]
+        ids: list[str] = []
+        texts: list[str] = []
+        for row in chunk:
+            try:
+                memory = parse_memory(Path(row["path"]).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            ids.append(row["memory_id"])
+            texts.append(memory_search_text(memory))
+        if not texts:
             continue
-        write_embedding(store, memory.id, vector, embedder.model_id)
-        count += 1
+        vectors = call_with_timeout(lambda: embedder.embed(texts), timeout=30.0, fallback=None)
+        if vectors is None or len(vectors) != len(ids):
+            print(
+                f"mnemosyne: embedding batch failed; skipped {len(ids)} memories in {store.scope} store",
+                file=sys.stderr,
+            )
+            continue
+        for memory_id, vector in zip(ids, vectors):
+            if vector:
+                write_embedding(store, memory_id, vector, embedder.model_id)
+                count += 1
     return count
 
 
