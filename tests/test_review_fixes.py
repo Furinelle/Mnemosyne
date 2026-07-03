@@ -61,6 +61,45 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class ConsolidateTests(unittest.TestCase):
+    def _seed(self):
+        self.assertEqual(0, main(["init"]))
+        for importance, content in (("80", "use httpOnly cookie for JWT tokens"),
+                                    ("60", "use httpOnly cookie for JWT auth tokens")):
+            self.assertEqual(0, main([
+                "write", "--type", "pitfall", "--importance", importance, "--force",
+                "--allow-duplicate", "--title", "JWT cookie storage",
+                "--content", content,
+            ]))
+
+    def test_consolidate_dry_run_lists_pairs_without_changes(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        with isolated_workspace():
+            self._seed()
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                code = main(["consolidate", "--scope", "project"])
+
+            self.assertEqual(0, code)
+            self.assertIn("would merge", output.getvalue())
+            self.assertEqual(2, len(load_memories(project_store())))
+
+    def test_consolidate_commit_merges_weaker_into_stronger(self) -> None:
+        with isolated_workspace():
+            self._seed()
+
+            self.assertEqual(0, main(["consolidate", "--scope", "project", "--commit"]))
+
+            memories = load_memories(project_store())
+            self.assertEqual(1, len(memories))
+            survivor = memories[0][1]
+            self.assertEqual(80, survivor.strength)
+            self.assertIn("auth tokens", survivor.body)
+
+
 class SupersededRetrievalTests(unittest.TestCase):
     def _write_pair(self):
         self.assertEqual(0, main(["init"]))

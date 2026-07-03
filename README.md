@@ -338,6 +338,7 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 | `link ID1 ID2 --rel REL` | 用 typed relation 链接两条记忆；自定义关系需 `--allow-custom`。 |
 | `graph ID --format mermaid` | BFS 展开关系图，支持 `mermaid`、`ascii`、`json`。 |
 | `maintain --dry-run` | 预览衰减、归档和 core 晋升候选。 |
+| `consolidate [--commit]` | 合并近重复 working 记忆（同类型、相似度 ≥0.8）；默认 dry-run 预览。 |
 | `maintain --scope all` | 维护全局和项目记忆。 |
 | `reindex --scope all` | 全量重建搜索索引。 |
 | `embed-backfill --scope all` | 为已有记忆计算或刷新 embedding。 |

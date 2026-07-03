@@ -101,6 +101,15 @@ def build_parser() -> argparse.ArgumentParser:
     maintain_parser.add_argument("--dry-run", action="store_true")
     maintain_parser.set_defaults(func=cmd_maintain)
 
+    consolidate_parser = subparsers.add_parser(
+        "consolidate", help="Merge near-duplicate working memories (dry-run by default)")
+    consolidate_parser.add_argument("--scope", choices=["global", "project", "all"], default="project")
+    consolidate_parser.add_argument("--threshold", type=float, default=0.8,
+        help="Jaccard similarity above which two same-type memories merge")
+    consolidate_parser.add_argument("--commit", action="store_true",
+        help="actually merge (default: preview only)")
+    consolidate_parser.set_defaults(func=cmd_consolidate)
+
     reindex_parser = subparsers.add_parser("reindex", help="Rebuild persistent search indexes")
     reindex_parser.add_argument("--scope", choices=["global", "project", "all"], default="all")
     reindex_parser.add_argument("--no-archive", action="store_true", help="exclude archive memories")
@@ -356,6 +365,56 @@ def cmd_maintain(args: argparse.Namespace) -> int:
         print("Core candidates:")
         for memory in summary.core_candidates:
             print(f"- {memory.id}: {memory.injection_summary}")
+    return 0
+
+
+def _consolidation_tokens(memory: Memory) -> set[str]:
+    from mnemosyne.search import tokenize as _tokenize
+
+    return set(_tokenize(f"{memory.canonical_summary} {memory.body}"))
+
+
+def cmd_consolidate(args: argparse.Namespace) -> int:
+    """Sleep-time style maintenance, conservative v1: merge near-duplicate
+    working memories of the same type. Heuristic-only (no LLM), dry-run by
+    default; the weaker memory is folded into the stronger via merge_memory."""
+    from mnemosyne.distill import jaccard  # same similarity the dedup path uses
+    from mnemosyne.index import remove_memory_index
+
+    merged_total = 0
+    for store in stores_for_scope(args.scope):
+        with lock_store(store):
+            entries = load_memories(store)
+            entries.sort(key=lambda pair: pair[1].strength, reverse=True)
+            consumed: set[str] = set()
+            for i, (strong_path, strong) in enumerate(entries):
+                if strong.id in consumed:
+                    continue
+                strong_tokens = _consolidation_tokens(strong)
+                for weak_path, weak in entries[i + 1:]:
+                    if weak.id in consumed or weak.type != strong.type:
+                        continue
+                    similarity = jaccard(sorted(strong_tokens), sorted(_consolidation_tokens(weak)))
+                    if similarity < args.threshold:
+                        continue
+                    if not args.commit:
+                        print(f"would merge {weak.id} -> {strong.id} (similarity {similarity:.2f})")
+                        consumed.add(weak.id)
+                        continue
+                    merge_memory(strong, weak)
+                    write_memory(strong_path, strong)
+                    update_search_index(store, strong_path, strong)
+                    weak_path.unlink(missing_ok=True)
+                    remove_memory_index(store, weak.id)
+                    consumed.add(weak.id)
+                    merged_total += 1
+                    print(f"merged {weak.id} -> {strong.id} (similarity {similarity:.2f})")
+            if args.commit and consumed:
+                rewrite_memory_index_file(store)
+    if not args.commit:
+        print("(dry-run) Add --commit to merge.")
+    else:
+        print(f"merged: {merged_total}")
     return 0
 
 
