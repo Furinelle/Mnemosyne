@@ -317,6 +317,8 @@ def cmd_maintain(args: argparse.Namespace) -> int:
                     summary.archived += 1
                 elif result == "core_candidate" and candidate is not None:
                     summary.core_candidates.append(candidate)
+        if not args.dry_run:
+            rewrite_memory_index_file(store)
         if index_enabled(store) and index_path(store).exists():
             reindex_store(store)
 
@@ -594,6 +596,23 @@ def update_memory_index_file(store: Store, memory: Memory) -> None:
             index_path.write_text("# Memory Index\n", encoding="utf-8")
     with index_path.open("a", encoding="utf-8") as handle:
         handle.write(f"\n- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}\n")
+
+
+def rewrite_memory_index_file(store: Store) -> None:
+    """Regenerate MEMORY.md from active working memories.
+
+    The write path appends for cheapness; maintain reconciles so entries for
+    archived or superseded memories do not accumulate forever.
+    """
+    try:
+        header = template_text("MEMORY.md").rstrip()
+    except (FileNotFoundError, OSError):
+        header = "# Memory Index"
+    lines = [header, ""]
+    memories = sorted(load_memories(store), key=lambda pair: pair[1].strength, reverse=True)
+    for _path, memory in memories:
+        lines.append(f"- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}")
+    (store.root / "MEMORY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def print_search_results(indexed_results, output_format: str, config: dict) -> int:

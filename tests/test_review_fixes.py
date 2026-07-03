@@ -61,6 +61,30 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class MemoryIndexRewriteTests(unittest.TestCase):
+    def test_maintain_rewrites_memory_index(self) -> None:
+        from mnemosyne.cli import update_memory_index_file
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            keep = Memory(id="keep-1", type="codebase", strength=90,
+                          injection_summary="stays", body="## keep\n\nstays")
+            drop = Memory(id="drop-1", type="pitfall", strength=25,
+                          injection_summary="archived away", body="## drop\n\ngoes")
+            for memory in (keep, drop):
+                write_memory(working_path(store, memory), memory)
+                update_memory_index_file(store, memory)
+
+            main(["maintain", "--scope", "project"])
+
+            content = (store.root / "MEMORY.md").read_text(encoding="utf-8")
+            self.assertIn("keep-1", content)
+            self.assertNotIn("drop-1", content, "archived memories must leave MEMORY.md")
+
+
 class ExpiresSemanticsTests(unittest.TestCase):
     _THRESHOLDS = {
         "decay_per_run": 1,
