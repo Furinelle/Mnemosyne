@@ -38,6 +38,7 @@ class Finding:
     title: str
     tags: list[str]
     content: str
+    evidence: str = ""
 
 
 def prep(task: str, max_memories: int = 5) -> str:
@@ -116,7 +117,8 @@ def parse_findings(text: str) -> list[Finding]:
         if not content:
             print(f'mnemosyne: dropping finding {title!r}, empty content', file=sys.stderr)
             return
-        findings.append(Finding(type_value, importance, title[:80], tags, content))
+        evidence = (current.get('evidence') or '').strip()
+        findings.append(Finding(type_value, importance, title[:80], tags, content, evidence))
 
     index = 0
     while index < len(lines):
@@ -162,7 +164,7 @@ def parse_findings(text: str) -> list[Finding]:
                 if current is not None:
                     flush()
                 current = {'type': value}
-            elif current is not None and key in ('importance', 'title', 'tags'):
+            elif current is not None and key in ('importance', 'title', 'tags', 'evidence'):
                 current[key] = value
             index += 1
             continue
@@ -212,6 +214,8 @@ def write_finding(finding: Finding, source: str) -> str:
         body=f'## {finding.title}\n\n{finding.content}',
         expires='',
     )
+    if finding.evidence:
+        memory.extra['evidence'] = finding.evidence[:200]
     path = working_path(store, memory)
     write_memory(path, memory)
     update_memory_index_file(store, memory)
