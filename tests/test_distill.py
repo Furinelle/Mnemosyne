@@ -189,3 +189,30 @@ def test_heuristic_still_captures_concise_pitfall():
     turn = Turn(role="assistant", text="出现 Traceback，根因是连接池未释放，修复为在 finally 中 close()")
     findings = HeuristicExtractor(confidence_threshold=0.6).extract([turn])
     assert len(findings) == 1 and findings[0].type == "pitfall"
+
+
+def test_parse_llm_json_reads_evidence_and_session_summary():
+    payload = (
+        '[{"type": "session_summary", "importance": 55, "title": "今日会话摘要",'
+        ' "tags": ["session"], "content": "重构了认证模块", "evidence": "user: 重构认证"}]'
+    )
+
+    findings = _parse_llm_json(payload)
+
+    assert len(findings) == 1
+    assert findings[0].type == "session_summary"
+    assert findings[0].evidence == "user: 重构认证"
+
+
+def test_build_prompt_toggles_session_summary():
+    from mnemosyne.distill.llm import _build_prompt
+
+    with_summary = _build_prompt("[user] hi", include_session_summary=True)
+    without_summary = _build_prompt("[user] hi", include_session_summary=False)
+
+    # The type list always mentions session_summary; the *instruction* to emit
+    # one is what the config toggles.
+    assert "evidence" in without_summary
+    assert "exactly one" in with_summary
+    assert "exactly one" not in without_summary
+    assert with_summary.endswith("[user] hi")

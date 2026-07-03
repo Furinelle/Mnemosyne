@@ -170,6 +170,7 @@ python3 -m mnemosyne show pitfall-2026-05-28-xxxxxx
 | `pitfall` | 非显然的 bug、根因、修复和避免方式。 |
 | `arch_decision` | 架构选择，以及为什么没有选其它方案。 |
 | `handoff` | 一个 Agent 给下一个 Agent 的交接摘要。 |
+| `session_summary` | LLM 蒸馏生成的会话级摘要（`[distill].session_summary = true` 时输出）。 |
 
 ## 让 Claude Code、Codex 和 Hermes 共享记忆
 
@@ -397,6 +398,7 @@ top_n = 5
 [distill]
 enabled = false
 engine = "heuristic"
+session_summary = false
 confidence_threshold = 0.6
 max_findings_per_session = 5
 dedup_threshold = 0.85
@@ -433,7 +435,7 @@ port = 3700
 - `injection.summary_chars` 控制注入摘要的单条截断长度（默认 120）。注入是"目录"而非全文：每条记忆一行，完整内容用 `python3 -m mnemosyne show ID` 按需获取。同一会话内已注入过的记忆不会重复注入。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
-- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。
+- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。`distill.session_summary` 开启后（需 `engine = "llm"`），每次蒸馏额外产出一条 `session_summary` 会话摘要；LLM findings 会带 `evidence` 原文引用便于溯源。Stop hook 的蒸馏是增量的：按 transcript 记录已处理轮次（`.distill_state.json`），每轮只处理新增内容。
 - `fusion.link_expansion` 控制 typed links 是否参与召回扩展。
 - `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
 - `mcp.sse` 控制可选 SSE 地址；stdio 始终是 `mcp serve` 默认值。

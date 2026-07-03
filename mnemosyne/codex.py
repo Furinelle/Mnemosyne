@@ -28,7 +28,7 @@ from mnemosyne.store import (
 FINDINGS_HEADER_RE = re.compile(r'^\s*\*\*(?:新发现|Findings)[:：]\*\*\s*$', re.MULTILINE)
 FIELD_RE = re.compile(r'^\s*-\s*(\w+)\s*:\s*(.*)$')
 CONTENT_OPEN_RE = re.compile(r'^\s*-\s*content\s*:\s*\|\s*$')
-ALLOWED_TYPES = ('arch_decision', 'pitfall', 'codebase', 'preference', 'handoff')
+ALLOWED_TYPES = ('arch_decision', 'pitfall', 'codebase', 'preference', 'handoff', 'session_summary')
 
 
 @dataclass
