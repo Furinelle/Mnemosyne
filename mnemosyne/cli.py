@@ -92,6 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("--limit", type=int, default=5)
     search_parser.add_argument("--format", choices=["text", "json"], default="text")
     search_parser.add_argument("--archive", action="store_true", help="include archive")
+    search_parser.add_argument("--include-superseded", action="store_true",
+        help="include memories superseded by newer ones")
     search_parser.set_defaults(func=cmd_search)
 
     maintain_parser = subparsers.add_parser("maintain", help="Decay and archive memories")
@@ -305,6 +307,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         limit=args.limit,
         type_filter=args.type,
         include_archive=args.archive,
+        include_superseded=args.include_superseded,
         config=config,
     )
     if not results:
@@ -506,6 +509,8 @@ def cmd_link(args: argparse.Namespace) -> int:
     add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
     if is_demoting(args.rel):
         second_memory.strength = max(0, second_memory.strength - DEMOTE_ON_SUPERSEDE)
+        second_memory.status = "superseded"
+        second_memory.extra["invalidated_by"] = first_memory.id
     write_memory(first_path, first_memory)
     write_memory(second_path, second_memory)
     update_search_index(first[0], first_path, first_memory)

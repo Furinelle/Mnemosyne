@@ -61,6 +61,54 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class SupersededRetrievalTests(unittest.TestCase):
+    def _write_pair(self):
+        self.assertEqual(0, main(["init"]))
+        self.assertEqual(0, main([
+            "write", "--type", "arch_decision", "--importance", "60", "--force",
+            "--title", "JWT storage decision", "--content", "use localStorage for JWT",
+        ]))
+        store = project_store()
+        old_id = load_memories(store)[0][1].id
+        self.assertEqual(0, main([
+            "write", "--type", "arch_decision", "--importance", "60", "--force",
+            "--title", "JWT storage decision",
+            "--content", "switch to httpOnly cookie for JWT storage",
+        ]))
+        new_id = next(m.id for _, m in load_memories(store) if m.id != old_id)
+        return store, old_id, new_id
+
+    def test_superseded_memory_is_marked_and_filtered(self) -> None:
+        from mnemosyne.fusion import search as fusion_search
+
+        with isolated_workspace():
+            store, old_id, new_id = self._write_pair()
+            memories = {m.id: m for _, m in load_memories(store)}
+            self.assertEqual("superseded", memories[old_id].status)
+            self.assertEqual(new_id, memories[old_id].extra.get("invalidated_by"))
+
+            default_ids = [r.memory.id for r in fusion_search([store], "JWT storage", limit=5)]
+            self.assertNotIn(old_id, default_ids)
+            self.assertIn(new_id, default_ids)
+
+            all_ids = [
+                r.memory.id
+                for r in fusion_search([store], "JWT storage", limit=5, include_superseded=True)
+            ]
+            self.assertIn(old_id, all_ids)
+
+    def test_cli_search_include_superseded_flag(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        with isolated_workspace():
+            store, old_id, _new_id = self._write_pair()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                main(["search", "JWT storage", "--format", "json", "--include-superseded"])
+            self.assertIn(old_id, output.getvalue())
+
+
 class WriteDedupTests(unittest.TestCase):
     def test_force_write_skips_exact_duplicate(self) -> None:
         import io

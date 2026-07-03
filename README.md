@@ -461,6 +461,10 @@ your-project/.mnemosyne/index.sqlite
 python3 -m mnemosyne reindex --scope all
 ```
 
+被 `supersedes` 取代的记忆默认不出现在搜索结果中（失效不删除），用
+`search --include-superseded` 回看历史结论；旧记忆 frontmatter 带
+`invalidated_by` 指向取代者。
+
 `search --format json` 会输出 `why_matched` 和 `score_breakdown`，方便区分 BM25、
 vector、link boost 与 reranker 的贡献。切换 embedding 模型后，运行：
 

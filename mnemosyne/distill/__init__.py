@@ -271,6 +271,8 @@ def _apply_supersedes(new_id: str, old_id: str) -> None:
     add_link(new_memory, old_memory.id, "supersedes")
     add_link(old_memory, new_memory.id, reverse("supersedes") or "superseded_by")
     old_memory.strength = max(0, old_memory.strength - DEMOTE_ON_SUPERSEDE)
+    old_memory.status = "superseded"
+    old_memory.extra["invalidated_by"] = new_id
     write_memory(new_path, new_memory)
     write_memory(old_path, old_memory)
     update_search_index(new_store, new_path, new_memory)
