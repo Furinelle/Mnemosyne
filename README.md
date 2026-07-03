@@ -375,6 +375,7 @@ types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
 
 [injection]
 max_tokens = 2000
+summary_chars = 120
 
 [search]
 index_enabled = true
@@ -429,6 +430,7 @@ port = 3700
 - `thresholds` 控制记忆衰减、召回和晋升阈值。
 - `memory.types` 是允许的记忆类型清单。写入其它类型会提示 warning。
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
+- `injection.summary_chars` 控制注入摘要的单条截断长度（默认 120）。注入是"目录"而非全文：每条记忆一行，完整内容用 `python3 -m mnemosyne show ID` 按需获取。同一会话内已注入过的记忆不会重复注入。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
 - `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。

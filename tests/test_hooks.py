@@ -50,6 +50,22 @@ class InjectionFormattingTests(unittest.TestCase):
 
         self.assertLess(text.index("weak-relevant"), text.index("strong-stale"))
 
+    def test_format_for_injection_single_line_with_show_hint(self) -> None:
+        results = [
+            {
+                "id": "memory-1", "scope": "project", "type": "codebase",
+                "tags": ["alpha"], "summary": "A" * 300, "score": 3.0, "strength": 90,
+            },
+        ]
+
+        text = format_for_injection(results)
+
+        entry_lines = [line for line in text.splitlines() if line.startswith("- ")]
+        self.assertEqual(1, len(entry_lines))
+        self.assertLess(len(entry_lines[0]), 200)
+        self.assertIn("memory-1", entry_lines[0])
+        self.assertIn("mnemosyne show", text)
+
 
 if __name__ == "__main__":
     unittest.main()

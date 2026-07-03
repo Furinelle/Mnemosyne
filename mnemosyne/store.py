@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     },
     "injection": {
         "max_tokens": 2000,
+        "summary_chars": 120,
     },
     "search": {
         "index_enabled": True,
@@ -105,6 +106,7 @@ types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
 
 [injection]
 max_tokens = 2000
+summary_chars = 120
 
 [search]
 index_enabled = true

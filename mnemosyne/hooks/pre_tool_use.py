@@ -42,7 +42,10 @@ def main() -> None:
         stores = collect_stores()
         config = load_config(stores[-1] if stores else None)
         max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
-        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(results, max_tokens=max_tokens)
+        summary_chars = int(config.get('injection', {}).get('summary_chars', 120))
+        context = f'## Memories relevant to {basename}\n\n' + format_for_injection(
+            results, max_tokens=max_tokens, summary_chars=summary_chars
+        )
         record_injected_ids(session_id, [item['id'] for item in results])
         output = {
             'hookSpecificOutput': {

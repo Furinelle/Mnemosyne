@@ -36,7 +36,8 @@ def main() -> None:
         stores = collect_stores()
         config = load_config(stores[-1] if stores else None)
         max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
-        context = format_for_injection(fresh, max_tokens=max_tokens)
+        summary_chars = int(config.get('injection', {}).get('summary_chars', 120))
+        context = format_for_injection(fresh, max_tokens=max_tokens, summary_chars=summary_chars)
         if not context:
             return
         record_injected_ids(session_id, [item['id'] for item in fresh])

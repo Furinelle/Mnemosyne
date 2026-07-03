@@ -254,11 +254,19 @@ def _run_search_indexed(
     return output
 
 
-def format_for_injection(results: list[dict], max_tokens: int | None = None) -> str:
+def format_for_injection(
+    results: list[dict],
+    max_tokens: int | None = None,
+    summary_chars: int = 120,
+) -> str:
+    """One line per memory plus a `show` hint: the injection is a table of
+    contents, not the content. Agents pull full bodies on demand, which keeps
+    the per-prompt context cost near-constant as the store grows."""
     if not results:
         return ''
     lines: list[str] = ['## Relevant memories from Mnemosyne', '']
-    used_tokens = _approx_tokens('\n'.join(lines))
+    footer = 'Run `python3 -m mnemosyne show <id>` for full detail.'
+    used_tokens = _approx_tokens('\n'.join(lines)) + _approx_tokens(footer)
     # Relevance first: a strong-but-irrelevant memory must not displace a
     # weak-but-relevant one. Strength only breaks ties between equal scores.
     sorted_results = sorted(
@@ -266,26 +274,27 @@ def format_for_injection(results: list[dict], max_tokens: int | None = None) -> 
         key=lambda item: (float(item.get('score', 0) or 0), int(item.get('strength', 0) or 0)),
         reverse=True,
     )
+    emitted = 0
     for item in sorted_results:
         tag_part = f" [{', '.join(item['tags'])}]" if item['tags'] else ''
-        summary = item['summary']
-        if len(summary) > 220:
-            summary = summary[:217].rstrip() + '...'
-        item_lines = [
-            f"- ({item['scope']}/{item['type']}) {item['id']}{tag_part}",
-            f'  {summary}',
-        ]
-        item_tokens = _approx_tokens('\n'.join(item_lines))
-        if max_tokens is not None and used_tokens + item_tokens > max_tokens:
-            if not lines[2:]:
+        summary = ' '.join(str(item['summary']).split())
+        if len(summary) > summary_chars:
+            summary = summary[: max(1, summary_chars - 3)].rstrip() + '...'
+        line = f"- ({item['scope']}/{item['type']}) {item['id']}{tag_part}: {summary}"
+        line_tokens = _approx_tokens(line)
+        if max_tokens is not None and used_tokens + line_tokens > max_tokens:
+            if emitted == 0:
                 remaining = max(0, (max_tokens - used_tokens - 8) * 4)
-                if remaining <= 0:
-                    break
-                truncated = summary[:remaining].rstrip() + '...'
-                lines.extend([item_lines[0], f'  {truncated}'])
+                if remaining > 0:
+                    lines.append(line[:remaining].rstrip() + '...')
+                    emitted += 1
             break
-        lines.extend(item_lines)
-        used_tokens += item_tokens
+        lines.append(line)
+        used_tokens += line_tokens
+        emitted += 1
+    if emitted == 0:
+        return ''
+    lines.extend(['', footer])
     return '\n'.join(lines)
 
 
