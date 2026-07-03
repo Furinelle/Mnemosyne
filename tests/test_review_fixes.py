@@ -61,6 +61,52 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class ExpiresSemanticsTests(unittest.TestCase):
+    _THRESHOLDS = {
+        "decay_per_run": 1,
+        "archive_strength": 30,
+        "deprecated_strength": 5,
+        "core_strength": 200,
+        "core_access_count": 99,
+    }
+
+    def _memory(self, expires: str):
+        from mnemosyne.schema import Memory
+
+        return Memory(id="m-1", type="pitfall", strength=80, expires=expires, body="## t\n\nbody")
+
+    def test_free_text_expires_never_archives(self) -> None:
+        from pathlib import Path
+
+        from mnemosyne.store import Store
+
+        result, _ = maintain_memory(
+            Store("project", Path(".")), Path("m-1.md"), self._memory("认证方案重构时失效"),
+            self._THRESHOLDS, dry_run=True,
+        )
+
+        self.assertEqual("decayed", result)
+
+    def test_iso_expires_archives_past_date(self) -> None:
+        from pathlib import Path
+
+        from mnemosyne.store import Store
+
+        result, _ = maintain_memory(
+            Store("project", Path(".")), Path("m-1.md"), self._memory("2020-01-01"),
+            self._THRESHOLDS, dry_run=True,
+        )
+
+        self.assertEqual("archived", result)
+
+    def test_is_date_expiry(self) -> None:
+        from mnemosyne.lifecycle import is_date_expiry
+
+        self.assertTrue(is_date_expiry("2026-12-31"))
+        self.assertFalse(is_date_expiry("认证方案重构时失效"))
+        self.assertFalse(is_date_expiry("2026-1-1"))
+
+
 class CorruptFileToleranceTests(unittest.TestCase):
     def test_parse_memory_tolerates_non_numeric_counters(self) -> None:
         from mnemosyne.schema import parse_memory

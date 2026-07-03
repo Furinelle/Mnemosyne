@@ -495,6 +495,9 @@ localStorage 中的 token 会被 XSS 读取，改用 httpOnly cookie 并补 CSRF
 `source` 用来追溯写入方，如 `claude-code`、`codex`、`user`。需要查看完整字段时用
 `python3 -m mnemosyne show ID`。
 
+`expires` 支持两种写法：ISO 日期（`2026-12-31`，maintain 到期自动归档）或自由文本
+条件注记（如 `认证方案重构时失效`，仅供人和 agent 阅读，不参与自动归档）。
+
 ## 存储结构
 
 ```text

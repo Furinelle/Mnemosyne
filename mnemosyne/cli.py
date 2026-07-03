@@ -14,7 +14,7 @@ from pathlib import Path
 
 import portalocker
 
-from mnemosyne.lifecycle import MaintainSummary, maintain_memory
+from mnemosyne.lifecycle import MaintainSummary, is_date_expiry, maintain_memory
 from mnemosyne.index import (
     backfill_embeddings,
     fts_available,
@@ -246,6 +246,12 @@ def cmd_write(args: argparse.Namespace) -> int:
         body=f"## {title}\n\n{content}",
         expires=args.expires,
     )
+
+    if args.expires and not is_date_expiry(args.expires):
+        print(
+            "Warning: --expires is not an ISO date (YYYY-MM-DD); kept as a note, will not auto-archive.",
+            file=sys.stderr,
+        )
 
     if not args.force and sys.stdin.isatty():
         duplicate = duplicate_prompt(store, memory)
