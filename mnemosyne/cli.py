@@ -32,6 +32,7 @@ from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
     lock_store,
     Store,
+    corrupt_memory_paths,
     ensure_store,
     find_memory,
     global_store,
@@ -418,6 +419,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             else:
                 index_detail = f"{index_path(store)} (not built yet; run reindex)"
             checks.append((f"{store.scope} index", True, index_detail, False))
+            bad = corrupt_memory_paths(store)
+            if bad:
+                names = ", ".join(path.name for path in bad[:3])
+                more = f" (+{len(bad) - 3} more)" if len(bad) > 3 else ""
+                checks.append((f"{store.scope} corrupt files", False, f"{names}{more}; fix or delete, they are skipped", False))
+            else:
+                checks.append((f"{store.scope} corrupt files", True, "none", False))
     failed = 0
     for name, ok, detail, hard in checks:
         status = "ok" if ok else ("missing" if hard else "info")

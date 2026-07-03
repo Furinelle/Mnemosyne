@@ -61,5 +61,46 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class CorruptFileToleranceTests(unittest.TestCase):
+    def test_parse_memory_tolerates_non_numeric_counters(self) -> None:
+        from mnemosyne.schema import parse_memory
+
+        text = "---\nid: bad-1\ntype: pitfall\nstrength: high\naccess_count: many\n---\n\n## t\n\nbody\n"
+
+        memory = parse_memory(text)
+
+        self.assertEqual(0, memory.strength)
+        self.assertEqual(0, memory.access_count)
+        self.assertEqual("bad-1", memory.id)
+
+    def test_load_memories_skips_undecodable_file(self) -> None:
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            good = Memory(id="good-1", type="codebase", strength=70, body="## ok\n\nfine")
+            write_memory(working_path(store, good), good)
+            (store.working_dir / "junk.md").write_bytes(b"\xff\xfe\x00 not utf8")
+
+            memories = load_memories(store)
+
+            self.assertEqual(["good-1"], [memory.id for _, memory in memories])
+
+    def test_corrupt_memory_paths_reports_bad_files(self) -> None:
+        from mnemosyne.store import corrupt_memory_paths, ensure_store
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            (store.working_dir / "junk.md").write_bytes(b"\xff\xfe\x00 not utf8")
+            (store.working_dir / "no_id.md").write_text("---\ntype: pitfall\n---\n\nbody\n", encoding="utf-8")
+
+            bad = corrupt_memory_paths(store)
+
+            self.assertEqual({"junk.md", "no_id.md"}, {path.name for path in bad})
+
+
 if __name__ == "__main__":
     unittest.main()
