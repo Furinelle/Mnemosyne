@@ -555,7 +555,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.4.0：新增会话级注入去重、单行注入 + `show` 按需拉全文（progressive disclosure）、embedding 增量 backfill；注入排序改为相关性优先，link expansion 走 SQLite，maintain 对账重写 MEMORY.md。0.3.2 修复了全局库衰减随活跃项目数放大、rerank 分数刻度混排、损坏文件拖垮整库、`expires` 语义分裂四个问题。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.5.0：蒸馏增量化（Stop hook 只处理新增轮次）、Finding 溯源 `evidence` 字段、新增 `session_summary` 会话摘要类型（LLM 引擎 opt-in）、`write` 统一查重（`--force` 不再跳过判定，新增 `--allow-duplicate`）。0.4.0 带来会话级注入去重、progressive disclosure 注入与 embedding 增量 backfill；0.3.2 修复了全局衰减放大等四个 P0 问题。
 
 ## License
 
