@@ -50,12 +50,26 @@ def _maybe_distill(event: dict) -> str:
     config = load_config(project)
     if not config.get("distill", {}).get("enabled"):
         return ""
-    from mnemosyne.distill import distill_text, parse_claude_transcript, turns_to_text
+    from mnemosyne.distill import (
+        distill_text,
+        load_processed_turns,
+        parse_claude_transcript,
+        record_processed_turns,
+        turns_to_text,
+    )
 
     turns = parse_claude_transcript(transcript_path)
     if not turns:
         return ""
-    actions = distill_text(turns_to_text(turns), source="claude-code", commit=True)
+    key = str(transcript_path)
+    done = load_processed_turns(key)
+    if done > len(turns):
+        done = 0  # transcript rotated/replaced; start over
+    new_turns = turns[done:]
+    if not new_turns:
+        return ""
+    actions = distill_text(turns_to_text(new_turns), source="claude-code", commit=True)
+    record_processed_turns(key, len(turns))
     saved = [a for a in actions if a.get("id")]
     if not saved:
         return ""

@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "deprecated_strength": 5,
     },
     "memory": {
-        "types": ["arch_decision", "pitfall", "codebase", "preference", "handoff"],
+        "types": ["arch_decision", "pitfall", "codebase", "preference", "handoff", "session_summary"],
     },
     "injection": {
         "max_tokens": 2000,
@@ -56,6 +56,7 @@ DEFAULT_CONFIG = {
     "distill": {
         "enabled": False,
         "engine": "heuristic",
+        "session_summary": False,
         "confidence_threshold": 0.6,
         "max_findings_per_session": 5,
         "dedup_threshold": 0.85,
@@ -102,7 +103,7 @@ archive_strength = 30
 deprecated_strength = 5
 
 [memory]
-types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
+types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff', 'session_summary']
 
 [injection]
 max_tokens = 2000
@@ -131,6 +132,7 @@ top_n = 5
 [distill]
 enabled = false
 engine = "heuristic"
+session_summary = false
 confidence_threshold = 0.6
 max_findings_per_session = 5
 dedup_threshold = 0.85

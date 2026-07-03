@@ -9,15 +9,28 @@ import os
 
 from mnemosyne.codex import ALLOWED_TYPES, Finding
 
-_PROMPT = (
+_BASE_PROMPT = (
     "You extract durable memories from a developer/agent conversation. "
     "Return ONLY a JSON array. Each element: "
     '{"type": one of '
     + "|".join(ALLOWED_TYPES)
-    + ', "importance": 50-90, "title": <=80 chars, "tags": [..], "content": "..."}. '
+    + ', "importance": 50-90, "title": <=80 chars, "tags": [..], "content": "...",'
+    ' "evidence": short verbatim quote from the conversation supporting this memory}. '
     "Only include genuinely reusable facts (pitfalls, decisions, preferences, codebase, handoff). "
-    "Empty array if nothing is worth saving.\n\nCONVERSATION:\n"
+    "Empty array if nothing is worth saving."
 )
+
+_SUMMARY_INSTRUCTION = (
+    ' Additionally, include exactly one element with type "session_summary": '
+    "2-4 sentences on what was worked on and the outcome, importance 55."
+)
+
+
+def _build_prompt(conversation: str, include_session_summary: bool) -> str:
+    prompt = _BASE_PROMPT
+    if include_session_summary:
+        prompt += _SUMMARY_INSTRUCTION
+    return prompt + "\n\nCONVERSATION:\n" + conversation
 
 
 def _parse_llm_json(payload: str) -> list[Finding]:
@@ -45,13 +58,16 @@ def _parse_llm_json(payload: str) -> list[Finding]:
         except (TypeError, ValueError):
             importance = 60
         tags = [str(t).strip() for t in item.get("tags", []) if str(t).strip()]
-        findings.append(Finding(type_value, importance, title, tags, content))
+        evidence = str(item.get("evidence", "")).strip()[:200]
+        findings.append(Finding(type_value, importance, title, tags, content, evidence))
     return findings
 
 
 class LLMExtractor:
     def __init__(self, config: dict, max_findings: int = 5) -> None:
-        self.llm_cfg = config.get("distill", {}).get("llm", {})
+        distill_cfg = config.get("distill", {})
+        self.llm_cfg = distill_cfg.get("llm", {})
+        self.include_session_summary = bool(distill_cfg.get("session_summary", False))
         self.max_findings = max_findings
 
     def extract(self, turns) -> list[Finding]:
@@ -63,7 +79,9 @@ class LLMExtractor:
 
             print("mnemosyne: distill.llm enabled but API key missing; skipping", file=sys.stderr)
             return []
-        payload = self._call_api(_PROMPT + turns_to_text(turns), api_key)
+        payload = self._call_api(
+            _build_prompt(turns_to_text(turns), self.include_session_summary), api_key
+        )
         return _parse_llm_json(payload)[: self.max_findings]
 
     def _call_api(self, prompt: str, api_key: str) -> str:

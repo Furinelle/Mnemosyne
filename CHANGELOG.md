@@ -2,6 +2,18 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.5.0] - 2026-07-04
+
+### 新增 (Added)
+
+- **蒸馏增量化**：Stop hook 按 transcript 记录已处理轮次（store 根 `.distill_state.json`，7 天 TTL），每次只蒸馏新增轮次；transcript 轮换自动从头处理。此前每轮回复结束都全量重蒸馏整个会话。
+- **Finding 溯源（evidence）**：`Finding` 新增可选 `evidence` 字段；host 引擎的 `**新发现:**` 块支持 `- evidence:` 行；LLM 引擎要求模型给出对话原文短引用；持久化到记忆 frontmatter 的 `evidence` 键。
+- **会话摘要类型（session_summary）**：新记忆类型；`[distill].session_summary = true` 且 `engine = "llm"` 时，每次蒸馏额外产出一条会话级摘要。
+
+### 变更 (Changed)
+
+- **write 统一查重**：`write` 在所有路径（含 `--force`）先做 duplicate/supersede 判定：完全重复跳过写入并提示既有 ID（新 flag `--allow-duplicate` 强写）；同主题新结论自动写入并建 `supersedes` 链、降级旧记忆。"先 search 再写" 从约定变成机制。
+
 ## [0.4.0] - 2026-07-04
 
 ### 新增 (Added)

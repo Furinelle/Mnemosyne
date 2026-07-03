@@ -104,6 +104,64 @@ def test_stop_hook_distills_when_enabled(tmp_path, monkeypatch, capsys):
     assert any(m.type == "preference" for _, m in saved)
 
 
+def test_processed_turns_roundtrip(tmp_path, monkeypatch):
+    from mnemosyne import distill
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    monkeypatch.chdir(tmp_path)  # no project store -> state lives in global root
+
+    assert distill.load_processed_turns("/a/t.jsonl") == 0
+    distill.record_processed_turns("/a/t.jsonl", 4)
+    assert distill.load_processed_turns("/a/t.jsonl") == 4
+    distill.record_processed_turns("/a/t.jsonl", 7)
+    assert distill.load_processed_turns("/a/t.jsonl") == 7
+    assert distill.load_processed_turns("/other.jsonl") == 0
+
+
+def test_stop_hook_processes_only_new_turns(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    store = project_store()
+    ensure_store(store)
+    store.config_path.write_text(
+        store.config_path.read_text(encoding="utf-8").replace(
+            "enabled = false\nengine", "enabled = true\nengine"
+        ),
+        encoding="utf-8",
+    )
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(
+        '{"type":"user","message":{"role":"user","content":"不要用 print 调试，改用 logging"}}',
+        encoding="utf-8",
+    )
+    event = json.dumps({"transcript_path": str(transcript), "stop_hook_active": False})
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(event))
+    stop.main()
+    capsys.readouterr()
+    first = load_memories(store)
+    assert len(first) == 1
+
+    # Delete the saved memory: if the hook re-processed old turns it would be
+    # recreated; incremental processing must leave the store empty.
+    first[0][0].unlink()
+    monkeypatch.setattr("sys.stdin", io.StringIO(event))
+    stop.main()
+    capsys.readouterr()
+    assert load_memories(store) == []
+
+    # A genuinely new turn is still picked up.
+    with transcript.open("a", encoding="utf-8") as handle:
+        handle.write(
+            '\n{"type":"user","message":{"role":"user","content":"别用 pip，改用 uv 安装依赖"}}'
+        )
+    monkeypatch.setattr("sys.stdin", io.StringIO(event))
+    stop.main()
+    capsys.readouterr()
+    assert len(load_memories(store)) == 1
+
+
 def test_injected_ids_roundtrip(tmp_path, monkeypatch):
     from mnemosyne.hooks import _common
 

@@ -3,19 +3,83 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from mnemosyne.codex import Finding
 from mnemosyne.hooks._common import run_search
 from mnemosyne.search import tokenize
-from mnemosyne.store import find_memory, load_config, stores_for_scope
+from mnemosyne.store import find_memory, global_store, load_config, stores_for_scope
 
 
 @dataclass(frozen=True)
 class Turn:
     role: str
     text: str
+
+
+DISTILL_STATE_FILENAME = ".distill_state.json"
+DISTILL_STATE_TTL_HOURS = 168  # transcripts can span days; prune after a week
+
+
+def _distill_state_path() -> Path:
+    from mnemosyne.store import find_project_store
+
+    project = find_project_store()
+    root = project.root if project is not None else global_store().root
+    return root / DISTILL_STATE_FILENAME
+
+
+def load_processed_turns(transcript_key: str) -> int:
+    if not transcript_key:
+        return 0
+    try:
+        data = json.loads(_distill_state_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+    entry = data.get("transcripts", {}).get(transcript_key, {})
+    try:
+        return max(0, int(entry.get("turns", 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def record_processed_turns(transcript_key: str, count: int) -> None:
+    """Remember how many turns of a transcript have been distilled.
+
+    The Stop hook fires after every assistant reply; without this the whole
+    transcript is re-parsed and re-extracted each turn. Failures degrade
+    silently to full re-processing (dedup still guards correctness).
+    """
+    if not transcript_key:
+        return
+    path = _distill_state_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    transcripts = data.setdefault("transcripts", {})
+    now = datetime.now()
+    cutoff = now - timedelta(hours=DISTILL_STATE_TTL_HOURS)
+    for key in list(transcripts):
+        try:
+            stamp = datetime.fromisoformat(str(transcripts[key].get("ts", "")))
+        except (AttributeError, ValueError):
+            stamp = None
+        if stamp is None or stamp < cutoff:
+            del transcripts[key]
+    transcripts[transcript_key] = {"ts": now.isoformat(), "turns": max(0, int(count))}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        pass
 
 
 def _block_text(content: object) -> str:
