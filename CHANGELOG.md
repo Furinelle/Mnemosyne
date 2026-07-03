@@ -2,6 +2,15 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.3.2] - 2026-07-04
+
+### 修复 (Fixed)
+
+- **全局库衰减速率随活跃项目数放大**：SessionStart 的 maintain 节流标记 `.last_maintain` 此前存在项目库、却触发 `maintain --scope all`，一天内在 N 个项目开会话会让全局库被 decay N 次。现改为按 store 各自存标记、各自节流触发（`--scope project` / `--scope global`），全局库每个间隔期只衰减一次；且没有项目库时全局库也能得到维护。
+- **rerank 启用时分数刻度混用**：`_rerank` 只覆写 top `2N` 条的分数为 reranker 分值（0~1），尾部保留 BM25/RRF 原始分后全体混排，未重排的尾部会反超重排头部。现在重排区整体排在未重排尾部之前。
+- **单个损坏文件拖垮整库**：手工编辑坏的 frontmatter（如 `strength: high`）此前抛 `ValueError` 使 search/maintain/hooks 全部失效。现在非数字计数字段回退 0，无法解码/解析的文件被跳过；`doctor` 新增 per-store 坏文件报告。
+- **`expires` 语义分裂**：文档示例是自由文本、lifecycle 却按 ISO 日期做字符串比较（不误归档纯靠字典序运气）。现仅 `YYYY-MM-DD` 格式参与到期归档，其余值保留为注记；`write --expires` 传非日期值时输出警告。
+
 ## [0.3.1] - 2026-06-19
 
 ### 修复 (Fixed)

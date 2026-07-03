@@ -550,7 +550,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.3.1：0.3.0 引入跨 agent 自动记忆形成（`distill`，opt-in）与 LongMemEval 检索基准；0.3.1 修复了 `distill` 去重比对截断摘要导致的重复写入、`find_project_store` 把全局库误当项目库的污染问题，并收紧了启发式抽取精度。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.3.2：修复了全局库衰减随活跃项目数放大、rerank 分数刻度混排、单个损坏记忆文件拖垮整库读取，以及 `expires` 自由文本与日期比较的语义分裂（现仅 ISO 日期参与自动归档）。
 
 ## License
 
