@@ -72,6 +72,52 @@ def test_stop_hook_distills_when_enabled(tmp_path, monkeypatch, capsys):
     assert any(m.type == "preference" for _, m in saved)
 
 
+def test_maybe_run_maintain_throttles_global_across_projects(tmp_path, monkeypatch):
+    from mnemosyne.hooks import session_start
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(home))
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        session_start.subprocess, "Popen", lambda cmd, **kwargs: calls.append(cmd)
+    )
+
+    for name in ("project_a", "project_b"):
+        project = tmp_path / name
+        (project / ".mnemosyne" / "working").mkdir(parents=True)
+        (project / ".mnemosyne" / "core.md").write_text("core", encoding="utf-8")
+        monkeypatch.chdir(project)
+        session_start.maybe_run_maintain()
+
+    global_calls = [cmd for cmd in calls if "global" in cmd]
+    project_calls = [cmd for cmd in calls if "project" in cmd]
+    assert len(global_calls) == 1, "global store must be maintained once, not once per project"
+    assert len(project_calls) == 2
+    assert (home / ".last_maintain").exists()
+
+
+def test_maybe_run_maintain_runs_again_after_interval(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta
+
+    from mnemosyne.hooks import session_start
+
+    home = tmp_path / "home"
+    home.mkdir()
+    stale = (datetime.now() - timedelta(hours=25)).isoformat()
+    (home / ".last_maintain").write_text(stale, encoding="utf-8")
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(home))
+    monkeypatch.chdir(tmp_path)  # no project store here
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        session_start.subprocess, "Popen", lambda cmd, **kwargs: calls.append(cmd)
+    )
+
+    session_start.maybe_run_maintain()
+
+    assert [cmd for cmd in calls if "global" in cmd], "stale marker must trigger a new run"
+
+
 def test_stop_hook_skips_when_stop_hook_active(tmp_path, monkeypatch):
     monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
     monkeypatch.chdir(tmp_path)
