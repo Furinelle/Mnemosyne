@@ -547,12 +547,13 @@ python3 -m mnemosyne doctor --scope all
 | `mcp serve` 提示缺依赖 | 安装 `python3 -m pip install -e ".[mcp]"`。 |
 | 切换 embedding 模型后向量未命中 | 跑 `python3 -m mnemosyne embed-backfill --scope all`。 |
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
+| 同一会话里记忆没有再次注入 | 会话级去重的预期行为；需要全文时用 `python3 -m mnemosyne show ID`。 |
 | `codex-ingest` 没写入 | 确认传入文本有 `**新发现:**` 块，并且命令带了 `--commit`。 |
 | Hermes provider 不生效 | 确认已运行 `install-hermes` 且重启了 Hermes；用 `--dry-run` 预览安装内容。 |
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.3.2：修复了全局库衰减随活跃项目数放大、rerank 分数刻度混排、单个损坏记忆文件拖垮整库读取，以及 `expires` 自由文本与日期比较的语义分裂（现仅 ISO 日期参与自动归档）。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.4.0：新增会话级注入去重、单行注入 + `show` 按需拉全文（progressive disclosure）、embedding 增量 backfill；注入排序改为相关性优先，link expansion 走 SQLite，maintain 对账重写 MEMORY.md。0.3.2 修复了全局库衰减随活跃项目数放大、rerank 分数刻度混排、损坏文件拖垮整库、`expires` 语义分裂四个问题。
 
 ## License
 

@@ -2,6 +2,20 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.4.0] - 2026-07-04
+
+### 新增 (Added)
+
+- **会话级注入去重**：同一会话内已注入过的记忆不再重复注入。状态存于 store 根目录 `.session_injected.json`（按 hook 事件的 `session_id` 记账，48 小时 TTL 自动清理），UserPromptSubmit 与 PreToolUse 两个注入点均生效。
+- **注入瘦身（progressive disclosure）**：注入从"两行 + 220 字摘要"改为"单行目录条目 + `show` 提示"，新增 `injection.summary_chars` 配置（默认 120）。注入是目录不是全文，agent 需要细节时用 `python3 -m mnemosyne show ID` 按需拉取。
+- **embedding 增量 backfill**：`embed-backfill` / `reindex` 只重嵌"缺失 / 换模型 / 内容已更新"的记忆（按 `embedding_mtime` 与文件 mtime 比对），按 `embedding.batch_size` 分批、每批独立超时，失败批打 stderr 警告——此前是全量重嵌 + 整批 30s 超时静默失败。
+
+### 变更 (Changed)
+
+- **注入排序改为相关性优先**：`format_for_injection` 此前按 strength 主导排序，强但不相关的记忆会挤掉弱但相关的；现在检索分主导、strength 仅作平分决胜。
+- **link expansion 走 SQLite**：链接目标解析改查 `memories_meta` 表（带单次检索内 memoize），不再对每条链接线性重读整库文件；索引不可用时自动回退线性扫描。
+- **MEMORY.md 对账重写**：`maintain`（非 dry-run）时按 working 区现存记忆全量重写 MEMORY.md，归档/取代条目不再永久残留；写入路径仍为廉价追加。
+
 ## [0.3.2] - 2026-07-04
 
 ### 修复 (Fixed)
