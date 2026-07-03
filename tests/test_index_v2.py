@@ -179,5 +179,35 @@ class IndexV2Tests(unittest.TestCase):
         self.assertEqual(2000, len(ids))
 
 
+class LookupIndexedMemoryTests(unittest.TestCase):
+    def test_lookup_via_index_and_missing_id(self) -> None:
+        from mnemosyne.index import lookup_indexed_memory, reindex_store
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            memory = Memory(id="target-1", type="codebase", strength=70, body="## t\n\nbody")
+            write_memory(working_path(store, memory), memory)
+            reindex_store(store)
+
+            found = lookup_indexed_memory([store], "target-1")
+
+            self.assertIsNotNone(found)
+            self.assertEqual("target-1", found[2].id)
+            self.assertIsNone(lookup_indexed_memory([store], "missing-1"))
+
+    def test_lookup_without_index_returns_none(self) -> None:
+        from mnemosyne.index import lookup_indexed_memory
+        from mnemosyne.store import ensure_store
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+
+            self.assertIsNone(lookup_indexed_memory([store], "anything"))
+
+
 if __name__ == "__main__":
     unittest.main()

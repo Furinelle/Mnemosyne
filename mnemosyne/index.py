@@ -295,6 +295,35 @@ def delete_memory_index(connection: sqlite3.Connection, scope: str, memory_id: s
     connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
 
 
+def lookup_indexed_memory(
+    stores: Iterable[Store], memory_id: str
+) -> tuple[Store, Path, Memory] | None:
+    """Resolve a memory id via the persistent index instead of scanning files.
+
+    Link expansion resolves every linked id of every candidate; a linear
+    re-read of the whole store per link makes search O(candidates x links x N).
+    """
+    for store in stores:
+        if not index_path(store).exists():
+            continue
+        try:
+            with closing(_connect(index_path(store))) as connection:
+                row = connection.execute(
+                    "SELECT path FROM memories_meta WHERE memory_id = ? LIMIT 1",
+                    (memory_id,),
+                ).fetchone()
+        except sqlite3.Error:
+            continue
+        if row is None:
+            continue
+        path = Path(row[0])
+        try:
+            return store, path, parse_memory(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return None
+
+
 def _search_rows(
     connection: sqlite3.Connection,
     expression: str,
