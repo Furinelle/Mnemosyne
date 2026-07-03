@@ -81,6 +81,8 @@ def build_parser() -> argparse.ArgumentParser:
     write_parser.add_argument("--content", default="")
     write_parser.add_argument("--expires", default="")
     write_parser.add_argument("--force", action="store_true")
+    write_parser.add_argument("--allow-duplicate", action="store_true",
+        help="skip duplicate detection and write anyway")
     write_parser.set_defaults(func=cmd_write)
 
     search_parser = subparsers.add_parser("search", help="Search memories")
@@ -253,6 +255,22 @@ def cmd_write(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
+    # Dedup applies to every write path, including --force: agents write with
+    # --force by default, which used to bypass duplicate detection entirely
+    # and left "search before write" as a convention instead of a mechanism.
+    from mnemosyne.codex import Finding
+    from mnemosyne.distill import classify_against_store
+
+    distill_cfg = config.get("distill", {})
+    verdict, target = classify_against_store(
+        Finding(type=args.type, importance=memory.strength, title=title, tags=tags, content=content),
+        dedup_threshold=float(distill_cfg.get("dedup_threshold", 0.85)),
+        subject_threshold=float(distill_cfg.get("subject_threshold", 0.5)),
+    )
+    if verdict == "duplicate" and target and not args.allow_duplicate:
+        print(f"Duplicate of {target}; skipped (use --allow-duplicate to write anyway).")
+        return 0
+
     if not args.force and sys.stdin.isatty():
         duplicate = duplicate_prompt(store, memory)
         if duplicate == "cancel":
@@ -269,6 +287,11 @@ def cmd_write(args: argparse.Namespace) -> int:
     write_memory(path, memory)
     update_memory_index_file(store, memory)
     update_search_index(store, path, memory)
+    if verdict == "supersede" and target:
+        from mnemosyne.distill import _apply_supersedes
+
+        _apply_supersedes(memory.id, target)
+        print(f"Supersedes {target} (linked, old memory demoted).")
     print(f"Wrote {memory.id}")
     return 0
 

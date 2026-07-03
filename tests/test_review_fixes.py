@@ -61,6 +61,63 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(original, parse_value(_format_scalar(original)))
 
 
+class WriteDedupTests(unittest.TestCase):
+    def test_force_write_skips_exact_duplicate(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            args = ["write", "--type", "pitfall", "--importance", "70", "--force",
+                    "--title", "JWT note", "--content", "use httpOnly cookie for JWT"]
+            self.assertEqual(0, main(args))
+            output = io.StringIO()
+
+            with redirect_stdout(output):
+                code = main(args)
+
+            self.assertEqual(0, code)
+            self.assertIn("Duplicate of", output.getvalue())
+            store = project_store()
+            self.assertEqual(1, len(load_memories(store)))
+
+    def test_allow_duplicate_writes_anyway(self) -> None:
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            args = ["write", "--type", "pitfall", "--importance", "70", "--force",
+                    "--title", "JWT note", "--content", "use httpOnly cookie for JWT"]
+            self.assertEqual(0, main(args))
+            self.assertEqual(0, main(args + ["--allow-duplicate"]))
+
+            self.assertEqual(2, len(load_memories(project_store())))
+
+    def test_same_subject_write_supersedes(self) -> None:
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            self.assertEqual(0, main([
+                "write", "--type", "arch_decision", "--importance", "60", "--force",
+                "--title", "JWT storage decision",
+                "--content", "use localStorage for JWT",
+            ]))
+            store = project_store()
+            old_id = load_memories(store)[0][1].id
+
+            self.assertEqual(0, main([
+                "write", "--type", "arch_decision", "--importance", "60", "--force",
+                "--title", "JWT storage decision",
+                "--content", "switch to httpOnly cookie for JWT storage",
+            ]))
+
+            memories = {m.id: m for _, m in load_memories(store)}
+            self.assertEqual(2, len(memories))
+            old = memories[old_id]
+            self.assertLess(old.strength, 60, "superseded memory must be demoted")
+            self.assertTrue(
+                any(link.get("rel") == "superseded_by" for link in old.links),
+                "old memory must carry the superseded_by backlink",
+            )
+
+
 class MemoryIndexRewriteTests(unittest.TestCase):
     def test_maintain_rewrites_memory_index(self) -> None:
         from mnemosyne.cli import update_memory_index_file

@@ -332,7 +332,7 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 |---|---|
 | `init` | 在当前目录创建项目 `.mnemosyne/`，并写入 `AGENTS.md` 模板。 |
 | `read --scope all` | 输出 global + project core memory，适合 prompt 注入。 |
-| `write --type T --importance N ...` | 写入一条记忆。 |
+| `write --type T --importance N ...` | 写入一条记忆。写入前自动查重：完全重复会跳过（`--allow-duplicate` 强写），同主题新结论会自动建 `supersedes` 链。 |
 | `search QUERY --format json` | 搜索记忆；优先使用 SQLite FTS5，回退到内存 BM25。 |
 | `show ID` | 查看一条完整记忆，包括 frontmatter。 |
 | `link ID1 ID2 --rel REL` | 用 typed relation 链接两条记忆；自定义关系需 `--allow-custom`。 |
