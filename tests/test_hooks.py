@@ -88,6 +88,54 @@ def test_stop_hook_distills_when_enabled(tmp_path, monkeypatch, capsys):
     assert any(m.type == "preference" for _, m in saved)
 
 
+def test_injected_ids_roundtrip(tmp_path, monkeypatch):
+    from mnemosyne.hooks import _common
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(home))
+    monkeypatch.chdir(tmp_path)  # no project store -> state lives in global root
+
+    _common.record_injected_ids("s1", ["m-1", "m-2"])
+    _common.record_injected_ids("s1", ["m-3"])
+
+    assert _common.load_injected_ids("s1") == {"m-1", "m-2", "m-3"}
+    assert _common.load_injected_ids("s2") == set()
+    assert _common.load_injected_ids("") == set()
+
+
+def test_user_prompt_submit_skips_already_injected(tmp_path, monkeypatch, capsys):
+    from mnemosyne.hooks import user_prompt_submit
+    from mnemosyne.schema import Memory
+    from mnemosyne.store import working_path, write_memory
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "home"))
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    store = project_store()
+    ensure_store(store)
+    memory = Memory(
+        id="pitfall-1", type="pitfall", strength=80,
+        injection_summary="JWT 认证失败排查记录",
+        body="## JWT 认证失败排查\n\ntoken 过期导致认证失败",
+        tags=["jwt"],
+    )
+    write_memory(working_path(store, memory), memory)
+
+    event = json.dumps({"session_id": "s1", "prompt": "JWT 认证失败怎么排查一下"})
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(event))
+    user_prompt_submit.main()
+    first = capsys.readouterr().out
+    assert "pitfall-1" in first
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(event))
+    user_prompt_submit.main()
+    second = capsys.readouterr().out
+    assert "pitfall-1" not in second
+
+
 def test_maybe_run_maintain_throttles_global_across_projects(tmp_path, monkeypatch):
     from mnemosyne.hooks import session_start
 
