@@ -228,7 +228,10 @@ def _rerank(query: str, results: list[FusionSearchResult], reranker, top_n: int)
     for result, score in zip(selected, scores):
         result.score = float(score)
         result.score_breakdown["rerank"] = float(score)
-    return _sorted_results(results)
+    # Reranked candidates always precede the un-reranked tail: reranker scores
+    # and BM25/RRF scores live on different scales, so a global sort would let
+    # a raw-score tail entry outrank a reranked head entry.
+    return _sorted_results(selected) + results[count:]
 
 
 def _sorted_results(results: Iterable[FusionSearchResult]) -> list[FusionSearchResult]:
