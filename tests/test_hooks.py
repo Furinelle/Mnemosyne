@@ -34,6 +34,22 @@ class InjectionFormattingTests(unittest.TestCase):
         self.assertNotIn("memory-2", text)
         self.assertLessEqual(len(text) // 4, 80)
 
+    def test_format_for_injection_ranks_relevance_over_strength(self) -> None:
+        results = [
+            {
+                "id": "strong-stale", "scope": "global", "type": "preference",
+                "tags": [], "summary": "irrelevant but strong", "score": 0.5, "strength": 95,
+            },
+            {
+                "id": "weak-relevant", "scope": "project", "type": "pitfall",
+                "tags": [], "summary": "exact topical hit", "score": 8.0, "strength": 35,
+            },
+        ]
+
+        text = format_for_injection(results)
+
+        self.assertLess(text.index("weak-relevant"), text.index("strong-stale"))
+
 
 if __name__ == "__main__":
     unittest.main()

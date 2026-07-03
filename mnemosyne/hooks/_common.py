@@ -200,9 +200,11 @@ def format_for_injection(results: list[dict], max_tokens: int | None = None) -> 
         return ''
     lines: list[str] = ['## Relevant memories from Mnemosyne', '']
     used_tokens = _approx_tokens('\n'.join(lines))
+    # Relevance first: a strong-but-irrelevant memory must not displace a
+    # weak-but-relevant one. Strength only breaks ties between equal scores.
     sorted_results = sorted(
         results,
-        key=lambda item: (int(item.get('strength', 0) or 0), float(item.get('score', 0) or 0)),
+        key=lambda item: (float(item.get('score', 0) or 0), int(item.get('strength', 0) or 0)),
         reverse=True,
     )
     for item in sorted_results:
