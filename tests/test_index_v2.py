@@ -179,6 +179,49 @@ class IndexV2Tests(unittest.TestCase):
         self.assertEqual(2000, len(ids))
 
 
+class FtsBootstrapRaceTests(unittest.TestCase):
+    def test_concurrent_fts_table_creation_does_not_raise(self) -> None:
+        """Reproduces the CI failure: two forked processes both check
+        sqlite_master, both see no memories_fts table, and both proceed to
+        create it (mnemosyne/index.py:_ensure_fts_table's SELECT-then-CREATE
+        is not atomic across connections). The check step is timing-dependent
+        (30/30 local runs passed while the same race failed on GitHub's Linux
+        runners), but the CREATE statement itself -- the actual production SQL,
+        via _FTS_TABLE_SQL -- is what must tolerate being run twice. Executing
+        it on two connections deterministically exercises that without relying
+        on OS scheduling luck."""
+        from mnemosyne.index import _FTS_TABLE_SQL
+
+        with isolated_workspace():
+            store = project_store()
+            store.root.mkdir(parents=True, exist_ok=True)
+            path = index_path(store)
+            connection_a = _connect(path)
+            connection_b = _connect(path)
+            try:
+                # Both connections observe "no table yet" -- the real race window.
+                def sees_no_table(connection: sqlite3.Connection) -> bool:
+                    return connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='memories_fts'"
+                    ).fetchone() is None
+
+                self.assertTrue(sees_no_table(connection_a))
+                self.assertTrue(sees_no_table(connection_b))
+
+                # Connection A wins the race and commits the table first.
+                connection_a.execute(_FTS_TABLE_SQL)
+                connection_a.commit()
+
+                # Connection B already decided (above) that the table was
+                # missing and proceeds to create it too -- must not raise
+                # "table memories_fts already exists".
+                connection_b.execute(_FTS_TABLE_SQL)
+                connection_b.commit()
+            finally:
+                connection_a.close()
+                connection_b.close()
+
+
 class LookupIndexedMemoryTests(unittest.TestCase):
     def test_lookup_via_index_and_missing_id(self) -> None:
         from mnemosyne.index import lookup_indexed_memory, reindex_store

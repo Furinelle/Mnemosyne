@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+import portalocker
+
 from mnemosyne.embedding.base import call_with_timeout
 from mnemosyne.schema import Memory, parse_memory
 from mnemosyne.search import memory_search_text, tokenize
@@ -90,42 +92,53 @@ def index_enabled(store: Store) -> bool:
 
 
 def ensure_index(store: Store) -> None:
+    """Create/migrate the index schema, guarded by a file lock.
+
+    Mnemosyne is multi-agent by design, so two processes can call this for
+    the very first time on the same fresh store concurrently. WAL +
+    busy_timeout only serialize row-level writes; the schema bootstrap below
+    is a check-then-create sequence (see _ensure_fts_table) that is not
+    atomic across separate connections without an explicit mutex, which used
+    to raise "table memories_fts already exists" under real concurrency.
+    """
     store.root.mkdir(parents=True, exist_ok=True)
-    with closing(_connect(index_path(store))) as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS memories_meta (
-                document_id TEXT PRIMARY KEY,
-                scope TEXT NOT NULL,
-                memory_id TEXT NOT NULL,
-                path TEXT NOT NULL,
-                type TEXT NOT NULL,
-                archived INTEGER NOT NULL,
-                strength INTEGER NOT NULL,
-                tags TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                mtime REAL NOT NULL DEFAULT 0,
-                embedding BLOB,
-                embedding_model TEXT NOT NULL DEFAULT '',
-                embedding_dim INTEGER NOT NULL DEFAULT 0,
-                embedding_mtime REAL NOT NULL DEFAULT 0
+    lock_path = store.root / ".index.lock"
+    with portalocker.Lock(str(lock_path), mode="a", timeout=10.0):
+        with closing(_connect(index_path(store))) as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS memories_meta (
+                    document_id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    memory_id TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    archived INTEGER NOT NULL,
+                    strength INTEGER NOT NULL,
+                    tags TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    mtime REAL NOT NULL DEFAULT 0,
+                    embedding BLOB,
+                    embedding_model TEXT NOT NULL DEFAULT '',
+                    embedding_dim INTEGER NOT NULL DEFAULT 0,
+                    embedding_mtime REAL NOT NULL DEFAULT 0
+                )
+                """
             )
-            """
-        )
-        columns = {row[1] for row in connection.execute("PRAGMA table_info(memories_meta)")}
-        migrations = {
-            "mtime": "REAL NOT NULL DEFAULT 0",
-            "embedding": "BLOB",
-            "embedding_model": "TEXT NOT NULL DEFAULT ''",
-            "embedding_dim": "INTEGER NOT NULL DEFAULT 0",
-            "embedding_mtime": "REAL NOT NULL DEFAULT 0",
-        }
-        for column, definition in migrations.items():
-            if column not in columns:
-                connection.execute(f"ALTER TABLE memories_meta ADD COLUMN {column} {definition}")
-        _ensure_fts_table(connection)
-        connection.execute(f"PRAGMA user_version={INDEX_VERSION}")
-        connection.commit()
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(memories_meta)")}
+            migrations = {
+                "mtime": "REAL NOT NULL DEFAULT 0",
+                "embedding": "BLOB",
+                "embedding_model": "TEXT NOT NULL DEFAULT ''",
+                "embedding_dim": "INTEGER NOT NULL DEFAULT 0",
+                "embedding_mtime": "REAL NOT NULL DEFAULT 0",
+            }
+            for column, definition in migrations.items():
+                if column not in columns:
+                    connection.execute(f"ALTER TABLE memories_meta ADD COLUMN {column} {definition}")
+            _ensure_fts_table(connection)
+            connection.execute(f"PRAGMA user_version={INDEX_VERSION}")
+            connection.commit()
 
 
 def reindex_store(store: Store, include_archive: bool = True) -> int:
@@ -545,27 +558,31 @@ def backfill_embeddings(
     return count
 
 
+_FTS_TABLE_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+    document_id UNINDEXED,
+    title,
+    summary,
+    body,
+    tags,
+    type,
+    tokenize='trigram'
+)
+"""
+
+
 def _ensure_fts_table(connection: sqlite3.Connection) -> None:
     row = connection.execute(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memories_fts'"
     ).fetchone()
     if row is not None and "trigram" not in (row[0] or "").lower():
-        connection.execute("DROP TABLE memories_fts")
+        connection.execute("DROP TABLE IF EXISTS memories_fts")
         row = None
     if row is None:
-        connection.execute(
-            """
-            CREATE VIRTUAL TABLE memories_fts USING fts5(
-                document_id UNINDEXED,
-                title,
-                summary,
-                body,
-                tags,
-                type,
-                tokenize='trigram'
-            )
-            """
-        )
+        # IF NOT EXISTS is the real guard against the concurrent-bootstrap
+        # race (see ensure_index's docstring); the SELECT above is only a
+        # cheap fast path to skip work when the table is already current.
+        connection.execute(_FTS_TABLE_SQL)
         _rebuild_fts_from_meta(connection)
 
 
