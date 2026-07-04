@@ -1,5 +1,7 @@
 # Mnemosyne
 
+[![CI](https://github.com/Furinelle/Mnemosyne/actions/workflows/ci.yml/badge.svg)](https://github.com/Furinelle/Mnemosyne/actions/workflows/ci.yml)
+
 > 希腊记忆女神，缪斯九姐妹之母。
 
 Mnemosyne 是一个面向本地 LLM Agent 的共享记忆层。它把长期记忆保存为
@@ -27,8 +29,12 @@ Markdown 文件，让 Claude Code、Codex、Hermes 等能调用 Shell/Python 的
 | Claude Code hooks | 支持 SessionStart、UserPromptSubmit、PreToolUse、Stop 四个自动注入点。 |
 | Codex 交接 | 提供 `codex-prep` 和 `codex-ingest`，也可通过 `AGENTS.md` 让 Codex 直接读写。 |
 | Hermes 原生集成 | `install-hermes` 一键安装原生 MemoryProvider 插件，重启后自动注入与检索。 |
-| 跨 agent 自动记忆形成 | 可选的 `distill` 引擎（heuristic/LLM/host）从会话 transcript 中抽取记忆，默认关闭，写入前会去重/supersede。 |
-| LongMemEval 基准 | `eval convert/fetch longmemeval` 和 `eval run --longmemeval` 提供 per-instance recall/MRR 与按问题类型拆分。 |
+| 跨 agent 自动记忆形成 | 可选的 `distill` 引擎（heuristic/LLM/host）从会话 transcript 中增量抽取记忆，默认关闭，写入前会去重/supersede，findings 可带 `evidence` 原文溯源。 |
+| LongMemEval 基准 | `eval convert/fetch longmemeval` 和 `eval run --longmemeval` 提供 per-instance recall/MRR 与按问题类型拆分；`eval run --min-recall` 可作 CI 回归门槛。 |
+| Progressive disclosure 注入 | hooks 注入是单行目录 + `show` 提示，同一会话内已注入过的记忆不会重复注入。 |
+| 时间有效性 | 被 `supersedes` 取代的记忆标记失效但不删除，默认检索会过滤，`--include-superseded` 可回看。 |
+| 记忆整合 | `consolidate` 合并同类型近重复的 working 记忆，默认 dry-run 预览。 |
+| CI | GitHub Actions 跑测试套件并对检索质量做 recall@5 回归门槛。 |
 
 基础依赖：Python 3.11+，`portalocker>=2.8`。
 
@@ -366,6 +372,7 @@ python3 -m mnemosyne <command> --help
 [thresholds]
 decay_per_run = 1
 bonus_access = 5
+bonus_write = 10
 bonus_recall = 20
 core_strength = 80
 core_access_count = 3
@@ -373,7 +380,7 @@ archive_strength = 30
 deprecated_strength = 5
 
 [memory]
-types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff']
+types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff', 'session_summary']
 
 [injection]
 max_tokens = 2000
@@ -387,7 +394,10 @@ enabled = false
 backend = "onnx"
 model = "BAAI/bge-small-zh-v1.5"
 onnx_path = ""
+api_base = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
 dimensions = 384
+batch_size = 32
 
 [rerank]
 enabled = false
@@ -414,12 +424,17 @@ api_key_env = "OPENAI_API_KEY"
 [fusion]
 rrf_k = 60
 link_expansion = true
+link_expansion_decay_fallback = 0.5
 link_expansion_max_hops = 1
+bm25_pool_size = 50
+vec_pool_size = 50
 
 [relations]
 allow_custom = false
 
 [mcp]
+expose_global = true
+expose_project = true
 default_search_limit = 5
 
 [mcp.sse]
@@ -430,16 +445,16 @@ port = 3700
 
 说明：
 
-- `thresholds` 控制记忆衰减、召回和晋升阈值。
+- `thresholds` 控制记忆衰减、召回和晋升阈值；`bonus_write` 是写入时的强度加成（当前仅供未来场景预留，写路径尚未使用）。
 - `memory.types` 是允许的记忆类型清单。写入其它类型会提示 warning。
 - `injection.max_tokens` 控制 hooks 注入记忆的近似 token 上限。
 - `injection.summary_chars` 控制注入摘要的单条截断长度（默认 120）。注入是"目录"而非全文：每条记忆一行，完整内容用 `python3 -m mnemosyne show ID` 按需获取。同一会话内已注入过的记忆不会重复注入。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
-- `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖。
+- `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖；`embedding.batch_size` 控制 backfill 每批嵌入的记忆数，每批独立超时。
 - `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。`distill.session_summary` 开启后（需 `engine = "llm"`），每次蒸馏额外产出一条 `session_summary` 会话摘要；LLM findings 会带 `evidence` 原文引用便于溯源。Stop hook 的蒸馏是增量的：按 transcript 记录已处理轮次（`.distill_state.json`），每轮只处理新增内容。
-- `fusion.link_expansion` 控制 typed links 是否参与召回扩展。
+- `fusion.link_expansion` 控制 typed links 是否参与召回扩展；`link_expansion_decay_fallback` 是多跳扩展时每跳的衰减系数；`bm25_pool_size`/`vec_pool_size` 控制各检索通路在融合前各自召回的候选池大小。
 - `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
-- `mcp.sse` 控制可选 SSE 地址；stdio 始终是 `mcp serve` 默认值。
+- `mcp.expose_global`/`mcp.expose_project` 控制 MCP server 是否暴露对应作用域；`mcp.sse` 控制可选 SSE 地址，stdio 始终是 `mcp serve` 默认值。
 
 全局 store 默认在 `~/.mnemosyne/`，可以覆盖：
 
@@ -526,7 +541,9 @@ your-project/.mnemosyne/   # 项目记忆
   index.sqlite              # 按需生成
   MEMORY.md                 # 按需生成
   .lock                     # maintain 时生成
-  .last_maintain            # SessionStart 节流维护时生成
+  .last_maintain            # SessionStart 节流维护时生成（按 store 各自计时）
+  .session_injected.json    # 会话级注入去重状态，48h TTL 自动清理
+  .distill_state.json       # 蒸馏增量处理状态（记录已处理的 transcript 轮次），7 天 TTL
 ```
 
 并发安全：
