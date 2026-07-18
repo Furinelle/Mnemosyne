@@ -30,7 +30,9 @@ from mnemosyne.relations import PREDEFINED, is_demoting, reverse
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
+    bump_memory_access,
     lock_store,
+    lock_stores,
     Store,
     corrupt_memory_paths,
     ensure_store,
@@ -544,36 +546,39 @@ DEMOTE_ON_SUPERSEDE = 20
 
 
 def cmd_link(args: argparse.Namespace) -> int:
-    stores = stores_for_scope("all")
-    first = find_memory(args.id1, stores, include_archive=True)
-    second = find_memory(args.id2, stores, include_archive=True)
-    if first is None:
-        print(f"Memory not found: {args.id1}", file=sys.stderr)
-        return 1
-    if second is None:
-        print(f"Memory not found: {args.id2}", file=sys.stderr)
-        return 1
-    _, first_path, first_memory = first
-    _, second_path, second_memory = second
-    allow_custom = bool(args.allow_custom or load_config(first[0]).get("relations", {}).get("allow_custom"))
-    if args.rel not in PREDEFINED and not allow_custom:
-        choices = ", ".join(sorted(PREDEFINED))
-        print(
-            f"Unknown relation: {args.rel}. Choose one of: {choices}; use --allow-custom to opt in.",
-            file=sys.stderr,
-        )
-        return 2
+    stores = [store for store in stores_for_scope("all") if store.root.exists()]
+    with lock_stores(stores):
+        # Resolve after locking: callers may have loaded either endpoint before
+        # a concurrent access update or supersedence write completed.
+        first = find_memory(args.id1, stores, include_archive=True)
+        second = find_memory(args.id2, stores, include_archive=True)
+        if first is None:
+            print(f"Memory not found: {args.id1}", file=sys.stderr)
+            return 1
+        if second is None:
+            print(f"Memory not found: {args.id2}", file=sys.stderr)
+            return 1
+        _, first_path, first_memory = first
+        _, second_path, second_memory = second
+        allow_custom = bool(args.allow_custom or load_config(first[0]).get("relations", {}).get("allow_custom"))
+        if args.rel not in PREDEFINED and not allow_custom:
+            choices = ", ".join(sorted(PREDEFINED))
+            print(
+                f"Unknown relation: {args.rel}. Choose one of: {choices}; use --allow-custom to opt in.",
+                file=sys.stderr,
+            )
+            return 2
 
-    add_link(first_memory, second_memory.id, args.rel)
-    add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
-    if is_demoting(args.rel):
-        second_memory.strength = max(0, second_memory.strength - DEMOTE_ON_SUPERSEDE)
-        second_memory.status = "superseded"
-        second_memory.extra["invalidated_by"] = first_memory.id
-    write_memory(first_path, first_memory)
-    write_memory(second_path, second_memory)
-    update_search_index(first[0], first_path, first_memory)
-    update_search_index(second[0], second_path, second_memory)
+        add_link(first_memory, second_memory.id, args.rel)
+        add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
+        if is_demoting(args.rel):
+            second_memory.strength = max(0, second_memory.strength - DEMOTE_ON_SUPERSEDE)
+            second_memory.status = "superseded"
+            second_memory.extra["invalidated_by"] = first_memory.id
+        write_memory(first_path, first_memory)
+        write_memory(second_path, second_memory)
+        update_search_index(first[0], first_path, first_memory)
+        update_search_index(second[0], second_path, second_memory)
     print(f"Linked {first_memory.id} <-> {second_memory.id} ({args.rel})")
     return 0
 
@@ -710,14 +715,17 @@ def print_search_results(indexed_results, output_format: str, config: dict) -> i
     for result in indexed_results:
         memory = result.memory
         path = result.path
-        memory.access_count += 1
-        memory.last_accessed = today
-        is_archive = "archive" in str(path)
+        is_archive = result.store.archive_dir in path.parents
         bonus = recall_bonus if is_archive else threshold_bonus
-        memory.strength = min(100, memory.strength + bonus)
         with suppress(portalocker.exceptions.LockException):
-            write_memory(path, memory, lock_timeout=0)
-            update_search_index(result.store, path, memory)
+            memory = bump_memory_access(
+                result.store,
+                path,
+                bonus,
+                today=today,
+                lock_timeout=0,
+                sync_index=True,
+            )
         output.append(
             {
                 "id": memory.id,

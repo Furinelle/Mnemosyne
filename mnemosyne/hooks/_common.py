@@ -27,11 +27,11 @@ except ModuleNotFoundError:
 from mnemosyne.search import BM25, SearchDocument, memory_search_text, tokenize
 from mnemosyne.store import (
     Store,
+    bump_memory_access,
     find_project_store,
     global_store,
     load_config,
     load_memories,
-    write_memory,
 )
 
 
@@ -184,10 +184,9 @@ def run_search(query: str, limit: int = 5, update_access: bool = False) -> list[
         store, path, memory = path_lookup[result.document.id]
         if update_access:
             try:
-                memory.access_count += 1
-                memory.last_accessed = date.today().isoformat()
-                memory.strength = min(100, memory.strength + bonus)
-                write_memory(path, memory, lock_timeout=0)
+                memory = bump_memory_access(
+                    store, path, bonus, today=date.today().isoformat(), lock_timeout=0
+                )
             except portalocker.exceptions.LockException:
                 pass
         output.append({
@@ -233,11 +232,14 @@ def _run_search_indexed(
         memory = result.memory
         if update_access:
             try:
-                memory.access_count += 1
-                memory.last_accessed = date.today().isoformat()
-                memory.strength = min(100, memory.strength + bonus)
-                write_memory(result.path, memory, lock_timeout=0)
-                update_memory_index(result.store, result.path, memory)
+                memory = bump_memory_access(
+                    result.store,
+                    result.path,
+                    bonus,
+                    today=date.today().isoformat(),
+                    lock_timeout=0,
+                    sync_index=True,
+                )
             except portalocker.exceptions.LockException:
                 pass
             except Exception:

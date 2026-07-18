@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import portalocker
+
 from mnemosyne.hooks._common import collect_stores, hook_safe, read_event
 from mnemosyne.store import (
     Store,
@@ -95,6 +97,21 @@ def _spawn_maintain(scope: str) -> bool:
     return True
 
 
+def _run_maintain_if_due(root: Path, scope: str) -> bool:
+    """Claim a store's maintenance interval and schedule it exactly once."""
+    lock_path = root / ".last_maintain.lock"
+    try:
+        with portalocker.Lock(str(lock_path), mode="a", timeout=0):
+            if not _maintain_due(root):
+                return False
+            if not _spawn_maintain(scope):
+                return False
+            _mark_maintained(root)
+            return True
+    except portalocker.exceptions.LockException:
+        return False
+
+
 def maybe_run_maintain() -> None:
     """Run background maintenance, throttled per store.
 
@@ -104,13 +121,11 @@ def maybe_run_maintain() -> None:
     decay by the number of active projects.
     """
     project = find_project_store()
-    if project is not None and _maintain_due(project.root):
-        if _spawn_maintain('project'):
-            _mark_maintained(project.root)
+    if project is not None:
+        _run_maintain_if_due(project.root, 'project')
     global_root = global_store().root
-    if global_root.exists() and _maintain_due(global_root):
-        if _spawn_maintain('global'):
-            _mark_maintained(global_root)
+    if global_root.exists():
+        _run_maintain_if_due(global_root, 'global')
 
 
 def main() -> None:

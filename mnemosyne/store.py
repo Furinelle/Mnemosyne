@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 import shutil
 from copy import deepcopy
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
+from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -319,6 +320,42 @@ def lock_store(store: Store, timeout: float = 30.0):
     lock_path = store.root / ".lock"
     with portalocker.Lock(str(lock_path), mode="a", timeout=timeout):
         yield
+
+
+@contextmanager
+def lock_stores(stores: Iterable[Store], timeout: float = 30.0):
+    """Lock several stores in a stable order so cross-store writes cannot deadlock."""
+    unique = {store.root.resolve(): store for store in stores}
+    with ExitStack() as stack:
+        for root in sorted(unique, key=str):
+            stack.enter_context(lock_store(unique[root], timeout=timeout))
+        yield
+
+
+def bump_memory_access(
+    store: Store,
+    path: Path,
+    bonus: int,
+    *,
+    today: str | None = None,
+    lock_timeout: float = 0,
+    sync_index: bool = False,
+) -> Memory:
+    """Atomically update access-only fields on the latest on-disk memory."""
+    with lock_store(store, timeout=lock_timeout):
+        current = parse_memory(path.read_text(encoding="utf-8"))
+        current.access_count += 1
+        current.last_accessed = today or date.today().isoformat()
+        current.strength = min(100, current.strength + bonus)
+        write_memory(path, current, lock_timeout=lock_timeout)
+        if sync_index:
+            # Imported lazily to keep store/index dependencies acyclic. The
+            # index update stays inside the store transaction so its row cannot
+            # lag behind a relationship mutation using the same lock.
+            from mnemosyne.index import update_memory_index
+
+            update_memory_index(store, path, current)
+        return current
 
 
 def memory_filename(memory: Memory) -> str:
