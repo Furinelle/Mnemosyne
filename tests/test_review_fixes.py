@@ -356,6 +356,42 @@ class WriteDedupTests(unittest.TestCase):
                 "old memory must carry the superseded_by backlink",
             )
 
+    def test_supersede_target_resolution_stays_in_destination_store(self) -> None:
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, global_store, working_path, write_memory
+
+        with isolated_workspace():
+            self.assertEqual(0, main(["init"]))
+            self.assertEqual(0, main([
+                "write", "--type", "arch_decision", "--importance", "60", "--force",
+                "--title", "JWT storage decision", "--content", "use localStorage for JWT",
+            ]))
+            project = project_store()
+            old_id = load_memories(project)[0][1].id
+            global_scope = global_store()
+            ensure_store(global_scope)
+            global_copy = Memory(
+                id=old_id,
+                type="arch_decision",
+                strength=90,
+                canonical_summary="unrelated global copy",
+                injection_summary="unrelated global copy",
+                body="unrelated global copy",
+            )
+            write_memory(working_path(global_scope, global_copy), global_copy)
+
+            self.assertEqual(0, main([
+                "write", "--type", "arch_decision", "--importance", "60", "--force",
+                "--title", "JWT storage decision",
+                "--content", "switch to httpOnly cookie for JWT storage",
+            ]))
+
+            project_old = next(memory for _, memory in load_memories(project) if memory.id == old_id)
+            global_old = load_memories(global_scope)[0][1]
+            self.assertEqual("superseded", project_old.status)
+            self.assertEqual("active", global_old.status)
+            self.assertEqual(90, global_old.strength)
+
 
 class MemoryIndexRewriteTests(unittest.TestCase):
     def test_maintain_rewrites_memory_index(self) -> None:

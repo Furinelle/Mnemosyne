@@ -310,7 +310,7 @@ def cmd_write(args: argparse.Namespace) -> int:
     if verdict == "supersede" and target:
         from mnemosyne.distill import _apply_supersedes
 
-        _apply_supersedes(memory.id, target)
+        _apply_supersedes(memory.id, target, stores=[store])
         print(f"Supersedes {target} (linked, old memory demoted).")
     print(f"Wrote {memory.id}")
     return 0
