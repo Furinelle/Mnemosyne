@@ -68,7 +68,9 @@ def search(
     embedder = embedder or get_embedder(config)
     vector_results: list[FusionSearchResult] = []
     if embedder.model_id != "none":
-        vector_results = _vector_lane(stores, query, vec_pool, include_archive, embedder)
+        vector_results = _vector_lane(
+            stores, query, vec_pool, type_filter, include_archive, embedder
+        )
         for result in vector_results:
             existing = candidates.get(result.document_id)
             if existing is None:
@@ -90,14 +92,17 @@ def search(
     if fusion_config.get("link_expansion", True):
         candidates = expand_links(candidates, stores, fusion_config)
 
-    results = _sorted_results(candidates.values())
+    results = [
+        result
+        for result in candidates.values()
+        if (not type_filter or result.memory.type == type_filter)
+        and (include_archive or result.store.archive_dir not in result.path.parents)
+        and (include_superseded or result.memory.status != "superseded")
+    ]
+    results = _sorted_results(results)
     reranker = reranker or get_reranker(config)
     if reranker.model_id != "none":
         results = _rerank(query, results, reranker, int(config.get("rerank", {}).get("top_n", 5)))
-    if not include_superseded:
-        # Invalidation, not deletion: superseded facts stay on disk and are
-        # recallable with include_superseded, but must not win default recall.
-        results = [result for result in results if result.memory.status != "superseded"]
     return results[:limit]
 
 
@@ -216,6 +221,7 @@ def _vector_lane(
     stores: list[Store],
     query: str,
     limit: int,
+    type_filter: str,
     include_archive: bool,
     embedder,
 ) -> list[FusionSearchResult]:
@@ -224,6 +230,8 @@ def _vector_lane(
         return []
     results: list[FusionSearchResult] = []
     for indexed in iter_embeddings(stores, embedder.model_id, embedder.dimensions, include_archive):
+        if type_filter and indexed.memory.type != type_filter:
+            continue
         score = cosine_similarity(vector, indexed.vector)
         if score <= 0:
             continue
@@ -259,4 +267,3 @@ def _rerank(query: str, results: list[FusionSearchResult], reranker, top_n: int)
 
 def _sorted_results(results: Iterable[FusionSearchResult]) -> list[FusionSearchResult]:
     return sorted(results, key=lambda result: (result.score, result.document_id), reverse=True)
-

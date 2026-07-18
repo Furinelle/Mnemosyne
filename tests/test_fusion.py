@@ -139,6 +139,66 @@ class FusionTests(unittest.TestCase):
             self.assertEqual(["first"], [result.memory.id for result in results])
             self.assertIn("vec", results[0].score_breakdown)
 
+    def test_type_filter_applies_to_vector_only_candidates(self) -> None:
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            wrong_type = _memory("vector-wrong-type", "unrelated vector document")
+            wanted_type = Memory(
+                id="wanted-type",
+                type="pitfall",
+                strength=70,
+                canonical_summary="unrelated pitfall",
+                injection_summary="unrelated pitfall",
+                body="unrelated pitfall",
+            )
+            for memory in (wrong_type, wanted_type):
+                write_memory(working_path(store, memory), memory)
+            from mnemosyne.index import reindex_store
+
+            reindex_store(store)
+            write_embedding(store, wrong_type.id, [1.0, 0.0], "hash-v1")
+            write_embedding(store, wanted_type.id, [0.0, 1.0], "hash-v1")
+            config = load_config(store)
+            config["embedding"]["enabled"] = True
+            config["fusion"]["link_expansion"] = False
+
+            results = search(
+                [store],
+                "alpha",
+                limit=5,
+                type_filter="pitfall",
+                config=config,
+                embedder=HashEmbedder(),
+            )
+
+            self.assertEqual([], results)
+
+    def test_default_search_removes_archive_targets_added_by_links(self) -> None:
+        with isolated_workspace():
+            from mnemosyne.store import move_to_archive
+
+            store = project_store()
+            ensure_store(store)
+            archived = _memory("archived-target", "archived target details")
+            source = _memory(
+                "working-source",
+                "active source needle",
+                links=[{"id": archived.id, "rel": "related"}],
+            )
+            archived_path = working_path(store, archived)
+            write_memory(archived_path, archived)
+            move_to_archive(store, archived_path, archived, "2026-07")
+            write_memory(working_path(store, source), source)
+            config = load_config(store)
+            config["search"]["index_enabled"] = False
+
+            results = search(
+                [store], "active source needle", limit=5, include_archive=False, config=config
+            )
+
+            self.assertEqual(["working-source"], [result.memory.id for result in results])
+
     def test_bm25_only_returns_empty_for_empty_query(self) -> None:
         with isolated_workspace():
             config = load_config(project_store())
