@@ -577,7 +577,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.0：被取代记忆默认退出检索（失效不删除，`--include-superseded` 回看）、新增 `consolidate` 近重复整合命令（dry-run 默认）、`eval run --min-recall` 检索质量门槛 + GitHub Actions CI。0.5.0 带来蒸馏增量化、`evidence` 溯源、`session_summary` 类型与 `write` 统一查重；0.4.0 带来注入去重与 progressive disclosure；0.3.2 修复四个 P0 问题。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.1：修复并发写回与维护竞态、作用域/类型去重、MCP 暴露策略、混合检索过滤、无损 consolidate、FTS 索引漂移，并统一所有发布版本元数据。0.6.0 带来 superseded 失效过滤、`consolidate` 与检索质量 CI 门槛；0.5.0 带来蒸馏增量化、`evidence` 溯源、`session_summary` 类型与 `write` 统一查重。
 
 ## License
 

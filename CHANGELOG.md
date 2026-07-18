@@ -2,6 +2,17 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.6.1] - 2026-07-18
+
+### 修复 (Fixed)
+
+- 搜索访问计数与 supersedes 关系更新使用同一 store 事务，SessionStart 维护调度增加原子节流，避免并发写回覆盖新元数据或重复衰减。
+- finding 去重限定在目标作用域及相同类型，Codex ingest 与 MCP 重复写入返回既有 ID；MCP 全部工具统一执行 `expose_global` / `expose_project`。
+- 混合检索在向量和链接扩展后再次执行类型、归档与 superseded 过滤。
+- `consolidate --commit` 保守拒绝冲突元数据，兼容合并保留证据、生命周期、访问统计及链接，并重写外部反向引用。
+- FTS 增量同步跳过损坏文件并删除陈旧行，frontmatter ID 在原路径改变时移除旧 document ID。
+- 包、运行时、MCP 与 Hermes 插件版本统一由 `mnemosyne.__version__` 驱动。
+
 ## [0.6.0] - 2026-07-04
 
 ### 新增 (Added)

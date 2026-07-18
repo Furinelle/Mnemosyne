@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
+from mnemosyne import __version__
 from mnemosyne.codex import prep
 from mnemosyne.fusion import search
 from mnemosyne.graph import build_graph, render_graph
@@ -23,6 +24,9 @@ from mnemosyne.store import find_memory, load_config, read_core, stores_for_scop
 
 class MissingMCPDependency(RuntimeError):
     pass
+
+
+SERVER_VERSION = __version__
 
 
 TOOL_SCHEMAS = [
@@ -167,7 +171,7 @@ def handle_request(request: dict) -> dict | None:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "mnemosyne", "version": "0.2.0"},
+                "serverInfo": {"name": "mnemosyne", "version": SERVER_VERSION},
             },
         )
     if method == "notifications/initialized":

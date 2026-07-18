@@ -1,6 +1,6 @@
 [project]
 name = 'mnemosyne'
-version = '0.3.1'
+dynamic = ['version']
 description = 'Portable dual-agent memory system for LLM agents'
 requires-python = '>=3.11'
 dependencies = ['portalocker>=2.8']
@@ -17,6 +17,9 @@ mnemosyne = 'mnemosyne.cli:main'
 [build-system]
 requires = ['hatchling']
 build-backend = 'hatchling.build'
+
+[tool.hatch.version]
+path = 'mnemosyne/__init__.py'
 
 [tool.hatch.build.targets.wheel]
 include = ['mnemosyne/**', 'templates/**']
