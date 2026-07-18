@@ -477,6 +477,11 @@ your-project/.mnemosyne/index.sqlite
 python3 -m mnemosyne reindex --scope all
 ```
 
+0.6.1 的索引格式为 v3。日常手工编辑无需主动重建：增量同步会对账文件路径和
+frontmatter `id`，清理损坏文件或历史重复行；文件改名但 `id` 不变时会保留同一索引记录。
+索引还会持久化 `status`，因此 superseded 过滤会在 BM25 候选池截断前执行，不会让失效
+记忆挤掉仍然有效的结果。
+
 被 `supersedes` 取代的记忆默认不出现在搜索结果中（失效不删除），用
 `search --include-superseded` 回看历史结论；旧记忆 frontmatter 带
 `invalidated_by` 指向取代者。
@@ -549,7 +554,9 @@ your-project/.mnemosyne/   # 项目记忆
 并发安全：
 
 - Markdown 写入使用临时文件 + `os.replace` 原子替换。
-- 维护任务使用 `portalocker` 加锁。
+- 搜索访问回写会在 store 锁内重新读取最新文件，只修改访问字段，避免覆盖并发新增的关系或状态。
+- finding 的分类、创建与 supersede 关联属于同一 store 事务；并发更新同一主题只留下一个 active head。
+- 跨 store 操作按稳定路径顺序获取 `portalocker` 锁；SessionStart 维护调度用独立原子节流锁。
 - SQLite 索引使用 WAL 和 `busy_timeout`，适合 Claude Code、Codex 与 Hermes 同时读写。
 
 ## 排障
@@ -577,7 +584,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.1：修复并发写回与维护竞态、作用域/类型去重、MCP 暴露策略、混合检索过滤、无损 consolidate、FTS 索引漂移，并统一所有发布版本元数据。0.6.0 带来 superseded 失效过滤、`consolidate` 与检索质量 CI 门槛；0.5.0 带来蒸馏增量化、`evidence` 溯源、`session_summary` 类型与 `write` 统一查重。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.1 是审查修复版本：关闭并发写回、维护调度与 supersede 事务竞态；统一 CLI、Codex、distill 和 MCP 的作用域/类型去重；落实 MCP 暴露边界；修复混合检索候选池过滤、无损 consolidate 及 FTS v3 索引对账；包、运行时、MCP 与 Hermes 插件版本统一为 0.6.1。0.6.0 带来 superseded 失效过滤、`consolidate` 与检索质量 CI 门槛。
 
 ## License
 

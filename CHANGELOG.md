@@ -6,11 +6,13 @@
 
 ### 修复 (Fixed)
 
-- 搜索访问计数与 supersedes 关系更新使用同一 store 事务，SessionStart 维护调度增加原子节流，避免并发写回覆盖新元数据或重复衰减。
-- finding 去重限定在目标作用域及相同类型，Codex ingest 与 MCP 重复写入返回既有 ID；MCP 全部工具统一执行 `expose_global` / `expose_project`。
-- 混合检索在向量和链接扩展后再次执行类型、归档与 superseded 过滤。
-- `consolidate --commit` 保守拒绝冲突元数据，兼容合并保留证据、生命周期、访问统计及链接，并重写外部反向引用。
-- FTS 增量同步跳过损坏文件并删除陈旧行，frontmatter ID 在原路径改变时移除旧 document ID。
+- 搜索访问计数在 store 锁内重读最新文件后仅更新访问字段，避免覆盖并发新增的 links、`status`、`invalidated_by` 或正文；跨 store 关系写入按稳定顺序加锁。
+- finding 的分类、创建与 supersede 关联成为单一 store 事务；并发同主题更新只保留一个 active head。SessionStart 维护调度增加原子节流，避免重复衰减。
+- finding 去重限定在目标作用域及相同类型，并由 CLI、Codex ingest、distill 与 MCP 共同执行；重复 Codex/MCP 写入返回既有 ID。
+- MCP 的 search/read/show/write/link/graph/maintain/Codex prep 全部执行 `expose_global` / `expose_project`，关闭的作用域不会被读取或修改。
+- 混合检索在 BM25/vector 候选池截断前过滤 superseded，并在向量与链接扩展后再次执行类型、归档和状态过滤，失效高分结果不再挤掉 active 命中。
+- `consolidate --commit` 保守拒绝冲突元数据，兼容合并保留证据、生命周期、访问统计及链接，并重写跨作用域外部反向引用。
+- FTS 索引升级至 v3 并持久化 `status`；增量同步跳过损坏文件、清理历史重复行，正确处理 frontmatter ID 修改以及同 ID 文件改名。
 - 包、运行时、MCP 与 Hermes 插件版本统一由 `mnemosyne.__version__` 驱动。
 
 ## [0.6.0] - 2026-07-04
