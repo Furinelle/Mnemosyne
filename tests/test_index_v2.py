@@ -23,6 +23,88 @@ from tests.helpers import isolated_workspace
 
 
 class IndexV2Tests(unittest.TestCase):
+    def test_sync_drops_stale_row_for_corrupt_memory_file(self) -> None:
+        from mnemosyne.index import reindex_store
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            memory = Memory(
+                id="will-corrupt",
+                type="pitfall",
+                strength=70,
+                canonical_summary="corrupt index needle",
+                injection_summary="corrupt index needle",
+                body="corrupt index needle",
+            )
+            path = working_path(store, memory)
+            write_memory(path, memory)
+            reindex_store(store)
+            old_mtime = path.stat().st_mtime_ns
+            path.write_bytes(b"\xff\xfeinvalid utf8")
+            path.touch()
+            if path.stat().st_mtime_ns <= old_mtime:
+                import os
+
+                os.utime(path, ns=(old_mtime + 1_000_000, old_mtime + 1_000_000))
+
+            results = search_index([store], "corrupt index needle", limit=5)
+
+            self.assertEqual([], results)
+            with closing(_connect(index_path(store))) as connection:
+                rows = connection.execute(
+                    "SELECT document_id FROM memories_meta WHERE path = ?", (str(path),)
+                ).fetchall()
+            self.assertEqual([], rows)
+
+    def test_sync_replaces_old_document_id_when_frontmatter_id_changes(self) -> None:
+        from mnemosyne.index import reindex_store, sync_index
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            memory = Memory(
+                id="old-frontmatter-id",
+                type="codebase",
+                strength=70,
+                canonical_summary="edited id needle",
+                injection_summary="edited id needle",
+                body="edited id needle",
+            )
+            path = working_path(store, memory)
+            write_memory(path, memory)
+            reindex_store(store)
+            old_mtime = path.stat().st_mtime_ns
+            memory.id = "new-frontmatter-id"
+            write_memory(path, memory)
+            if path.stat().st_mtime_ns <= old_mtime:
+                import os
+
+                os.utime(path, ns=(old_mtime + 1_000_000, old_mtime + 1_000_000))
+
+            sync_index(store)
+
+            with closing(_connect(index_path(store))) as connection:
+                meta_ids = [
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT document_id FROM memories_meta WHERE path = ? ORDER BY document_id",
+                        (str(path),),
+                    )
+                ]
+                fts_ids = [
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT document_id FROM memories_fts ORDER BY document_id",
+                    )
+                ]
+            self.assertEqual(["project:new-frontmatter-id"], meta_ids)
+            self.assertEqual(["project:new-frontmatter-id"], fts_ids)
+
     def test_ensure_index_migrates_v1_metadata_columns(self) -> None:
         with isolated_workspace():
             store = project_store()

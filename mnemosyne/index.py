@@ -186,14 +186,24 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
                 continue
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
-            except OSError:
+            except (OSError, ValueError):
+                if existing is not None:
+                    delete_document_index(connection, existing[0])
                 continue
-            delete_memory_index(connection, store.scope, memory.id)
+            if not memory.id:
+                if existing is not None:
+                    delete_document_index(connection, existing[0])
+                continue
+            document_id = f"{store.scope}:{memory.id}"
+            if existing is not None and existing[0] != document_id:
+                delete_document_index(connection, existing[0])
+            # Replace the searchable text while preserving embeddings on a
+            # same-id metadata row. index_memory performs the metadata UPSERT.
+            connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
             index_memory(connection, store, path, memory)
         for spath, (document_id, _) in by_path.items():
             if spath not in seen_paths:
-                connection.execute("DELETE FROM memories_meta WHERE document_id = ?", (document_id,))
-                connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
+                delete_document_index(connection, document_id)
         connection.commit()
 
 
@@ -242,7 +252,7 @@ def search_index(
             path = Path(row["path"])
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
-            except OSError:
+            except (OSError, ValueError):
                 continue
             results.append(
                 IndexedSearchResult(
@@ -305,6 +315,11 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
 
 def delete_memory_index(connection: sqlite3.Connection, scope: str, memory_id: str) -> None:
     document_id = f"{scope}:{memory_id}"
+    delete_document_index(connection, document_id)
+
+
+def delete_document_index(connection: sqlite3.Connection, document_id: str) -> None:
+    """Delete an index row when only its path-associated document ID is known."""
     connection.execute("DELETE FROM memories_meta WHERE document_id = ?", (document_id,))
     connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
 
@@ -490,7 +505,7 @@ def iter_embeddings(
             path = Path(row["path"])
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
-            except OSError:
+            except (OSError, ValueError):
                 continue
             yield IndexedEmbedding(
                 store=store,
@@ -591,7 +606,7 @@ def _rebuild_fts_from_meta(connection: sqlite3.Connection) -> None:
     for document_id, path_text, tags, summary in rows:
         try:
             memory = parse_memory(Path(path_text).read_text(encoding="utf-8"))
-        except OSError:
+        except (OSError, ValueError):
             continue
         _index_fts(connection, document_id, memory, tags, summary)
 
