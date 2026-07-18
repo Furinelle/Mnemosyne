@@ -62,14 +62,28 @@ def search(
     fusion_config = config.get("fusion", {})
     bm25_pool = max(limit, int(fusion_config.get("bm25_pool_size", limit * 10)))
     vec_pool = max(limit, int(fusion_config.get("vec_pool_size", limit * 10)))
-    bm25_results = _bm25_lane(stores, query, bm25_pool, type_filter, include_archive, config)
+    bm25_results = _bm25_lane(
+        stores,
+        query,
+        bm25_pool,
+        type_filter,
+        include_archive,
+        include_superseded,
+        config,
+    )
     candidates = {result.document_id: result for result in bm25_results}
 
     embedder = embedder or get_embedder(config)
     vector_results: list[FusionSearchResult] = []
     if embedder.model_id != "none":
         vector_results = _vector_lane(
-            stores, query, vec_pool, type_filter, include_archive, embedder
+            stores,
+            query,
+            vec_pool,
+            type_filter,
+            include_archive,
+            include_superseded,
+            embedder,
         )
         for result in vector_results:
             existing = candidates.get(result.document_id)
@@ -173,6 +187,7 @@ def _bm25_lane(
     limit: int,
     type_filter: str,
     include_archive: bool,
+    include_superseded: bool,
     config: dict,
 ) -> list[FusionSearchResult]:
     if config.get("search", {}).get("index_enabled", True) and fts_available():
@@ -182,6 +197,7 @@ def _bm25_lane(
             limit=limit,
             memory_type=type_filter,
             include_archive=include_archive,
+            include_superseded=include_superseded,
         )
         if indexed:
             return [
@@ -201,6 +217,8 @@ def _bm25_lane(
     for store in stores:
         for path, memory in load_memories(store, include_archive=include_archive):
             if type_filter and memory.type != type_filter:
+                continue
+            if not include_superseded and memory.status == "superseded":
                 continue
             document_id = f"{store.scope}:{memory.id}"
             documents.append(SearchDocument(document_id, memory_search_text(memory), memory))
@@ -223,6 +241,7 @@ def _vector_lane(
     limit: int,
     type_filter: str,
     include_archive: bool,
+    include_superseded: bool,
     embedder,
 ) -> list[FusionSearchResult]:
     vector = call_with_timeout(lambda: embedder.embed_one(query), timeout=10.0, fallback=None)
@@ -231,6 +250,8 @@ def _vector_lane(
     results: list[FusionSearchResult] = []
     for indexed in iter_embeddings(stores, embedder.model_id, embedder.dimensions, include_archive):
         if type_filter and indexed.memory.type != type_filter:
+            continue
+        if not include_superseded and indexed.memory.status == "superseded":
             continue
         score = cosine_similarity(vector, indexed.vector)
         if score <= 0:

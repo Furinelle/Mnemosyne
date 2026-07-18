@@ -161,7 +161,7 @@ def classify_against_store(
     supersede_target: str | None = None
     supersede_score = 0.0
     for _path, memory in load_memories(destination, include_archive=False):
-        if memory.type != finding.type:
+        if memory.type != finding.type or memory.status == "superseded":
             continue
         # Compare against the full stored body, not the truncated summary.
         # summarize() caps at ~220 chars, so long findings lost their tail
@@ -214,9 +214,10 @@ def process_finding(
         from mnemosyne.codex import write_finding
 
         record["id"] = write_finding(finding, source, store=destination, _locked=True)
-
-    if verdict == "supersede" and target:
-        _apply_supersedes(record["id"], target, stores=[destination])
+        if verdict == "supersede" and target:
+            _apply_supersedes(
+                record["id"], target, stores=[destination], _locked=True
+            )
     return record
 
 
@@ -307,14 +308,21 @@ def distill_text(text: str, *, source: str = "claude-code", commit: bool = False
     return actions
 
 
-def _apply_supersedes(new_id: str, old_id: str, *, stores: list[Store] | None = None) -> None:
+def _apply_supersedes(
+    new_id: str,
+    old_id: str,
+    *,
+    stores: list[Store] | None = None,
+    _locked: bool = False,
+) -> None:
     from mnemosyne.cli import DEMOTE_ON_SUPERSEDE, add_link, update_search_index
     from mnemosyne.relations import reverse
     from mnemosyne.store import write_memory
 
     selected = stores_for_scope("all") if stores is None else list(stores)
     selected = [store for store in selected if store.root.exists()]
-    with lock_stores(selected):
+
+    def apply_locked() -> None:
         new = find_memory(new_id, selected, include_archive=False)
         old = find_memory(old_id, selected, include_archive=True)
         if new is None or old is None:
@@ -330,3 +338,9 @@ def _apply_supersedes(new_id: str, old_id: str, *, stores: list[Store] | None = 
         write_memory(old_path, old_memory)
         update_search_index(new_store, new_path, new_memory)
         update_search_index(old_store, old_path, old_memory)
+
+    if _locked:
+        apply_locked()
+    else:
+        with lock_stores(selected):
+            apply_locked()

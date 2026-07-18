@@ -21,7 +21,7 @@ from mnemosyne.store import Store, iter_memory_paths, load_config, load_memories
 
 
 INDEX_FILENAME = "index.sqlite"
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -113,6 +113,7 @@ def ensure_index(store: Store) -> None:
                     memory_id TEXT NOT NULL,
                     path TEXT NOT NULL,
                     type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
                     archived INTEGER NOT NULL,
                     strength INTEGER NOT NULL,
                     tags TEXT NOT NULL,
@@ -128,6 +129,7 @@ def ensure_index(store: Store) -> None:
             columns = {row[1] for row in connection.execute("PRAGMA table_info(memories_meta)")}
             migrations = {
                 "mtime": "REAL NOT NULL DEFAULT 0",
+                "status": "TEXT NOT NULL DEFAULT 'active'",
                 "embedding": "BLOB",
                 "embedding_model": "TEXT NOT NULL DEFAULT ''",
                 "embedding_dim": "INTEGER NOT NULL DEFAULT 0",
@@ -136,6 +138,8 @@ def ensure_index(store: Store) -> None:
             for column, definition in migrations.items():
                 if column not in columns:
                     connection.execute(f"ALTER TABLE memories_meta ADD COLUMN {column} {definition}")
+                    if column == "status":
+                        _backfill_status(connection)
             _ensure_fts_table(connection)
             connection.execute(f"PRAGMA user_version={INDEX_VERSION}")
             connection.commit()
@@ -152,6 +156,20 @@ def reindex_store(store: Store, include_archive: bool = True) -> int:
             count += 1
         connection.commit()
     return count
+
+
+def _backfill_status(connection: sqlite3.Connection) -> None:
+    """Populate lifecycle status when migrating a pre-v3 metadata table."""
+    rows = connection.execute("SELECT document_id, path FROM memories_meta").fetchall()
+    for document_id, path_text in rows:
+        try:
+            memory = parse_memory(Path(path_text).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        connection.execute(
+            "UPDATE memories_meta SET status = ? WHERE document_id = ?",
+            (memory.status, document_id),
+        )
 
 
 def sync_index(store: Store, include_archive: bool = True) -> None:
@@ -176,6 +194,7 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
         for document_id, path_text, mtime in rows:
             by_path.setdefault(path_text, []).append((document_id, mtime))
         seen_paths: set[str] = set()
+        seen_document_ids: set[str] = set()
         for path in iter_memory_paths(store, include_archive=include_archive):
             spath = str(path)
             try:
@@ -185,6 +204,7 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
             seen_paths.add(spath)
             existing = by_path.get(spath, [])
             if len(existing) == 1 and abs(existing[0][1] - mtime) <= 1e-6:
+                seen_document_ids.add(existing[0][0])
                 continue
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
@@ -197,6 +217,7 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
                     delete_document_index(connection, document_id)
                 continue
             document_id = f"{store.scope}:{memory.id}"
+            seen_document_ids.add(document_id)
             for old_document_id, _ in existing:
                 if old_document_id != document_id:
                     delete_document_index(connection, old_document_id)
@@ -207,7 +228,11 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
         for spath, indexed_rows in by_path.items():
             if spath not in seen_paths:
                 for document_id, _ in indexed_rows:
-                    delete_document_index(connection, document_id)
+                    # The same stable memory ID may have moved to a new path
+                    # earlier in this pass. Its UPSERT already updated path;
+                    # deleting the old path's ID here would delete the new row.
+                    if document_id not in seen_document_ids:
+                        delete_document_index(connection, document_id)
         connection.commit()
 
 
@@ -239,6 +264,7 @@ def search_index(
     limit: int = 5,
     memory_type: str = "",
     include_archive: bool = False,
+    include_superseded: bool = False,
 ) -> list[IndexedSearchResult]:
     expression = _query_expression(query)
     if not expression:
@@ -249,9 +275,23 @@ def search_index(
         sync_index(store)
         with closing(_connect(index_path(store))) as connection:
             connection.row_factory = sqlite3.Row
-            rows = _search_rows(connection, expression, limit, memory_type, include_archive)
+            rows = _search_rows(
+                connection,
+                expression,
+                limit,
+                memory_type,
+                include_archive,
+                include_superseded,
+            )
             if not rows and any(_needs_like_fallback(token) for token in tokenize(query)):
-                rows = _search_rows_like(connection, tokenize(query), limit, memory_type, include_archive)
+                rows = _search_rows_like(
+                    connection,
+                    tokenize(query),
+                    limit,
+                    memory_type,
+                    include_archive,
+                    include_superseded,
+                )
         for row in rows:
             path = Path(row["path"])
             try:
@@ -288,13 +328,14 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
     connection.execute(
         """
         INSERT INTO memories_meta (
-            document_id, scope, memory_id, path, type, archived, strength, tags, summary, mtime
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            document_id, scope, memory_id, path, type, status, archived, strength, tags, summary, mtime
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(document_id) DO UPDATE SET
             scope=excluded.scope,
             memory_id=excluded.memory_id,
             path=excluded.path,
             type=excluded.type,
+            status=excluded.status,
             archived=excluded.archived,
             strength=excluded.strength,
             tags=excluded.tags,
@@ -307,6 +348,7 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
             memory.id,
             str(path),
             memory.type,
+            memory.status,
             archived,
             int(memory.strength),
             tags,
@@ -363,6 +405,7 @@ def _search_rows(
     limit: int,
     memory_type: str,
     include_archive: bool,
+    include_superseded: bool,
 ) -> list[sqlite3.Row]:
     filters = ["memories_fts MATCH ?"]
     params: list[object] = [expression]
@@ -371,6 +414,8 @@ def _search_rows(
         params.append(memory_type)
     if not include_archive:
         filters.append("m.archived = 0")
+    if not include_superseded:
+        filters.append("m.status != 'superseded'")
     params.append(limit)
     where = " AND ".join(filters)
     return list(
@@ -399,6 +444,7 @@ def _search_rows_like(
     limit: int,
     memory_type: str,
     include_archive: bool,
+    include_superseded: bool,
 ) -> list[sqlite3.Row]:
     short_tokens = [token for token in tokens if _needs_like_fallback(token)]
     if not short_tokens:
@@ -416,6 +462,8 @@ def _search_rows_like(
         params.append(memory_type)
     if not include_archive:
         filters.append("m.archived = 0")
+    if not include_superseded:
+        filters.append("m.status != 'superseded'")
     params.append(limit)
     where = " AND ".join(filters)
     return list(

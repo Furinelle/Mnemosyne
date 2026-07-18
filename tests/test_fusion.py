@@ -199,6 +199,32 @@ class FusionTests(unittest.TestCase):
 
             self.assertEqual(["working-source"], [result.memory.id for result in results])
 
+    def test_superseded_bm25_hit_cannot_exhaust_limited_candidate_pool(self) -> None:
+        for index_enabled in (False, True):
+            with self.subTest(index_enabled=index_enabled), isolated_workspace():
+                store = project_store()
+                ensure_store(store)
+                superseded = _memory(
+                    "a-superseded",
+                    "needle needle needle needle needle needle needle needle",
+                )
+                superseded.status = "superseded"
+                active = _memory("z-active", "needle")
+                write_memory(working_path(store, superseded), superseded)
+                write_memory(working_path(store, active), active)
+                if index_enabled:
+                    from mnemosyne.index import reindex_store
+
+                    reindex_store(store)
+                config = load_config(store)
+                config["search"]["index_enabled"] = index_enabled
+                config["fusion"]["bm25_pool_size"] = 1
+                config["fusion"]["link_expansion"] = False
+
+                results = search([store], "needle", limit=1, config=config)
+
+                self.assertEqual(["z-active"], [result.memory.id for result in results])
+
     def test_bm25_only_returns_empty_for_empty_query(self) -> None:
         with isolated_workspace():
             config = load_config(project_store())

@@ -148,6 +148,39 @@ class IndexV2Tests(unittest.TestCase):
                 ]
             self.assertEqual(["project:current-id"], ids)
 
+    def test_sync_keeps_same_document_id_when_file_is_renamed(self) -> None:
+        from mnemosyne.index import reindex_store, sync_index
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            memory = Memory(
+                id="stable-id",
+                type="codebase",
+                strength=70,
+                canonical_summary="renamed file needle",
+                injection_summary="renamed file needle",
+                body="renamed file needle",
+            )
+            old_path = working_path(store, memory)
+            write_memory(old_path, memory)
+            reindex_store(store)
+            new_path = old_path.with_name("renamed-memory.md")
+            old_path.rename(new_path)
+
+            sync_index(store)
+
+            with closing(_connect(index_path(store))) as connection:
+                rows = connection.execute(
+                    "SELECT document_id, path FROM memories_meta ORDER BY document_id"
+                ).fetchall()
+            self.assertEqual([("project:stable-id", str(new_path))], rows)
+            self.assertEqual(["stable-id"], [item.memory.id for item in search_index(
+                [store], "renamed file needle", limit=5
+            )])
+
     def test_ensure_index_migrates_v1_metadata_columns(self) -> None:
         with isolated_workspace():
             store = project_store()

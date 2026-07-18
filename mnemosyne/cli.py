@@ -307,10 +307,11 @@ def cmd_write(args: argparse.Namespace) -> int:
         write_memory(path, memory)
         update_memory_index_file(store, memory)
         update_search_index(store, path, memory)
-    if verdict == "supersede" and target:
-        from mnemosyne.distill import _apply_supersedes
+        if verdict == "supersede" and target:
+            from mnemosyne.distill import _apply_supersedes
 
-        _apply_supersedes(memory.id, target, stores=[store])
+            _apply_supersedes(memory.id, target, stores=[store], _locked=True)
+    if verdict == "supersede" and target:
         print(f"Supersedes {target} (linked, old memory demoted).")
     print(f"Wrote {memory.id}")
     return 0

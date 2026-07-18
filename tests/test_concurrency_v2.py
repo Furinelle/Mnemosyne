@@ -61,6 +61,35 @@ def _race_maintenance(root: str, home: str, start: multiprocessing.synchronize.E
     session_start.maybe_run_maintain()
 
 
+def _write_concurrent_supersede(
+    root: str,
+    home: str,
+    index: int,
+    start: multiprocessing.synchronize.Event,
+) -> None:
+    os.chdir(root)
+    os.environ["MNEMOSYNE_HOME"] = home
+
+    from mnemosyne.codex import Finding
+    from mnemosyne.distill import process_finding
+    from mnemosyne.store import project_store
+
+    start.wait(5)
+    process_finding(
+        Finding(
+            type="arch_decision",
+            importance=70,
+            title="Concurrent decision",
+            tags=["race"],
+            content=f"choice{index}",
+        ),
+        source="test",
+        commit=True,
+        store=project_store(),
+        subject_threshold=0.5,
+    )
+
+
 class ConcurrencyV2Tests(unittest.TestCase):
     def test_two_processes_can_write_embedding_rows(self) -> None:
         with isolated_workspace() as (project, home):
@@ -141,6 +170,43 @@ class ConcurrencyV2Tests(unittest.TestCase):
             self.assertEqual([0] * len(workers), [worker.exitcode for worker in workers])
             calls = (home / "maintain-calls").read_text(encoding="utf-8").splitlines()
             self.assertEqual(["global"], calls)
+
+    def test_concurrent_same_subject_updates_leave_one_active_head(self) -> None:
+        with isolated_workspace() as (project, home):
+            from mnemosyne.codex import Finding, write_finding
+            from mnemosyne.store import ensure_store, load_memories
+
+            store = project_store()
+            ensure_store(store)
+            write_finding(
+                Finding(
+                    type="arch_decision",
+                    importance=70,
+                    title="Concurrent decision",
+                    tags=["race"],
+                    content="initial",
+                ),
+                "test",
+                store=store,
+            )
+            context = multiprocessing.get_context("fork")
+            start = context.Event()
+            workers = [
+                context.Process(
+                    target=_write_concurrent_supersede,
+                    args=(str(project), str(home), index, start),
+                )
+                for index in range(6)
+            ]
+            for worker in workers:
+                worker.start()
+            start.set()
+            for worker in workers:
+                worker.join(10)
+
+            self.assertEqual([0] * len(workers), [worker.exitcode for worker in workers])
+            active = [memory for _, memory in load_memories(store) if memory.status == "active"]
+            self.assertEqual(1, len(active))
 
 
 if __name__ == "__main__":
