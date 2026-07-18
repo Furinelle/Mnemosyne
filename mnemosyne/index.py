@@ -172,7 +172,9 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
         rows = connection.execute(
             "SELECT document_id, path, mtime FROM memories_meta"
         ).fetchall()
-        by_path = {row[1]: (row[0], row[2]) for row in rows}
+        by_path: dict[str, list[tuple[str, float]]] = {}
+        for document_id, path_text, mtime in rows:
+            by_path.setdefault(path_text, []).append((document_id, mtime))
         seen_paths: set[str] = set()
         for path in iter_memory_paths(store, include_archive=include_archive):
             spath = str(path)
@@ -181,29 +183,31 @@ def sync_index(store: Store, include_archive: bool = True) -> None:
             except OSError:
                 continue
             seen_paths.add(spath)
-            existing = by_path.get(spath)
-            if existing is not None and abs(existing[1] - mtime) <= 1e-6:
+            existing = by_path.get(spath, [])
+            if len(existing) == 1 and abs(existing[0][1] - mtime) <= 1e-6:
                 continue
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
-                if existing is not None:
-                    delete_document_index(connection, existing[0])
+                for document_id, _ in existing:
+                    delete_document_index(connection, document_id)
                 continue
             if not memory.id:
-                if existing is not None:
-                    delete_document_index(connection, existing[0])
+                for document_id, _ in existing:
+                    delete_document_index(connection, document_id)
                 continue
             document_id = f"{store.scope}:{memory.id}"
-            if existing is not None and existing[0] != document_id:
-                delete_document_index(connection, existing[0])
+            for old_document_id, _ in existing:
+                if old_document_id != document_id:
+                    delete_document_index(connection, old_document_id)
             # Replace the searchable text while preserving embeddings on a
             # same-id metadata row. index_memory performs the metadata UPSERT.
             connection.execute("DELETE FROM memories_fts WHERE document_id = ?", (document_id,))
             index_memory(connection, store, path, memory)
-        for spath, (document_id, _) in by_path.items():
+        for spath, indexed_rows in by_path.items():
             if spath not in seen_paths:
-                delete_document_index(connection, document_id)
+                for document_id, _ in indexed_rows:
+                    delete_document_index(connection, document_id)
         connection.commit()
 
 

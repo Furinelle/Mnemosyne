@@ -105,6 +105,49 @@ class IndexV2Tests(unittest.TestCase):
             self.assertEqual(["project:new-frontmatter-id"], meta_ids)
             self.assertEqual(["project:new-frontmatter-id"], fts_ids)
 
+    def test_sync_removes_preexisting_duplicate_ids_for_one_path(self) -> None:
+        from mnemosyne.index import index_memory, reindex_store, sync_index
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            current = Memory(
+                id="current-id",
+                type="codebase",
+                strength=70,
+                canonical_summary="duplicate row needle",
+                injection_summary="duplicate row needle",
+                body="duplicate row needle",
+            )
+            path = working_path(store, current)
+            write_memory(path, current)
+            reindex_store(store)
+            stale = Memory(
+                id="stale-id",
+                type="codebase",
+                strength=70,
+                canonical_summary="duplicate row needle",
+                injection_summary="duplicate row needle",
+                body="duplicate row needle",
+            )
+            with closing(_connect(index_path(store))) as connection:
+                index_memory(connection, store, path, stale)
+                connection.commit()
+
+            sync_index(store)
+
+            with closing(_connect(index_path(store))) as connection:
+                ids = [
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT document_id FROM memories_meta WHERE path = ? ORDER BY document_id",
+                        (str(path),),
+                    )
+                ]
+            self.assertEqual(["project:current-id"], ids)
+
     def test_ensure_index_migrates_v1_metadata_columns(self) -> None:
         with isolated_workspace():
             store = project_store()
