@@ -149,6 +149,56 @@ class SupersededRetrievalTests(unittest.TestCase):
 
 
 class WriteDedupTests(unittest.TestCase):
+    def test_classification_is_isolated_to_destination_scope(self) -> None:
+        from mnemosyne.codex import Finding
+        from mnemosyne.distill import classify_against_store
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, global_store, working_path, write_memory
+
+        with isolated_workspace():
+            project = project_store()
+            ensure_store(project)
+            global_memory = Memory(
+                id="global-copy",
+                type="pitfall",
+                strength=70,
+                body="## JWT note\n\nuse httpOnly cookie for JWT",
+            )
+            global_scope = global_store()
+            ensure_store(global_scope)
+            write_memory(working_path(global_scope, global_memory), global_memory)
+            finding = Finding(
+                "pitfall", 70, "JWT note", ["jwt"], "use httpOnly cookie for JWT"
+            )
+
+            verdict, target = classify_against_store(finding, store=project)
+
+            self.assertEqual(("new", None), (verdict, target))
+
+    def test_classification_only_compares_same_memory_type(self) -> None:
+        from mnemosyne.codex import Finding
+        from mnemosyne.distill import classify_against_store
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            existing = Memory(
+                id="same-text-different-type",
+                type="codebase",
+                strength=70,
+                body="## JWT note\n\nuse httpOnly cookie for JWT",
+            )
+            write_memory(working_path(store, existing), existing)
+            finding = Finding(
+                "pitfall", 70, "JWT note", ["jwt"], "use httpOnly cookie for JWT"
+            )
+
+            verdict, target = classify_against_store(finding, store=store)
+
+            self.assertEqual(("new", None), (verdict, target))
+
     def test_force_write_skips_exact_duplicate(self) -> None:
         import io
         from contextlib import redirect_stdout

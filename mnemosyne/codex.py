@@ -17,10 +17,12 @@ from mnemosyne.hooks._common import (
 from mnemosyne.index import update_memory_index
 from mnemosyne.schema import Memory
 from mnemosyne.store import (
+    Store,
     find_project_store,
     global_store,
     load_config,
     read_core,
+    lock_store,
     working_path,
     write_memory,
 )
@@ -41,9 +43,10 @@ class Finding:
     evidence: str = ""
 
 
-def prep(task: str, max_memories: int = 5) -> str:
+def prep(task: str, max_memories: int = 5, stores: list[Store] | None = None) -> str:
     parts: list[str] = ['## Project memory (via Mnemosyne)', '']
-    for store in collect_stores():
+    selected_stores = collect_stores() if stores is None else list(stores)
+    for store in selected_stores:
         core = read_core(store).strip()
         if not core:
             continue
@@ -53,10 +56,14 @@ def prep(task: str, max_memories: int = 5) -> str:
         parts.append('')
     keywords = extract_keywords(task, limit=8)
     if keywords:
-        results = run_search(' '.join(keywords), limit=max_memories, update_access=False)
+        results = run_search(
+            ' '.join(keywords),
+            limit=max_memories,
+            update_access=False,
+            stores=selected_stores,
+        )
         if results:
-            stores = collect_stores()
-            config = load_config(stores[-1] if stores else None)
+            config = load_config(selected_stores[-1] if selected_stores else None)
             max_tokens = int(config.get('injection', {}).get('max_tokens', 2000))
             summary_chars = int(config.get('injection', {}).get('summary_chars', 120))
             parts.append('### Relevant prior memories')
@@ -190,11 +197,20 @@ def parse_findings(text: str) -> list[Finding]:
     return findings
 
 
-def write_finding(finding: Finding, source: str) -> str:
+def write_finding(
+    finding: Finding,
+    source: str,
+    *,
+    store: Store | None = None,
+    _locked: bool = False,
+) -> str:
     # Write to the real project store, or the global store when there is no
     # project (e.g. Hermes running from $HOME). Previously project_store()
     # mislabeled the global dir as a project and polluted it.
-    store = find_project_store() or global_store()
+    destination = store or find_project_store() or global_store()
+    if not _locked:
+        with lock_store(destination):
+            return write_finding(finding, source, store=destination, _locked=True)
     today = date.today().isoformat()
     memory_id = make_memory_id(finding.type, today)
     summary = summarize(finding.title, finding.content)
@@ -216,15 +232,20 @@ def write_finding(finding: Finding, source: str) -> str:
     )
     if finding.evidence:
         memory.extra['evidence'] = finding.evidence[:200]
-    path = working_path(store, memory)
+    path = working_path(destination, memory)
     write_memory(path, memory)
-    update_memory_index_file(store, memory)
-    update_memory_index(store, path, memory)
+    update_memory_index_file(destination, memory)
+    update_memory_index(destination, path, memory)
     return memory_id
 
 
 def ingest(text: str, source: str = 'codex', commit: bool = False) -> list[dict]:
     findings = parse_findings(text)
+    store = find_project_store() or global_store()
+    config = load_config(store)
+    distill_cfg = config.get("distill", {})
+    from mnemosyne.distill import process_finding
+
     actions: list[dict] = []
     for finding in findings:
         record = {
@@ -234,7 +255,14 @@ def ingest(text: str, source: str = 'codex', commit: bool = False) -> list[dict]
             'tags': finding.tags,
             'content_preview': finding.content[:120] + ('...' if len(finding.content) > 120 else ''),
         }
-        if commit:
-            record['id'] = write_finding(finding, source)
+        outcome = process_finding(
+            finding,
+            source=source,
+            commit=commit,
+            store=store,
+            dedup_threshold=float(distill_cfg.get("dedup_threshold", 0.85)),
+            subject_threshold=float(distill_cfg.get("subject_threshold", 0.5)),
+        )
+        record.update(outcome)
         actions.append(record)
     return actions

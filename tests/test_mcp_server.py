@@ -104,6 +104,150 @@ class MCPServerTests(unittest.TestCase):
 
             self.assertEqual(memory_id, _result_payload(search_response)[0]["id"])
 
+    def test_repeated_write_returns_structured_duplicate_result(self) -> None:
+        from mnemosyne.mcp.server import handle_request
+
+        request = {
+            "jsonrpc": "2.0",
+            "id": 31,
+            "method": "tools/call",
+            "params": {
+                "name": "mnemosyne_write",
+                "arguments": {
+                    "type": "pitfall",
+                    "importance": 70,
+                    "title": "Stable MCP write",
+                    "content": "Clear the stale MCP cache before retrying.",
+                    "scope": "project",
+                },
+            },
+        }
+        with isolated_workspace():
+            first = handle_request(request)
+            request["id"] = 32
+            second = handle_request(request)
+
+            self.assertNotIn("error", first)
+            self.assertNotIn("error", second)
+            first_payload = _result_payload(first)
+            second_payload = _result_payload(second)
+            self.assertEqual("created", first_payload["status"])
+            self.assertEqual("duplicate", second_payload["status"])
+            self.assertEqual(first_payload["id"], second_payload["id"])
+
+    def test_exposure_flags_apply_to_all_mcp_surfaces(self) -> None:
+        from mnemosyne.mcp.server import handle_request
+        from mnemosyne.store import global_store
+
+        with isolated_workspace():
+            project = project_store()
+            global_scope = global_store()
+            ensure_store(project)
+            ensure_store(global_scope)
+            project.core_path.write_text("PROJECT_ONLY_CORE", encoding="utf-8")
+            global_scope.core_path.write_text("HIDDEN_GLOBAL_CORE", encoding="utf-8")
+            project.config_path.write_text(
+                project.config_path.read_text(encoding="utf-8").replace(
+                    "expose_global = true", "expose_global = false"
+                ),
+                encoding="utf-8",
+            )
+            for store, memory_id in ((project, "visible-project"), (global_scope, "hidden-global")):
+                memory = Memory(
+                    id=memory_id,
+                    type="codebase",
+                    strength=70,
+                    canonical_summary="shared exposure needle",
+                    injection_summary="shared exposure needle",
+                    body="shared exposure needle",
+                )
+                write_memory(working_path(store, memory), memory)
+
+            def request(name: str, arguments: dict, request_id: int) -> dict:
+                return handle_request(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "tools/call",
+                        "params": {"name": name, "arguments": arguments},
+                    }
+                )
+
+            search = _result_payload(request(
+                "mnemosyne_search", {"query": "exposure needle", "scope": "all"}, 40
+            ))
+            self.assertEqual(["visible-project"], [item["id"] for item in search])
+
+            core = _result_payload(request("mnemosyne_read_core", {"scope": "all"}, 41))
+            self.assertEqual({"project": "PROJECT_ONLY_CORE"}, core)
+            self.assertEqual(-32602, request("mnemosyne_show", {"id": "hidden-global"}, 42)["error"]["code"])
+            self.assertEqual(-32602, request(
+                "mnemosyne_write",
+                {"type": "pitfall", "importance": 60, "content": "hidden write", "scope": "global"},
+                43,
+            )["error"]["code"])
+            self.assertEqual(-32602, request(
+                "mnemosyne_link", {"id1": "visible-project", "id2": "hidden-global"}, 44
+            )["error"]["code"])
+            self.assertEqual(-32602, request(
+                "mnemosyne_graph", {"id": "hidden-global"}, 45
+            )["error"]["code"])
+
+            maintain = _result_payload(request(
+                "mnemosyne_maintain", {"scope": "all", "dry_run": True}, 46
+            ))
+            self.assertEqual(1, maintain["processed"])
+            prepared = _result_payload(request(
+                "mnemosyne_codex_prep", {"task": "exposure needle"}, 47
+            ))
+            self.assertIn("PROJECT_ONLY_CORE", prepared)
+            self.assertNotIn("HIDDEN_GLOBAL_CORE", prepared)
+            self.assertNotIn("hidden-global", prepared)
+
+    def test_disabled_project_scope_is_rejected_and_all_keeps_global(self) -> None:
+        from mnemosyne.mcp.server import handle_request
+        from mnemosyne.store import global_store
+
+        with isolated_workspace():
+            project = project_store()
+            ensure_store(project)
+            project.config_path.write_text(
+                project.config_path.read_text(encoding="utf-8").replace(
+                    "expose_project = true", "expose_project = false"
+                ),
+                encoding="utf-8",
+            )
+            global_scope = global_store()
+            ensure_store(global_scope)
+            memory = Memory(
+                id="global-visible",
+                type="codebase",
+                strength=70,
+                canonical_summary="global policy needle",
+                injection_summary="global policy needle",
+                body="global policy needle",
+            )
+            write_memory(working_path(global_scope, memory), memory)
+
+            project_read = handle_request({
+                "jsonrpc": "2.0",
+                "id": 48,
+                "method": "tools/call",
+                "params": {"name": "mnemosyne_read_core", "arguments": {"scope": "project"}},
+            })
+            all_search = handle_request({
+                "jsonrpc": "2.0",
+                "id": 49,
+                "method": "tools/call",
+                "params": {
+                    "name": "mnemosyne_search",
+                    "arguments": {"query": "policy needle", "scope": "all"},
+                },
+            })
+
+            self.assertEqual(-32602, project_read["error"]["code"])
+            self.assertEqual(["global-visible"], [item["id"] for item in _result_payload(all_search)])
+
     def test_invalid_tool_and_json_return_standard_errors(self) -> None:
         from mnemosyne.mcp.server import handle_request, process_line
 

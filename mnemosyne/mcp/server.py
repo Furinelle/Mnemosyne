@@ -258,7 +258,7 @@ def serve_sse(host: str, port: int) -> int:
 
 def _search(arguments: dict) -> list[dict]:
     scope = str(arguments.get("scope", "all"))
-    stores = stores_for_scope(scope)
+    stores = _allowed_stores(scope)
     config = load_config(stores[-1] if stores else None)
     limit = int(arguments.get("limit", config.get("mcp", {}).get("default_search_limit", 5)))
     results = search(
@@ -290,31 +290,39 @@ def _search(arguments: dict) -> list[dict]:
 def _write(arguments: dict) -> dict:
     from mnemosyne.cli import cmd_write
 
+    scope = str(arguments.get("scope", "project"))
+    _allowed_stores(scope)
     args = argparse.Namespace(
         type=str(arguments["type"]),
         importance=int(arguments["importance"]),
-        scope=str(arguments.get("scope", "project")),
+        scope=scope,
         source=str(arguments.get("source", "mcp")),
         tags=str(arguments.get("tags", "")),
         title=str(arguments.get("title", "")),
         content=str(arguments["content"]),
         expires=str(arguments.get("expires", "")),
         force=True,
+        allow_duplicate=False,
     )
     output = _capture_command(lambda: cmd_write(args))
-    memory_id = output.strip().splitlines()[-1].removeprefix("Wrote ")
-    return {"id": memory_id}
+    for line in reversed(output.strip().splitlines()):
+        if line.startswith("Wrote "):
+            return {"status": "created", "id": line.removeprefix("Wrote ").strip()}
+        if line.startswith("Duplicate of "):
+            memory_id = line.removeprefix("Duplicate of ").split(";", 1)[0].strip()
+            return {"status": "duplicate", "id": memory_id}
+    raise ValueError(f"Unexpected write output: {output.strip()}")
 
 
 def _read_core(arguments: dict) -> dict:
     return {
         store.scope: read_core(store)
-        for store in stores_for_scope(str(arguments.get("scope", "all")))
+        for store in _allowed_stores(str(arguments.get("scope", "all")))
     }
 
 
 def _show(arguments: dict) -> str:
-    found = find_memory(str(arguments["id"]), stores_for_scope("all"), include_archive=True)
+    found = find_memory(str(arguments["id"]), _allowed_stores("all"), include_archive=True)
     if found is None:
         raise ValueError(f"Memory not found: {arguments['id']}")
     return serialize_memory(found[2])
@@ -323,25 +331,35 @@ def _show(arguments: dict) -> str:
 def _link(arguments: dict) -> dict:
     from mnemosyne.cli import cmd_link
 
+    stores = _allowed_stores("all")
+    for key in ("id1", "id2"):
+        if find_memory(str(arguments[key]), stores, include_archive=True) is None:
+            raise ValueError(f"Memory not found in exposed stores: {arguments[key]}")
     args = argparse.Namespace(
         id1=str(arguments["id1"]),
         id2=str(arguments["id2"]),
         rel=str(arguments.get("rel", "related")),
         allow_custom=bool(arguments.get("allow_custom", False)),
+        stores=stores,
     )
     _capture_command(lambda: cmd_link(args))
     return {"ok": True}
 
 
 def _graph(arguments: dict) -> str:
-    graph = build_graph(str(arguments["id"]), stores_for_scope("all"), depth=int(arguments.get("depth", 1)))
+    graph = build_graph(str(arguments["id"]), _allowed_stores("all"), depth=int(arguments.get("depth", 1)))
     return render_graph(graph, str(arguments.get("format", "mermaid")))
 
 
 def _maintain(arguments: dict) -> dict:
     from mnemosyne.cli import cmd_maintain
 
-    args = argparse.Namespace(scope=str(arguments.get("scope", "all")), dry_run=bool(arguments.get("dry_run", True)))
+    scope = str(arguments.get("scope", "all"))
+    args = argparse.Namespace(
+        scope=scope,
+        stores=_allowed_stores(scope),
+        dry_run=bool(arguments.get("dry_run", True)),
+    )
     output = _capture_command(lambda: cmd_maintain(args))
     summary: dict[str, int] = {}
     for line in output.splitlines():
@@ -353,7 +371,25 @@ def _maintain(arguments: dict) -> dict:
 
 
 def _codex_prep(arguments: dict) -> str:
-    return prep(str(arguments["task"]), max_memories=int(arguments.get("limit", 5)))
+    return prep(
+        str(arguments["task"]),
+        max_memories=int(arguments.get("limit", 5)),
+        stores=_allowed_stores("all"),
+    )
+
+
+def _allowed_stores(scope: str) -> list:
+    """Resolve an MCP scope after applying project-configured exposure policy."""
+    config = load_config().get("mcp", {})
+    expose = {
+        "global": bool(config.get("expose_global", True)),
+        "project": bool(config.get("expose_project", True)),
+    }
+    requested = stores_for_scope(scope)
+    allowed = [store for store in requested if expose.get(store.scope, False)]
+    if scope != "all" and not allowed:
+        raise ValueError(f"MCP access to {scope} scope is disabled")
+    return allowed
 
 
 def _capture_command(command: Callable[[], int]) -> str:

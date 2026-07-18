@@ -31,6 +31,31 @@ class CodexIngestTests(unittest.TestCase):
         self.assertEqual(["First finding", "Second finding"], [item.title for item in findings])
         self.assertEqual(["codebase", "pitfall"], [item.type for item in findings])
 
+    def test_repeated_committed_ingest_is_idempotent(self) -> None:
+        from mnemosyne.codex import ingest
+        from mnemosyne.store import ensure_store, load_memories, project_store
+        from tests.helpers import isolated_workspace
+
+        text = """**新发现:**
+- type: pitfall
+- importance: 70
+- title: Stable cache repair
+- tags: cache
+- content: |
+    Clear the stale cache before rebuilding the index.
+"""
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+
+            first = ingest(text, source="codex", commit=True)
+            second = ingest(text, source="codex", commit=True)
+
+            self.assertEqual("new", first[0]["verdict"])
+            self.assertEqual("duplicate", second[0]["verdict"])
+            self.assertEqual(first[0]["id"], second[0]["id"])
+            self.assertEqual(1, len(load_memories(store)))
+
 
 class EvidenceTests(unittest.TestCase):
     def test_parse_findings_reads_evidence_field(self) -> None:
@@ -74,4 +99,3 @@ class EvidenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

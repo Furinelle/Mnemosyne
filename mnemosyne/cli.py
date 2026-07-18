@@ -275,15 +275,6 @@ def cmd_write(args: argparse.Namespace) -> int:
     from mnemosyne.distill import classify_against_store
 
     distill_cfg = config.get("distill", {})
-    verdict, target = classify_against_store(
-        Finding(type=args.type, importance=memory.strength, title=title, tags=tags, content=content),
-        dedup_threshold=float(distill_cfg.get("dedup_threshold", 0.85)),
-        subject_threshold=float(distill_cfg.get("subject_threshold", 0.5)),
-    )
-    if verdict == "duplicate" and target and not args.allow_duplicate:
-        print(f"Duplicate of {target}; skipped (use --allow-duplicate to write anyway).")
-        return 0
-
     if not args.force and sys.stdin.isatty():
         duplicate = duplicate_prompt(store, memory)
         if duplicate == "cancel":
@@ -296,10 +287,23 @@ def cmd_write(args: argparse.Namespace) -> int:
             print(f"Merged into {duplicate_memory.id}")
             return 0
 
-    path = working_path(store, memory)
-    write_memory(path, memory)
-    update_memory_index_file(store, memory)
-    update_search_index(store, path, memory)
+    finding = Finding(type=args.type, importance=memory.strength, title=title, tags=tags, content=content)
+    with lock_store(store):
+        # Classification and creation are one transaction, so simultaneous
+        # writers cannot both observe an empty destination and create copies.
+        verdict, target = classify_against_store(
+            finding,
+            store=store,
+            dedup_threshold=float(distill_cfg.get("dedup_threshold", 0.85)),
+            subject_threshold=float(distill_cfg.get("subject_threshold", 0.5)),
+        )
+        if verdict == "duplicate" and target and not args.allow_duplicate:
+            print(f"Duplicate of {target}; skipped (use --allow-duplicate to write anyway).")
+            return 0
+        path = working_path(store, memory)
+        write_memory(path, memory)
+        update_memory_index_file(store, memory)
+        update_search_index(store, path, memory)
     if verdict == "supersede" and target:
         from mnemosyne.distill import _apply_supersedes
 
@@ -333,7 +337,9 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 def cmd_maintain(args: argparse.Namespace) -> int:
     summary = MaintainSummary()
-    stores = stores_for_scope(args.scope)
+    stores = getattr(args, "stores", None)
+    if stores is None:
+        stores = stores_for_scope(args.scope)
     for store in stores:
         with lock_store(store):
             config = load_config(store)
@@ -546,7 +552,10 @@ DEMOTE_ON_SUPERSEDE = 20
 
 
 def cmd_link(args: argparse.Namespace) -> int:
-    stores = [store for store in stores_for_scope("all") if store.root.exists()]
+    requested_stores = getattr(args, "stores", None)
+    if requested_stores is None:
+        requested_stores = stores_for_scope("all")
+    stores = [store for store in requested_stores if store.root.exists()]
     with lock_stores(stores):
         # Resolve after locking: callers may have loaded either endpoint before
         # a concurrent access update or supersedence write completed.

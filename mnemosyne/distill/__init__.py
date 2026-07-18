@@ -9,9 +9,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from mnemosyne.codex import Finding
-from mnemosyne.hooks._common import run_search
 from mnemosyne.search import tokenize
-from mnemosyne.store import find_memory, global_store, load_config, stores_for_scope
+from mnemosyne.store import (
+    Store,
+    find_memory,
+    find_project_store,
+    global_store,
+    load_config,
+    load_memories,
+    lock_store,
+    lock_stores,
+    stores_for_scope,
+)
 
 
 @dataclass(frozen=True)
@@ -136,6 +145,7 @@ def jaccard(a: list[str], b: list[str]) -> float:
 def classify_against_store(
     finding: Finding,
     *,
+    store: Store | None = None,
     dedup_threshold: float = 0.85,
     subject_threshold: float = 0.5,
 ) -> tuple[str, str | None]:
@@ -144,30 +154,70 @@ def classify_against_store(
     duplicate  -> content nearly identical to an existing memory; skip writing.
     supersede  -> same subject, materially different content; write new + link.
     """
+    destination = store or find_project_store() or global_store()
     text = f"{finding.title} {finding.content}".strip()
-    results = run_search(text, limit=3, update_access=False)
-    if not results:
-        return ("new", None)
-    stores = stores_for_scope("all")
     text_tokens = tokenize(text)
     title_tokens = tokenize(finding.title)
     supersede_target: str | None = None
-    for hit in results:
-        located = find_memory(hit["id"], stores, include_archive=False)
-        if located is None:
+    supersede_score = 0.0
+    for _path, memory in load_memories(destination, include_archive=False):
+        if memory.type != finding.type:
             continue
         # Compare against the full stored body, not the truncated summary.
         # summarize() caps at ~220 chars, so long findings lost their tail
         # tokens and never reached dedup_threshold -> the same memory was
         # rewritten on every session (observed: 9 identical copies).
-        body_tokens = tokenize(located[2].body or "")
+        body_tokens = tokenize(memory.body or "")
         if jaccard(text_tokens, body_tokens) >= dedup_threshold:
-            return ("duplicate", hit["id"])
-        if supersede_target is None and jaccard(title_tokens, body_tokens) >= subject_threshold:
-            supersede_target = hit["id"]
+            return ("duplicate", memory.id)
+        subject_score = jaccard(title_tokens, body_tokens)
+        if subject_score >= subject_threshold and subject_score > supersede_score:
+            supersede_target = memory.id
+            supersede_score = subject_score
     if supersede_target is not None:
         return ("supersede", supersede_target)
     return ("new", None)
+
+
+def process_finding(
+    finding: Finding,
+    *,
+    source: str,
+    commit: bool,
+    store: Store | None = None,
+    dedup_threshold: float = 0.85,
+    subject_threshold: float = 0.5,
+) -> dict:
+    """Classify and optionally persist a finding in one destination store."""
+    destination = store or find_project_store() or global_store()
+    if not commit:
+        verdict, target = classify_against_store(
+            finding,
+            store=destination,
+            dedup_threshold=dedup_threshold,
+            subject_threshold=subject_threshold,
+        )
+        return {"verdict": verdict, "target": target}
+
+    with lock_store(destination):
+        verdict, target = classify_against_store(
+            finding,
+            store=destination,
+            dedup_threshold=dedup_threshold,
+            subject_threshold=subject_threshold,
+        )
+        record: dict = {"verdict": verdict, "target": target}
+        if verdict == "duplicate":
+            if commit and target:
+                record["id"] = target
+            return record
+        from mnemosyne.codex import write_finding
+
+        record["id"] = write_finding(finding, source, store=destination, _locked=True)
+
+    if verdict == "supersede" and target:
+        _apply_supersedes(record["id"], target, stores=[destination])
+    return record
 
 
 def _make_extractor(config: dict):
@@ -234,46 +284,49 @@ def distill_text(text: str, *, source: str = "claude-code", commit: bool = False
     distill_cfg = config.get("distill", {})
     dedup = float(distill_cfg.get("dedup_threshold", 0.85))
     subject = float(distill_cfg.get("subject_threshold", 0.5))
+    store = find_project_store() or global_store()
     actions: list[dict] = []
     for finding in findings:
-        verdict, target = classify_against_store(
-            finding, dedup_threshold=dedup, subject_threshold=subject
+        outcome = process_finding(
+            finding,
+            source=source,
+            commit=commit,
+            store=store,
+            dedup_threshold=dedup,
+            subject_threshold=subject,
         )
         record = {
-            "verdict": verdict,
+            "verdict": outcome["verdict"],
             "type": finding.type,
             "title": finding.title,
-            "target": target,
+            "target": outcome.get("target"),
         }
-        if commit and verdict != "duplicate":
-            from mnemosyne.codex import write_finding
-
-            new_id = write_finding(finding, source)
-            record["id"] = new_id
-            if verdict == "supersede" and target:
-                _apply_supersedes(new_id, target)
+        if "id" in outcome:
+            record["id"] = outcome["id"]
         actions.append(record)
     return actions
 
 
-def _apply_supersedes(new_id: str, old_id: str) -> None:
+def _apply_supersedes(new_id: str, old_id: str, *, stores: list[Store] | None = None) -> None:
     from mnemosyne.cli import DEMOTE_ON_SUPERSEDE, add_link, update_search_index
     from mnemosyne.relations import reverse
     from mnemosyne.store import write_memory
 
-    stores = stores_for_scope("all")
-    new = find_memory(new_id, stores, include_archive=False)
-    old = find_memory(old_id, stores, include_archive=True)
-    if new is None or old is None:
-        return
-    new_store, new_path, new_memory = new
-    old_store, old_path, old_memory = old
-    add_link(new_memory, old_memory.id, "supersedes")
-    add_link(old_memory, new_memory.id, reverse("supersedes") or "superseded_by")
-    old_memory.strength = max(0, old_memory.strength - DEMOTE_ON_SUPERSEDE)
-    old_memory.status = "superseded"
-    old_memory.extra["invalidated_by"] = new_id
-    write_memory(new_path, new_memory)
-    write_memory(old_path, old_memory)
-    update_search_index(new_store, new_path, new_memory)
-    update_search_index(old_store, old_path, old_memory)
+    selected = stores_for_scope("all") if stores is None else list(stores)
+    selected = [store for store in selected if store.root.exists()]
+    with lock_stores(selected):
+        new = find_memory(new_id, selected, include_archive=False)
+        old = find_memory(old_id, selected, include_archive=True)
+        if new is None or old is None:
+            return
+        new_store, new_path, new_memory = new
+        old_store, old_path, old_memory = old
+        add_link(new_memory, old_memory.id, "supersedes")
+        add_link(old_memory, new_memory.id, reverse("supersedes") or "superseded_by")
+        old_memory.strength = max(0, old_memory.strength - DEMOTE_ON_SUPERSEDE)
+        old_memory.status = "superseded"
+        old_memory.extra["invalidated_by"] = new_id
+        write_memory(new_path, new_memory)
+        write_memory(old_path, old_memory)
+        update_search_index(new_store, new_path, new_memory)
+        update_search_index(old_store, old_path, old_memory)

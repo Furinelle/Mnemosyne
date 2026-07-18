@@ -155,21 +155,26 @@ def collect_stores() -> list[Store]:
     return stores
 
 
-def run_search(query: str, limit: int = 5, update_access: bool = False) -> list[dict]:
+def run_search(
+    query: str,
+    limit: int = 5,
+    update_access: bool = False,
+    stores: list[Store] | None = None,
+) -> list[dict]:
     if not query.strip():
         return []
-    stores = collect_stores()
-    config = load_config(stores[-1] if stores else None)
+    selected_stores = collect_stores() if stores is None else list(stores)
+    config = load_config(selected_stores[-1] if selected_stores else None)
     bonus = int(config['thresholds'].get('bonus_access', 5))
 
     if bool(config.get('search', {}).get('index_enabled', True)):
-        indexed = _run_search_indexed(stores, query, limit, update_access, bonus)
+        indexed = _run_search_indexed(selected_stores, query, limit, update_access, bonus)
         if indexed is not None:
             return indexed
 
     documents: list[SearchDocument] = []
     path_lookup: dict[str, tuple[Store, Path, object]] = {}
-    for store in stores:
+    for store in selected_stores:
         for path, memory in load_memories(store, include_archive=False):
             document_id = f'{store.scope}:{memory.id}'
             documents.append(SearchDocument(document_id, memory_search_text(memory), memory))
