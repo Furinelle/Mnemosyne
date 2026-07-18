@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from contextlib import suppress
+from dataclasses import fields
 import importlib.util
 import json
 import os
@@ -282,10 +284,11 @@ def cmd_write(args: argparse.Namespace) -> int:
             return 1
         if duplicate and duplicate != "none":
             duplicate_path, duplicate_memory = duplicate
-            merge_memory(duplicate_memory, memory)
-            write_memory(duplicate_path, duplicate_memory)
-            print(f"Merged into {duplicate_memory.id}")
-            return 0
+            if merge_memory(duplicate_memory, memory):
+                write_memory(duplicate_path, duplicate_memory)
+                print(f"Merged into {duplicate_memory.id}")
+                return 0
+            print("Selected duplicate has incompatible metadata; writing a separate memory.")
 
     finding = Finding(type=args.type, importance=memory.strength, title=title, tags=tags, content=content)
     with lock_store(store):
@@ -390,8 +393,12 @@ def cmd_consolidate(args: argparse.Namespace) -> int:
     from mnemosyne.index import remove_memory_index
 
     merged_total = 0
-    for store in stores_for_scope(args.scope):
-        with lock_store(store):
+    target_stores = stores_for_scope(args.scope)
+    visible_stores = [store for store in stores_for_scope("all") if store.root.exists()]
+
+    def consolidate_loaded_stores() -> None:
+        nonlocal merged_total
+        for store in target_stores:
             entries = load_memories(store)
             entries.sort(key=lambda pair: pair[1].strength, reverse=True)
             consumed: set[str] = set()
@@ -405,13 +412,20 @@ def cmd_consolidate(args: argparse.Namespace) -> int:
                     similarity = jaccard(sorted(strong_tokens), sorted(_consolidation_tokens(weak)))
                     if similarity < args.threshold:
                         continue
+                    candidate = deepcopy(strong)
+                    if not merge_memory(candidate, weak):
+                        print(
+                            f"skipped {weak.id} -> {strong.id}: incompatible lifecycle or custom metadata"
+                        )
+                        continue
                     if not args.commit:
                         print(f"would merge {weak.id} -> {strong.id} (similarity {similarity:.2f})")
                         consumed.add(weak.id)
                         continue
-                    merge_memory(strong, weak)
+                    strong = candidate
                     write_memory(strong_path, strong)
                     update_search_index(store, strong_path, strong)
+                    _rewrite_memory_references(visible_stores, weak.id, strong.id)
                     weak_path.unlink(missing_ok=True)
                     remove_memory_index(store, weak.id)
                     consumed.add(weak.id)
@@ -419,6 +433,12 @@ def cmd_consolidate(args: argparse.Namespace) -> int:
                     print(f"merged {weak.id} -> {strong.id} (similarity {similarity:.2f})")
             if args.commit and consumed:
                 rewrite_memory_index_file(store)
+
+    if args.commit:
+        with lock_stores(visible_stores):
+            consolidate_loaded_stores()
+    else:
+        consolidate_loaded_stores()
     if not args.commit:
         print("(dry-run) Add --commit to merge.")
     else:
@@ -769,19 +789,110 @@ def add_link(memory: Memory, link_id: str, rel: str) -> None:
     memory.links.append({"id": link_id, "rel": rel})
 
 
-def merge_memory(existing: Memory, incoming: Memory) -> None:
-    existing.strength = max(existing.strength, incoming.strength)
-    existing.last_accessed = date.today().isoformat()
-    existing.access_count += 1
+def _list_values(value) -> list[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
+def merge_memory(existing: Memory, incoming: Memory) -> bool:
+    """Losslessly fold incoming into existing, or leave existing unchanged."""
+    if existing.type != incoming.type or existing.status != incoming.status:
+        return False
+    if existing.expires and incoming.expires and existing.expires != incoming.expires:
+        return False
+
+    candidate = deepcopy(existing)
+    candidate.strength = max(existing.strength, incoming.strength)
+    candidate.created = min(filter(None, (existing.created, incoming.created)), default="")
+    candidate.last_accessed = max(existing.last_accessed, incoming.last_accessed)
+    candidate.access_count = existing.access_count + incoming.access_count
+    candidate.expires = existing.expires or incoming.expires
     for tag in incoming.tags:
-        if tag not in existing.tags:
-            existing.tags.append(tag)
-    if incoming.body and incoming.body not in existing.body:
-        existing.body = existing.body.rstrip() + "\n\n" + incoming.body.strip()
-    if incoming.canonical_summary and incoming.canonical_summary not in existing.canonical_summary:
-        existing.canonical_summary = (existing.canonical_summary + " " + incoming.canonical_summary).strip()
-    if incoming.injection_summary and incoming.injection_summary not in existing.injection_summary:
-        existing.injection_summary = (existing.injection_summary + " " + incoming.injection_summary).strip()
+        if tag not in candidate.tags:
+            candidate.tags.append(tag)
+
+    links: list[dict[str, str]] = []
+    seen_links: set[tuple[str, str]] = set()
+    for link in [*existing.links, *incoming.links]:
+        target = str(link.get("id", ""))
+        relation = str(link.get("rel", ""))
+        if not target or target in {existing.id, incoming.id}:
+            continue
+        key = (target, relation)
+        if key not in seen_links:
+            links.append({"id": target, "rel": relation})
+            seen_links.add(key)
+    candidate.links = links
+
+    if incoming.body and incoming.body not in candidate.body:
+        candidate.body = candidate.body.rstrip() + "\n\n" + incoming.body.strip()
+    if incoming.canonical_summary and incoming.canonical_summary not in candidate.canonical_summary:
+        candidate.canonical_summary = (
+            candidate.canonical_summary + " " + incoming.canonical_summary
+        ).strip()
+    if incoming.injection_summary and incoming.injection_summary not in candidate.injection_summary:
+        candidate.injection_summary = (
+            candidate.injection_summary + " " + incoming.injection_summary
+        ).strip()
+
+    evidence_a = candidate.extra.pop("evidence", "")
+    evidence_b = incoming.extra.get("evidence", "")
+    if evidence_a or evidence_b:
+        if not isinstance(evidence_a, str) or not isinstance(evidence_b, str):
+            return False
+        evidence = [item for item in (evidence_a, evidence_b) if item]
+        candidate.extra["evidence"] = "\n\n".join(dict.fromkeys(evidence))
+
+    ignored_extra = {"evidence", "merged_from", "merged_sources"}
+    for key, value in incoming.extra.items():
+        if key in ignored_extra:
+            continue
+        if key in candidate.extra and candidate.extra[key] != value:
+            return False
+        candidate.extra[key] = deepcopy(value)
+
+    merged_from = _list_values(existing.extra.get("merged_from"))
+    merged_from.extend(_list_values(incoming.extra.get("merged_from")))
+    merged_from.append(incoming.id)
+    candidate.extra["merged_from"] = list(dict.fromkeys(merged_from))
+    sources = _list_values(existing.extra.get("merged_sources"))
+    sources.extend([existing.source, incoming.source])
+    sources.extend(_list_values(incoming.extra.get("merged_sources")))
+    candidate.extra["merged_sources"] = list(dict.fromkeys(filter(None, sources)))
+
+    for field in fields(Memory):
+        setattr(existing, field.name, deepcopy(getattr(candidate, field.name)))
+    return True
+
+
+def _rewrite_memory_references(stores: list[Store], old_id: str, new_id: str) -> None:
+    """Rewrite links and invalidation pointers after a consolidation merge."""
+    for store in stores:
+        for path, memory in load_memories(store, include_archive=True):
+            if memory.id in {old_id, new_id}:
+                continue
+            changed = False
+            rewritten: list[dict[str, str]] = []
+            seen: set[tuple[str, str]] = set()
+            for link in memory.links:
+                target = new_id if link.get("id") == old_id else str(link.get("id", ""))
+                relation = str(link.get("rel", ""))
+                changed = changed or target != link.get("id")
+                if not target or target == memory.id or (target, relation) in seen:
+                    continue
+                rewritten.append({"id": target, "rel": relation})
+                seen.add((target, relation))
+            if memory.extra.get("invalidated_by") == old_id:
+                memory.extra["invalidated_by"] = new_id
+                changed = True
+            if not changed:
+                continue
+            memory.links = rewritten
+            write_memory(path, memory)
+            update_search_index(store, path, memory)
 
 
 def cmd_install_hermes(args: argparse.Namespace) -> int:

@@ -99,6 +99,108 @@ class ConsolidateTests(unittest.TestCase):
             self.assertEqual(80, survivor.strength)
             self.assertIn("auth tokens", survivor.body)
 
+    def test_consolidate_preserves_metadata_and_rewrites_external_backlinks(self) -> None:
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, global_store, working_path, write_memory
+
+        with isolated_workspace():
+            project = project_store()
+            global_scope = global_store()
+            ensure_store(project)
+            ensure_store(global_scope)
+            strong = Memory(
+                id="strong",
+                type="pitfall",
+                source="codex",
+                strength=80,
+                created="2026-07-01",
+                last_accessed="2026-07-10",
+                access_count=3,
+                tags=["jwt"],
+                links=[{"id": "external", "rel": "related"}],
+                canonical_summary="use httpOnly cookie for JWT tokens",
+                injection_summary="use httpOnly cookie for JWT tokens",
+                body="use httpOnly cookie for JWT tokens",
+                expires="2026-12-31",
+                extra={"evidence": "review A"},
+            )
+            weak = Memory(
+                id="weak",
+                type="pitfall",
+                source="claude-code",
+                strength=60,
+                created="2026-07-02",
+                last_accessed="2026-07-12",
+                access_count=4,
+                tags=["auth"],
+                links=[{"id": "second-external", "rel": "refines"}],
+                canonical_summary="use httpOnly cookie for JWT auth tokens",
+                injection_summary="use httpOnly cookie for JWT auth tokens",
+                body="use httpOnly cookie for JWT auth tokens",
+                expires="2026-12-31",
+                extra={"evidence": "review B"},
+            )
+            backlink = Memory(
+                id="external",
+                type="codebase",
+                strength=70,
+                links=[{"id": "weak", "rel": "related"}],
+                body="external graph node",
+            )
+            for memory in (strong, weak):
+                write_memory(working_path(project, memory), memory)
+            write_memory(working_path(global_scope, backlink), backlink)
+
+            self.assertEqual(
+                0,
+                main(["consolidate", "--scope", "project", "--threshold", "0.5", "--commit"]),
+            )
+
+            survivors = load_memories(project)
+            self.assertEqual(1, len(survivors))
+            survivor = survivors[0][1]
+            self.assertEqual("strong", survivor.id)
+            self.assertEqual(7, survivor.access_count)
+            self.assertEqual("2026-07-12", survivor.last_accessed)
+            self.assertEqual("2026-07-01", survivor.created)
+            self.assertEqual("2026-12-31", survivor.expires)
+            self.assertEqual({"jwt", "auth"}, set(survivor.tags))
+            self.assertIn({"id": "second-external", "rel": "refines"}, survivor.links)
+            self.assertIn("review A", survivor.extra["evidence"])
+            self.assertIn("review B", survivor.extra["evidence"])
+            self.assertIn("weak", survivor.extra["merged_from"])
+            external = load_memories(global_scope)[0][1]
+            self.assertEqual([{"id": "strong", "rel": "related"}], external.links)
+
+    def test_consolidate_skips_incompatible_expiry_metadata(self) -> None:
+        from mnemosyne.schema import Memory
+        from mnemosyne.store import ensure_store, working_path, write_memory
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            for memory_id, strength, expires in (
+                ("strong", 80, "2026-12-31"),
+                ("weak", 60, "2027-12-31"),
+            ):
+                memory = Memory(
+                    id=memory_id,
+                    type="pitfall",
+                    strength=strength,
+                    canonical_summary="same cache repair tokens",
+                    injection_summary="same cache repair tokens",
+                    body="same cache repair tokens",
+                    expires=expires,
+                )
+                write_memory(working_path(store, memory), memory)
+
+            self.assertEqual(
+                0,
+                main(["consolidate", "--scope", "project", "--threshold", "0.5", "--commit"]),
+            )
+
+            self.assertEqual(2, len(load_memories(store)))
+
 
 class SupersededRetrievalTests(unittest.TestCase):
     def _write_pair(self):
