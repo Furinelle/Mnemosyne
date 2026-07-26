@@ -185,6 +185,19 @@ def build_parser() -> argparse.ArgumentParser:
                                        help="preview without writing")
     install_hermes_parser.set_defaults(func=cmd_install_hermes)
 
+    inject_parser = subparsers.add_parser(
+        "inject", help="Produce injection context for an agent-neutral lifecycle event")
+    inject_parser.add_argument("--event", required=True,
+        choices=["session_start", "turn_start", "file_touch", "session_end"])
+    inject_parser.add_argument("--session", default="",
+        help="opaque session id for cross-turn injection dedup")
+    inject_parser.add_argument("--channel", choices=["cli", "mcp", "none"], default="cli",
+        help="which retrieval hint fits the calling agent")
+    inject_parser.add_argument("--format", dest="fmt", choices=["text", "json"], default="text")
+    inject_parser.add_argument("--fail-safe", action="store_true",
+        help="never fail: on any error print nothing and exit 0")
+    inject_parser.set_defaults(func=cmd_inject)
+
     distill_parser = subparsers.add_parser("distill", help="Extract memories from a conversation transcript")
     distill_group = distill_parser.add_mutually_exclusive_group(required=True)
     distill_group.add_argument("--transcript", type=Path, help="Path to a Claude Code JSONL transcript")
@@ -768,6 +781,34 @@ def cmd_install_hermes(args: argparse.Namespace) -> int:
             print("Restart Hermes to activate (memory.provider: mnemosyne).")
         else:
             print("Skipped config.yaml — set memory.provider: mnemosyne manually.")
+    return 0
+
+
+def cmd_inject(args: argparse.Namespace) -> int:
+    from mnemosyne.events import handle_event
+
+    try:
+        raw = sys.stdin.read().strip()
+        payload = json.loads(raw) if raw else {}
+        if not isinstance(payload, dict):
+            raise ValueError("inject payload must be a JSON object")
+        result = handle_event(args.event, payload, session=args.session, channel=args.channel)
+    except Exception as exc:
+        if args.fail_safe:
+            return 0
+        print(f"inject failed: {exc}", file=sys.stderr)
+        return 1
+    if args.fmt == "json":
+        print(json.dumps(
+            {
+                "context": result.context,
+                "memory_ids": result.memory_ids,
+                "approx_tokens": result.approx_tokens,
+            },
+            ensure_ascii=False,
+        ))
+    elif result.context:
+        print(result.context)
     return 0
 
 
