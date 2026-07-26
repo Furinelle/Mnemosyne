@@ -27,7 +27,6 @@ from mnemosyne.lifecycle import is_date_expiry
 from mnemosyne.index import (
     backfill_embeddings,
     fts_available,
-    index_enabled,
     index_path,
     reindex_store,
     update_memory_index as update_search_index,

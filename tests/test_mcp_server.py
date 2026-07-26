@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import io
 import json
 import os
 import subprocess
 import sys
 import unittest
-from contextlib import redirect_stderr
 from pathlib import Path
-from unittest.mock import patch
 
-from mnemosyne.cli import main
 from mnemosyne.schema import Memory
 from mnemosyne.store import ensure_store, project_store, working_path, write_memory
 from tests.helpers import isolated_workspace
