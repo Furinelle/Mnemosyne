@@ -4,18 +4,26 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
-from contextlib import suppress
 from dataclasses import fields
 import importlib.util
 import json
-import uuid
 import sys
 from datetime import date
 from pathlib import Path
 
-import portalocker
 
-from mnemosyne.lifecycle import MaintainSummary, is_date_expiry, maintain_memory
+from mnemosyne import api
+from mnemosyne.api import (  # noqa: F401  (re-exported for backward compat)
+    DEMOTE_ON_SUPERSEDE,
+    MnemosyneError,
+    add_link,
+    first_line_title,
+    make_memory_id,
+    rewrite_memory_index_file,
+    summarize,
+    update_memory_index_file,
+)
+from mnemosyne.lifecycle import is_date_expiry
 from mnemosyne.index import (
     backfill_embeddings,
     fts_available,
@@ -26,12 +34,9 @@ from mnemosyne.index import (
 )
 from mnemosyne.embedding import get_embedder
 from mnemosyne.fusion import search as fusion_search
-from mnemosyne.relations import PREDEFINED, is_demoting, reverse
 from mnemosyne.schema import Memory, serialize_memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import (
-    bump_memory_access,
-    lock_store,
     lock_stores,
     Store,
     corrupt_memory_paths,
@@ -45,7 +50,6 @@ from mnemosyne.store import (
     stores_for_scope,
     template_text,
     templates_dir,
-    working_path,
     write_memory,
 )
 
@@ -241,26 +245,7 @@ def cmd_write(args: argparse.Namespace) -> int:
         return 2
 
     title = args.title.strip() or first_line_title(content)
-    today = date.today().isoformat()
-    memory_id = make_memory_id(args.type, today)
     tags = [tag.strip() for tag in args.tags.split(",") if tag.strip()]
-    summary = summarize(title, content)
-    memory = Memory(
-        id=memory_id,
-        type=args.type,
-        source=args.source,
-        strength=max(0, min(100, args.importance)),
-        created=today,
-        last_accessed=today,
-        access_count=0,
-        tags=tags,
-        links=[],
-        canonical_summary=summary,
-        injection_summary=summary,
-        status="active",
-        body=f"## {title}\n\n{content}",
-        expires=args.expires,
-    )
 
     if args.expires and not is_date_expiry(args.expires):
         print(
@@ -268,50 +253,56 @@ def cmd_write(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    # Dedup applies to every write path, including --force: agents write with
-    # --force by default, which used to bypass duplicate detection entirely
-    # and left "search before write" as a convention instead of a mechanism.
-    from mnemosyne.codex import Finding
-    from mnemosyne.distill import classify_against_store
-
-    distill_cfg = config.get("distill", {})
+    # Interactive merge stays in the CLI: it needs a TTY prompt. The dedup
+    # transaction itself lives in api.write_entry for every caller.
     if not args.force and sys.stdin.isatty():
-        duplicate = duplicate_prompt(store, memory)
+        today = date.today().isoformat()
+        summary = summarize(title, content)
+        probe = Memory(
+            id=make_memory_id(args.type, today),
+            type=args.type,
+            source=args.source,
+            strength=max(0, min(100, args.importance)),
+            created=today,
+            last_accessed=today,
+            access_count=0,
+            tags=tags,
+            links=[],
+            canonical_summary=summary,
+            injection_summary=summary,
+            status="active",
+            body=f"## {title}\n\n{content}",
+            expires=args.expires,
+        )
+        duplicate = duplicate_prompt(store, probe)
         if duplicate == "cancel":
             print("Cancelled.")
             return 1
         if duplicate and duplicate != "none":
             duplicate_path, duplicate_memory = duplicate
-            if merge_memory(duplicate_memory, memory):
+            if merge_memory(duplicate_memory, probe):
                 write_memory(duplicate_path, duplicate_memory)
                 print(f"Merged into {duplicate_memory.id}")
                 return 0
             print("Selected duplicate has incompatible metadata; writing a separate memory.")
 
-    finding = Finding(type=args.type, importance=memory.strength, title=title, tags=tags, content=content)
-    with lock_store(store):
-        # Classification and creation are one transaction, so simultaneous
-        # writers cannot both observe an empty destination and create copies.
-        verdict, target = classify_against_store(
-            finding,
-            store=store,
-            dedup_threshold=float(distill_cfg.get("dedup_threshold", 0.85)),
-            subject_threshold=float(distill_cfg.get("subject_threshold", 0.5)),
-        )
-        if verdict == "duplicate" and target and not args.allow_duplicate:
-            print(f"Duplicate of {target}; skipped (use --allow-duplicate to write anyway).")
-            return 0
-        path = working_path(store, memory)
-        write_memory(path, memory)
-        update_memory_index_file(store, memory)
-        update_search_index(store, path, memory)
-        if verdict == "supersede" and target:
-            from mnemosyne.distill import _apply_supersedes
-
-            _apply_supersedes(memory.id, target, stores=[store], _locked=True)
-    if verdict == "supersede" and target:
-        print(f"Supersedes {target} (linked, old memory demoted).")
-    print(f"Wrote {memory.id}")
+    result = api.write_entry(
+        type=args.type,
+        importance=args.importance,
+        content=content,
+        title=title,
+        tags=tags,
+        scope=args.scope,
+        source=args.source,
+        expires=args.expires,
+        allow_duplicate=args.allow_duplicate,
+    )
+    if result.status == "duplicate":
+        print(f"Duplicate of {result.duplicate_of}; skipped (use --allow-duplicate to write anyway).")
+        return 0
+    if result.superseded:
+        print(f"Supersedes {result.superseded} (linked, old memory demoted).")
+    print(f"Wrote {result.id}")
     return 0
 
 
@@ -338,43 +329,19 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 
 def cmd_maintain(args: argparse.Namespace) -> int:
-    summary = MaintainSummary()
-    stores = getattr(args, "stores", None)
-    if stores is None:
-        stores = stores_for_scope(args.scope)
-    for store in stores:
-        with lock_store(store):
-            config = load_config(store)
-            for path, memory in load_memories(store, include_archive=False):
-                summary.processed += 1
-                result, candidate = maintain_memory(
-                    store,
-                    path,
-                    memory,
-                    config["thresholds"],
-                    dry_run=args.dry_run,
-                )
-                if result == "decayed":
-                    summary.decayed += 1
-                elif result == "deprecated":
-                    summary.deprecated += 1
-                elif result == "archived":
-                    summary.archived += 1
-                elif result == "core_candidate" and candidate is not None:
-                    summary.core_candidates.append(candidate)
-        if not args.dry_run:
-            rewrite_memory_index_file(store)
-        if index_enabled(store) and index_path(store).exists():
-            reindex_store(store)
-
-    print(f"processed: {summary.processed}")
-    print(f"decayed: {summary.decayed}")
-    print(f"deprecated: {summary.deprecated}")
-    print(f"archived: {summary.archived}")
-    if summary.core_candidates:
+    summary = api.maintain(
+        scope=args.scope,
+        dry_run=args.dry_run,
+        stores=getattr(args, "stores", None),
+    )
+    print(f"processed: {summary['processed']}")
+    print(f"decayed: {summary['decayed']}")
+    print(f"deprecated: {summary['deprecated']}")
+    print(f"archived: {summary['archived']}")
+    if summary["core_candidates"]:
         print("Core candidates:")
-        for memory in summary.core_candidates:
-            print(f"- {memory.id}: {memory.injection_summary}")
+        for candidate in summary["core_candidates"]:
+            print(f"- {candidate['id']}: {candidate['summary']}")
     return 0
 
 
@@ -565,49 +532,19 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
-# Strength penalty applied to the target of a demoting relation (e.g. the
-# memory that gets superseded). Activates the demote_target relation semantics.
-DEMOTE_ON_SUPERSEDE = 20
-
-
 def cmd_link(args: argparse.Namespace) -> int:
-    requested_stores = getattr(args, "stores", None)
-    if requested_stores is None:
-        requested_stores = stores_for_scope("all")
-    stores = [store for store in requested_stores if store.root.exists()]
-    with lock_stores(stores):
-        # Resolve after locking: callers may have loaded either endpoint before
-        # a concurrent access update or supersedence write completed.
-        first = find_memory(args.id1, stores, include_archive=True)
-        second = find_memory(args.id2, stores, include_archive=True)
-        if first is None:
-            print(f"Memory not found: {args.id1}", file=sys.stderr)
-            return 1
-        if second is None:
-            print(f"Memory not found: {args.id2}", file=sys.stderr)
-            return 1
-        _, first_path, first_memory = first
-        _, second_path, second_memory = second
-        allow_custom = bool(args.allow_custom or load_config(first[0]).get("relations", {}).get("allow_custom"))
-        if args.rel not in PREDEFINED and not allow_custom:
-            choices = ", ".join(sorted(PREDEFINED))
-            print(
-                f"Unknown relation: {args.rel}. Choose one of: {choices}; use --allow-custom to opt in.",
-                file=sys.stderr,
-            )
-            return 2
-
-        add_link(first_memory, second_memory.id, args.rel)
-        add_link(second_memory, first_memory.id, reverse(args.rel) or args.rel)
-        if is_demoting(args.rel):
-            second_memory.strength = max(0, second_memory.strength - DEMOTE_ON_SUPERSEDE)
-            second_memory.status = "superseded"
-            second_memory.extra["invalidated_by"] = first_memory.id
-        write_memory(first_path, first_memory)
-        write_memory(second_path, second_memory)
-        update_search_index(first[0], first_path, first_memory)
-        update_search_index(second[0], second_path, second_memory)
-    print(f"Linked {first_memory.id} <-> {second_memory.id} ({args.rel})")
+    try:
+        result = api.link_entries(
+            args.id1,
+            args.id2,
+            rel=args.rel,
+            allow_custom=bool(args.allow_custom),
+            stores=getattr(args, "stores", None),
+        )
+    except MnemosyneError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.exit_code
+    print(f"Linked {result['id1']} <-> {result['id2']} ({result['rel']})")
     return 0
 
 
@@ -662,29 +599,6 @@ def cmd_codex_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
-def make_memory_id(memory_type: str, day: str) -> str:
-    # 8 hex chars (32 bits) instead of 6 (24 bits): the old space made silent
-    # filename collisions (and os.replace overwrites) plausible across many
-    # same-day writes. uuid4 is a stronger entropy source than random.choice.
-    suffix = uuid.uuid4().hex[:8]
-    return f"{memory_type}-{day}-{suffix}"
-
-
-def summarize(title: str, content: str) -> str:
-    text = " ".join(content.split())
-    if len(text) > 220:
-        text = text[:217].rstrip() + "..."
-    return f"{title}: {text}" if title else text
-
-
-def first_line_title(content: str) -> str:
-    for line in content.splitlines():
-        stripped = line.strip().lstrip("#").strip()
-        if stripped:
-            return stripped[:80]
-    return "Untitled"
-
-
 def duplicate_prompt(store: Store, memory: Memory) -> str | tuple[Path, Memory]:
     path_lookup: dict[str, tuple[Path, Memory]] = {}
     documents = []
@@ -707,71 +621,8 @@ def duplicate_prompt(store: Store, memory: Memory) -> str | tuple[Path, Memory]:
     return "none"
 
 
-def update_memory_index_file(store: Store, memory: Memory) -> None:
-    index_path = store.root / "MEMORY.md"
-    if not index_path.exists():
-        try:
-            index_path.write_text(template_text("MEMORY.md"), encoding="utf-8")
-        except FileNotFoundError:
-            index_path.write_text("# Memory Index\n", encoding="utf-8")
-    with index_path.open("a", encoding="utf-8") as handle:
-        handle.write(f"\n- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}\n")
-
-
-def rewrite_memory_index_file(store: Store) -> None:
-    """Regenerate MEMORY.md from active working memories.
-
-    The write path appends for cheapness; maintain reconciles so entries for
-    archived or superseded memories do not accumulate forever.
-    """
-    try:
-        header = template_text("MEMORY.md").rstrip()
-    except (FileNotFoundError, OSError):
-        header = "# Memory Index"
-    lines = [header, ""]
-    memories = sorted(load_memories(store), key=lambda pair: pair[1].strength, reverse=True)
-    for _path, memory in memories:
-        lines.append(f"- `{memory.id}` ({memory.type}, strength {memory.strength}): {memory.injection_summary}")
-    (store.root / "MEMORY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
 def print_search_results(indexed_results, output_format: str, config: dict) -> int:
-    threshold_bonus = int(config["thresholds"].get("bonus_access", 5))
-    recall_bonus = int(config["thresholds"].get("bonus_recall", 20))
-    output = []
-    today = date.today().isoformat()
-    for result in indexed_results:
-        memory = result.memory
-        path = result.path
-        is_archive = result.store.archive_dir in path.parents
-        bonus = recall_bonus if is_archive else threshold_bonus
-        # OSError too: a concurrent `maintain` can archive (move) the file
-        # between retrieval and the access bump. Failing to bump must not take
-        # the whole search down with it.
-        with suppress(portalocker.exceptions.LockException, OSError):
-            memory = bump_memory_access(
-                result.store,
-                path,
-                bonus,
-                today=today,
-                lock_timeout=0,
-                sync_index=True,
-            )
-        output.append(
-            {
-                "id": memory.id,
-                "scope": result.store.scope,
-                "type": memory.type,
-                "score": round(result.score, 4),
-                "strength": memory.strength,
-                "tags": memory.tags,
-                "links": memory.links,
-                "summary": memory.injection_summary,
-                "path": str(path),
-                "why_matched": result.why_matched,
-                "score_breakdown": result.score_breakdown,
-            }
-        )
+    output = api.results_to_dicts(indexed_results, config)
     if output_format == "json":
         print(json.dumps(output, ensure_ascii=False, indent=2))
     else:
@@ -783,12 +634,6 @@ def print_search_results(indexed_results, output_format: str, config: dict) -> i
             print(f"path: {item['path']}")
             print()
     return 0
-
-
-def add_link(memory: Memory, link_id: str, rel: str) -> None:
-    if any(link.get("id") == link_id and link.get("rel") == rel for link in memory.links):
-        return
-    memory.links.append({"id": link_id, "rel": rel})
 
 
 def _list_values(value) -> list[str]:
