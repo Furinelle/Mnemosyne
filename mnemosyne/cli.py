@@ -72,6 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     init_parser = subparsers.add_parser("init", help="Create .mnemosyne/ in the current directory")
+    init_parser.add_argument("--agent", choices=["generic", "codex", "claude-code", "hermes"],
+        default="generic", help="which agent's guidance files to write (default: generic)")
+    init_parser.add_argument("--no-agent-files", action="store_true",
+        help="do not write AGENTS.md or other guidance files")
     init_parser.set_defaults(func=cmd_init)
 
     read_parser = subparsers.add_parser("read", help="Print core memory for prompt injection")
@@ -158,35 +162,38 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_serve_parser.add_argument("--sse", action="store_true", help="serve optional SSE transport")
     mcp_serve_parser.set_defaults(func=cmd_mcp_serve)
 
-    codex_prep_parser = subparsers.add_parser('codex-prep',
-        help='Generate a prompt prefix for handoff to a non-Claude agent')
-    codex_prep_parser.add_argument('task')
-    codex_prep_parser.add_argument('--limit', type=int, default=5)
-    codex_prep_parser.set_defaults(func=cmd_codex_prep)
+    for prep_name, prep_help in (
+        ("prep", "Generate a context prompt prefix for any agent task"),
+        ("codex-prep", "Alias of prep (kept for backward compatibility)"),
+    ):
+        prep_parser = subparsers.add_parser(prep_name, help=prep_help)
+        prep_parser.add_argument('task')
+        prep_parser.add_argument('--limit', type=int, default=5)
+        prep_parser.set_defaults(func=cmd_prep)
 
-    codex_ingest_parser = subparsers.add_parser('codex-ingest',
-        help='Parse Findings blocks from stdin and write them as memories')
-    codex_ingest_parser.add_argument('--source', default='codex')
-    codex_ingest_parser.add_argument('--commit', action='store_true',
-        help='actually write (default: dry-run preview)')
-    codex_ingest_parser.add_argument('--format', dest='fmt',
-        choices=['auto', 'markdown', 'json'], default='auto',
-        help='findings block format (default: auto-detect)')
-    codex_ingest_parser.set_defaults(func=cmd_codex_ingest)
+    for ingest_name, ingest_help in (
+        ("ingest", "Parse findings blocks from stdin and write them as memories"),
+        ("codex-ingest", "Alias of ingest (kept for backward compatibility)"),
+    ):
+        ingest_parser = subparsers.add_parser(ingest_name, help=ingest_help)
+        ingest_parser.add_argument('--source', default='codex')
+        ingest_parser.add_argument('--commit', action='store_true',
+            help='actually write (default: dry-run preview)')
+        ingest_parser.add_argument('--format', dest='fmt',
+            choices=['auto', 'markdown', 'json'], default='auto',
+            help='findings block format (default: auto-detect)')
+        ingest_parser.set_defaults(func=cmd_ingest)
+
+    install_parser = subparsers.add_parser(
+        "install", help="Install a Mnemosyne adapter into an agent host")
+    install_parser.add_argument("agent", choices=["hermes", "claude-code"])
+    _add_install_options(install_parser)
+    install_parser.set_defaults(func=cmd_install)
 
     install_hermes_parser = subparsers.add_parser(
-        "install-hermes", help="Install the Mnemosyne memory provider into Hermes")
-    install_hermes_parser.add_argument("--python", default=None,
-                                       help="bridge python that can import mnemosyne")
-    install_hermes_parser.add_argument("--hermes-home", default=None,
-                                       help="HERMES_HOME (default: $HERMES_HOME or ~/.hermes)")
-    install_hermes_parser.add_argument("--force", action="store_true",
-                                       help="overwrite an existing plugin dir")
-    install_hermes_parser.add_argument("--no-config", action="store_true",
-                                       help="do not edit config.yaml")
-    install_hermes_parser.add_argument("--dry-run", action="store_true",
-                                       help="preview without writing")
-    install_hermes_parser.set_defaults(func=cmd_install_hermes)
+        "install-hermes", help="Alias of `install hermes` (kept for backward compatibility)")
+    _add_install_options(install_hermes_parser)
+    install_hermes_parser.set_defaults(func=cmd_install, agent="hermes")
 
     inject_parser = subparsers.add_parser(
         "inject", help="Produce injection context for an agent-neutral lifecycle event")
@@ -216,25 +223,44 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+AGENT_GUIDANCE_TEMPLATES = {
+    "generic": "agents/generic/AGENTS.md",
+    "codex": "agents/codex/AGENTS.md",
+    "claude-code": "agents/generic/AGENTS.md",
+    "hermes": "agents/generic/AGENTS.md",
+}
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     store = Store("project", Path.cwd() / ".mnemosyne")
     ensure_store(store, template_text("core_project.md"))
     print("Mnemosyne initialized. Add .mnemosyne/ to .gitignore or commit it.")
-    agents_path = Path.cwd() / "AGENTS.md"
-    if not agents_path.exists():
-        try:
-            agents_path.write_text(template_text("AGENTS.md"), encoding="utf-8")
-            print(f"Wrote {agents_path}")
-        except FileNotFoundError:
-            pass
-    settings_path = templates_dir() / "settings.json"
+    agent = getattr(args, "agent", "generic")
+    if not getattr(args, "no_agent_files", False):
+        agents_path = Path.cwd() / "AGENTS.md"
+        if not agents_path.exists():
+            try:
+                agents_path.write_text(
+                    template_text(AGENT_GUIDANCE_TEMPLATES[agent]), encoding="utf-8")
+                print(f"Wrote {agents_path}")
+            except FileNotFoundError:
+                pass
     print()
     print("Next steps:")
     print("  1. Ensure mnemosyne is importable from any cwd (recommended):")
     print("       pip install -e .")
-    print("  2. To enable Claude Code auto-injection, merge this hooks config")
-    print("     into ~/.claude/settings.json or .claude/settings.json:")
-    print(f"       {settings_path}")
+    if agent == "hermes":
+        print("  2. Install the Hermes provider plugin:")
+        print("       python3 -m mnemosyne install hermes")
+    elif agent == "codex":
+        print("  2. Codex reads AGENTS.md automatically; hand off with")
+        print("     `mnemosyne prep` and report back with findings blocks.")
+    else:
+        settings_path = templates_dir() / "agents" / "claude_code" / "settings.json"
+        print("  2. To enable Claude Code auto-injection, merge this hooks config")
+        print("     into ~/.claude/settings.json or .claude/settings.json:")
+        print(f"       {settings_path}")
+        print("  3. Any MCP client can attach with: python3 -m mnemosyne mcp serve")
     return 0
 
 
@@ -246,6 +272,19 @@ def cmd_read(args: argparse.Namespace) -> int:
         print(content.rstrip() if content else "(empty)")
         print()
     return 0
+
+
+import re as _re
+
+_SOURCE_RE = _re.compile(r"^[a-z0-9_-]+(:[a-z0-9_.-]+)?$")
+
+
+def _normalize_source(value: str) -> str:
+    """Normalize source names to `<agent>[:<profile>]` (lowercase)."""
+    normalized = str(value or "").strip().lower()
+    if normalized and not _SOURCE_RE.match(normalized):
+        print(f"Warning: source '{normalized}' does not match <agent>[:<profile>].", file=sys.stderr)
+    return normalized or "agent"
 
 
 def cmd_write(args: argparse.Namespace) -> int:
@@ -313,7 +352,7 @@ def cmd_write(args: argparse.Namespace) -> int:
         title=title,
         tags=tags,
         scope=args.scope,
-        source=args.source,
+        source=_normalize_source(args.source),
         expires=args.expires,
         allow_duplicate=args.allow_duplicate,
     )
@@ -585,19 +624,19 @@ def cmd_mcp_serve(args: argparse.Namespace) -> int:
     return serve(sse=args.sse)
 
 
-def cmd_codex_prep(args: argparse.Namespace) -> int:
+def cmd_prep(args: argparse.Namespace) -> int:
     from mnemosyne.handoff import prep
     print(prep(args.task, max_memories=args.limit, channel='cli'))
     return 0
 
 
-def cmd_codex_ingest(args: argparse.Namespace) -> int:
+def cmd_ingest(args: argparse.Namespace) -> int:
     from mnemosyne.handoff import ingest
     text = sys.stdin.read()
     if not text.strip():
         print('No input on stdin.', file=sys.stderr)
         return 2
-    actions = ingest(text, source=args.source, commit=args.commit, fmt=getattr(args, 'fmt', 'auto'))
+    actions = ingest(text, source=_normalize_source(args.source), commit=args.commit, fmt=getattr(args, 'fmt', 'auto'))
     if not actions:
         print('No findings parsed.')
         return 0
@@ -757,38 +796,28 @@ def _rewrite_memory_references(stores: list[Store], old_id: str, new_id: str) ->
             update_search_index(store, path, memory)
 
 
-def cmd_install_hermes(args: argparse.Namespace) -> int:
-    import os
-    from pathlib import Path
-    from mnemosyne.integrations.hermes import _install
+def _add_install_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--python", default=None,
+                        help="bridge python that can import mnemosyne (hermes)")
+    parser.add_argument("--hermes-home", default=None,
+                        help="HERMES_HOME (default: $HERMES_HOME or ~/.hermes)")
+    parser.add_argument("--force", action="store_true",
+                        help="overwrite an existing plugin dir")
+    parser.add_argument("--no-config", action="store_true",
+                        help="do not edit the host's config file")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="preview without writing")
 
-    home = args.hermes_home or os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes")
-    try:
-        result = _install.install_hermes(
-            hermes_home=Path(home),
-            python_path=args.python,
-            force=args.force,
-            write_config=not args.no_config,
-            dry_run=args.dry_run,
-        )
-    except FileExistsError as exc:
-        print(f"error: {exc}")
-        return 1
-    if args.dry_run:
-        print("[dry-run] would install to", result["plugin_dir"])
-        print("[dry-run] bridge python:", result["python"])
-        if "config_preview" in result:
-            print("[dry-run] config.yaml after edit:\n")
-            print(result["config_preview"])
-    else:
-        print("Installed Mnemosyne provider to", result["plugin_dir"])
-        print("Bridge python:", result["python"])
-        if result["config_written"]:
-            print("Updated config.yaml (backup:", result["backup"], ")")
-            print("Restart Hermes to activate (memory.provider: mnemosyne).")
-        else:
-            print("Skipped config.yaml — set memory.provider: mnemosyne manually.")
-    return 0
+
+def cmd_install(args: argparse.Namespace) -> int:
+    from mnemosyne.integrations._registry import INSTALLERS
+
+    handler = INSTALLERS.get(args.agent)
+    if handler is None:
+        known = ", ".join(sorted(INSTALLERS))
+        print(f"Unknown agent: {args.agent}. Known: {known}", file=sys.stderr)
+        return 2
+    return handler(args)
 
 
 def cmd_inject(args: argparse.Namespace) -> int:
@@ -827,7 +856,7 @@ def cmd_distill(args: argparse.Namespace) -> int:
         text = sys.stdin.read()
     else:
         text = turns_to_text(parse_transcript(args.transcript, getattr(args, "fmt", "auto")))
-    actions = distill_text(text, source=args.source, commit=args.commit)
+    actions = distill_text(text, source=_normalize_source(args.source), commit=args.commit)
     if not actions:
         print("No findings extracted.")
         return 0
