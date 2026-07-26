@@ -50,7 +50,7 @@ def _maybe_distill(event: dict) -> str:
     result = handle_event(
         "session_end",
         {
-            "transcript": {"path": str(transcript_path)},
+            "transcript": {"path": str(transcript_path), "format": "claude-jsonl"},
             "source": "claude-code",
         },
     )

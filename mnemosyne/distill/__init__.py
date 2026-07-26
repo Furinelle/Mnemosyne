@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from mnemosyne.findings import Finding
+from mnemosyne.transcripts import (  # noqa: F401  (re-exported for backward compat)
+    Turn,
+    parse_role_lines as _parse_role_lines,
+    parse_transcript,
+)
 from mnemosyne.search import tokenize
 from mnemosyne.store import (
     Store,
@@ -21,12 +25,6 @@ from mnemosyne.store import (
     lock_stores,
     stores_for_scope,
 )
-
-
-@dataclass(frozen=True)
-class Turn:
-    role: str
-    text: str
 
 
 DISTILL_STATE_FILENAME = ".distill_state.json"
@@ -91,43 +89,9 @@ def record_processed_turns(transcript_key: str, count: int) -> None:
         pass
 
 
-def _block_text(content: object) -> str:
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts: list[str] = []
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "text":
-                parts.append(str(block.get("text", "")))
-        return "\n".join(p for p in parts if p).strip()
-    return ""
-
-
 def parse_claude_transcript(path: Path) -> list[Turn]:
-    """Parse a Claude Code JSONL transcript into user/assistant text turns."""
-    turns: list[Turn] = []
-    try:
-        raw = Path(path).read_text(encoding="utf-8")
-    except OSError:
-        return turns
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        message = record.get("message")
-        if not isinstance(message, dict):
-            continue
-        role = message.get("role")
-        if role not in ("user", "assistant"):
-            continue
-        text = _block_text(message.get("content"))
-        if text:
-            turns.append(Turn(role=role, text=text))
-    return turns
+    """Parse a Claude Code JSONL transcript (compat wrapper over transcripts)."""
+    return parse_transcript(Path(path), "claude-jsonl")
 
 
 def turns_to_text(turns: list[Turn]) -> str:
@@ -233,36 +197,6 @@ def _make_extractor(config: dict):
     from mnemosyne.distill.heuristic import HeuristicExtractor
 
     return HeuristicExtractor(confidence_threshold=threshold, max_findings=max_findings)
-
-
-def _parse_role_lines(text: str) -> list[Turn]:
-    """Parse '[role] text' lines (as produced by `turns_to_text`) back into turns.
-
-    Continuation lines of a multi-line turn are accumulated into the current
-    turn rather than each physical line becoming its own turn. Without this, a
-    multi-line user turn loses its `[user]` marker on every line after the
-    first, so those lines get misclassified as assistant text and role-gated
-    rules (e.g. the preference heuristic) silently drop them.
-    """
-    turns: list[Turn] = []
-    role: str | None = None
-    buffer: list[str] = []
-
-    def flush() -> None:
-        if role is not None:
-            body = "\n".join(buffer).strip()
-            if body:
-                turns.append(Turn(role=role, text=body))
-
-    for line in text.splitlines():
-        if line.startswith("[user] ") or line.startswith("[assistant] "):
-            flush()
-            role = "user" if line.startswith("[user] ") else "assistant"
-            buffer = [line.split("] ", 1)[1]]
-        elif role is not None:
-            buffer.append(line)
-    flush()
-    return turns
 
 
 def _findings_from_text(text: str, config: dict) -> list[Finding]:

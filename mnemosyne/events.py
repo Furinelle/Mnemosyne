@@ -154,16 +154,16 @@ def _session_end(payload: dict) -> InjectionResult:
     from mnemosyne.distill import (
         distill_text,
         load_processed_turns,
-        parse_claude_transcript,
         record_processed_turns,
         turns_to_text,
     )
+    from mnemosyne.transcripts import parse_transcript
 
     source = str(payload.get("source") or "agent")
     transcript = payload.get("transcript")
     if isinstance(transcript, dict) and transcript.get("path"):
         path = str(transcript["path"])
-        turns = parse_claude_transcript(Path(path))
+        turns = parse_transcript(Path(path), str(transcript.get("format") or "auto"))
         if not turns:
             return InjectionResult(context="")
         done = load_processed_turns(path)

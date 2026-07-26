@@ -203,9 +203,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     distill_parser = subparsers.add_parser("distill", help="Extract memories from a conversation transcript")
     distill_group = distill_parser.add_mutually_exclusive_group(required=True)
-    distill_group.add_argument("--transcript", type=Path, help="Path to a Claude Code JSONL transcript")
+    distill_group.add_argument("--transcript", type=Path,
+        help="Path to a transcript (claude-jsonl, role-jsonl, or plain text)")
     distill_group.add_argument("--stdin", action="store_true", help="Read plain transcript text from stdin")
-    distill_parser.add_argument("--source", default="claude-code")
+    distill_parser.add_argument("--format", dest="fmt",
+        choices=["auto", "claude-jsonl", "role-jsonl", "text"], default="auto",
+        help="transcript format (default: auto-detect)")
+    distill_parser.add_argument("--source", default="agent")
     distill_parser.add_argument("--commit", action="store_true", help="Persist findings (default: dry-run)")
     distill_parser.set_defaults(func=cmd_distill)
 
@@ -816,12 +820,13 @@ def cmd_inject(args: argparse.Namespace) -> int:
 
 
 def cmd_distill(args: argparse.Namespace) -> int:
-    from mnemosyne.distill import distill_text, parse_claude_transcript, turns_to_text
+    from mnemosyne.distill import distill_text, turns_to_text
+    from mnemosyne.transcripts import parse_transcript
 
     if args.stdin:
         text = sys.stdin.read()
     else:
-        text = turns_to_text(parse_claude_transcript(args.transcript))
+        text = turns_to_text(parse_transcript(args.transcript, getattr(args, "fmt", "auto")))
     actions = distill_text(text, source=args.source, commit=args.commit)
     if not actions:
         print("No findings extracted.")
