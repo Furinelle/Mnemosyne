@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import shutil
-import subprocess
-import sys
 from typing import Any, Dict, List, Optional
+
+from mnemosyne.integrations._bridge import CLIBridge
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +58,7 @@ def _messages_to_text(messages: Optional[List[Dict[str, Any]]]) -> str:
 MNEMOSYNE_TOOL: Dict[str, Any] = {
     "name": "mnemosyne",
     "description": (
-        "Shared long-term memory across Claude Code, Codex, and Hermes. "
+        "Shared long-term memory for all agents via Mnemosyne. "
         "action='search' to recall past memories; action='write' to persist a "
         "durable fact the user would expect remembered across sessions and agents "
         "(preferences, decisions, pitfalls, codebase knowledge). "
@@ -92,8 +90,7 @@ class MnemosyneMemoryProvider(MemoryProvider):
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self._config = config or {}
-        self._python: Optional[str] = None
-        self._python_resolved = False
+        self._bridge_instance: Optional[CLIBridge] = None
         self._session_id = ""
         self._source = "hermes"
         self._recall_limit = 5
@@ -106,59 +103,30 @@ class MnemosyneMemoryProvider(MemoryProvider):
 
     # -- bridge ---------------------------------------------------------------
 
-    def _python_has_mnemosyne(self, py: str) -> bool:
-        if not py:
-            return False
-        try:
-            proc = subprocess.run(
-                [py, "-c", "import mnemosyne"],
-                capture_output=True, text=True, timeout=10,
-            )
-            return proc.returncode == 0
-        except Exception:
-            return False
+    def _bridge(self) -> CLIBridge:
+        if self._bridge_instance is None:
+            explicit = self._config.get("python")
+            if explicit:
+                # Respect an explicitly configured python; do not silently fall
+                # back to a different interpreter (which may see a different store).
+                self._bridge_instance = CLIBridge(
+                    python_candidates=[explicit], timeout=self._timeout, allow_env_override=False
+                )
+            else:
+                self._bridge_instance = CLIBridge(timeout=self._timeout)
+        return self._bridge_instance
 
     def _resolve_python(self) -> Optional[str]:
-        if self._python_resolved:
-            return self._python
-        self._python_resolved = True
-        explicit = self._config.get("python")
-        if explicit:
-            # Respect an explicitly configured python; do not silently fall
-            # back to a different interpreter (which may see a different store).
-            self._python = explicit if self._python_has_mnemosyne(explicit) else None
-            return self._python
-        for cand in (shutil.which("python3"), "/opt/homebrew/bin/python3", sys.executable):
-            if cand and self._python_has_mnemosyne(cand):
-                self._python = cand
-                return cand
-        self._python = None
-        return None
+        return self._bridge().resolve()
 
     def _run(self, args: List[str], *, json_out: bool = False, input_text: Optional[str] = None):
-        empty = [] if json_out else ""
-        py = self._resolve_python()
-        if not py:
-            return empty
-        try:
-            proc = subprocess.run(
-                [py, "-m", "mnemosyne", *args],
-                input=input_text,
-                capture_output=True, text=True,
-                timeout=self._timeout, cwd=os.getcwd(),
-            )
-        except Exception as exc:
-            logger.debug("mnemosyne %s failed: %s", args[:1], exc)
-            return empty
-        if proc.returncode != 0:
-            logger.debug("mnemosyne %s exit %s: %s", args[:1], proc.returncode, proc.stderr[:200])
-            return empty
-        out = proc.stdout
         if json_out:
-            try:
-                return json.loads(out) if out.strip() else []
-            except Exception:
-                return []
+            payload = self._bridge().run_json(args, stdin=input_text)
+            return payload if payload is not None else []
+        code, out, err = self._bridge().run(args, stdin=input_text)
+        if code != 0:
+            logger.debug("mnemosyne %s exit %s: %s", args[:1], code, err[:200])
+            return ""
         return out
 
     # -- lifecycle ------------------------------------------------------------
@@ -171,6 +139,7 @@ class MnemosyneMemoryProvider(MemoryProvider):
         self._recall_limit = int(self._config.get("recall_limit", 5))
         self._timeout = float(self._config.get("timeout", 5))
         self._mirror = bool(self._config.get("mirror_builtin_writes", False))
+        self._bridge_instance = None  # timeout may have changed; rebuild lazily
         profile = kwargs.get("agent_identity")
         self._source = f"hermes:{profile}" if profile else "hermes"
         self._resolve_python()
@@ -278,28 +247,13 @@ class MnemosyneMemoryProvider(MemoryProvider):
         inline script through the same python used for every other bridge
         call (kept consistent with ``_python_has_mnemosyne``).
         """
-        py = self._resolve_python()
-        if not py:
-            return False
         script = (
             "import json,sys;"
             "from mnemosyne.store import load_config;"
             "print(json.dumps(bool(load_config().get('distill',{}).get('enabled'))))"
         )
-        try:
-            proc = subprocess.run(
-                [py, "-c", script],
-                capture_output=True, text=True,
-                timeout=self._timeout, cwd=os.getcwd(),
-            )
-        except Exception:
-            return False
-        if proc.returncode != 0:
-            return False
-        try:
-            return bool(json.loads(proc.stdout.strip() or "false"))
-        except Exception:
-            return False
+        payload = self._bridge().run_json(["-c", script], raw_python=True)
+        return bool(payload)
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
         """Auto-distill durable memories from the finished conversation.

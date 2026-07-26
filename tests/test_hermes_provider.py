@@ -203,3 +203,28 @@ class ProviderSessionEndTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CLIBridgeTests(unittest.TestCase):
+    def test_clibridge_run_json_roundtrip(self):
+        from mnemosyne.integrations._bridge import CLIBridge
+        bridge = CLIBridge()
+        payload = bridge.run_json(["-c", "import json; print(json.dumps({'ok': 1}))"], raw_python=True)
+        self.assertEqual(payload, {"ok": 1})
+
+    def test_bridge_python_env_override(self):
+        import os
+        from mnemosyne.integrations._bridge import CLIBridge
+        old = os.environ.get("MNEMOSYNE_BRIDGE_PYTHON")
+        os.environ["MNEMOSYNE_BRIDGE_PYTHON"] = "/nonexistent/python3"
+        try:
+            self.assertEqual(CLIBridge().candidates[0], "/nonexistent/python3")
+        finally:
+            if old is None:
+                os.environ.pop("MNEMOSYNE_BRIDGE_PYTHON", None)
+            else:
+                os.environ["MNEMOSYNE_BRIDGE_PYTHON"] = old
+
+    def test_hermes_tool_description_neutral(self):
+        from mnemosyne.integrations.hermes import MNEMOSYNE_TOOL
+        self.assertNotIn("Claude Code, Codex", str(MNEMOSYNE_TOOL))
