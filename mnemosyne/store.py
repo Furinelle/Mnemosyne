@@ -34,6 +34,10 @@ DEFAULT_CONFIG = {
     "injection": {
         "max_tokens": 2000,
         "summary_chars": 120,
+        "show_command_template": "",
+    },
+    "hooks": {
+        "write_tools": ["Edit", "Write"],
     },
     "search": {
         "index_enabled": True,
@@ -110,6 +114,12 @@ types = ['arch_decision', 'pitfall', 'codebase', 'preference', 'handoff', 'sessi
 [injection]
 max_tokens = 2000
 summary_chars = 120
+# Custom footer for injected memory lists ("" = default `mnemosyne show` hint)
+show_command_template = ""
+
+[hooks]
+# Host tool names that trigger file-relevant memory injection
+write_tools = ['Edit', 'Write']
 
 [search]
 index_enabled = true
