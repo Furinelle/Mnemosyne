@@ -80,7 +80,7 @@ Mnemosyne 会把 float16 向量保存到 SQLite 元数据表，并用 RRF 融合
 ### MCP 服务化
 
 `mnemosyne mcp serve` 把搜索、写入、读取 core、查看、链接、图谱、维护和
-`codex-prep` 暴露为 MCP tools。默认传输是 stdio，适合本地编辑器和 Agent；
+`prep_context`（旧名 `codex_prep` 保留为可调用别名）暴露为 MCP tools。默认传输是 stdio，适合本地编辑器和 Agent；
 `mnemosyne mcp serve --sse` 可用于调试或远程接入。
 
 MCP server 是纯 stdlib 实现，无需安装任何额外依赖即可直接
@@ -143,7 +143,6 @@ python3 -m mnemosyne doctor
 ```bash
 python3 -m pip install -e ".[vector]"   # numpy + onnxruntime
 python3 -m pip install -e ".[rerank]"   # cross-encoder runtime
-python3 -m pip install -e ".[mcp]"      # MCP server SDK
 ```
 
 安装后推荐继续使用 `python3 -m mnemosyne ...`，这样不依赖 shell 是否能找到
@@ -288,10 +287,9 @@ export MNEMOSYNE_AUTO_INIT=0
 
 ### MCP 客户端
 
-先安装 MCP extra，再选择客户端模板：
+MCP server 为纯 stdlib 实现，无需额外安装，直接选择客户端模板：
 
 ```bash
-python3 -m pip install -e ".[mcp]"
 cat mnemosyne/templates/mcp_clients/cursor.json
 ```
 
@@ -381,7 +379,7 @@ strength >= core_strength 且 access_count >= core_access_count：提示晋升�
 | `eval run --longmemeval [--by-type] [--pipeline {bm25,full}]` | per-instance 隔离评分，输出 recall@1/5/10、MRR，可按问题类型拆分，`full` 走真实 FTS5+fusion 检索栈。 |
 | `mcp serve` | 启动 MCP stdio server；加 `--sse` 使用 SSE。 |
 | `doctor --scope all` | 检查依赖、模板、store、FTS5、索引和可选组件状态。 |
-| `codex-prep TASK` | 生成给 Codex 的 prompt 前缀。 |
+| `prep TASK`（旧名 `codex-prep`） | 生成给任意 agent 的 prompt 前缀。 |
 | `codex-ingest --commit` | 从 stdin 解析 `**新发现:**` / `**Findings:**` 并写入记忆。 |
 | `distill --transcript PATH \| --stdin --commit` | 从会话 transcript 抽取记忆；默认 dry-run，加 `--commit` 写入。 |
 
@@ -611,7 +609,6 @@ python3 -m mnemosyne doctor --scope all
 | Codex 没自动读记忆 | 确认 `~/.codex/AGENTS.md` 或项目 `AGENTS.md` 中有 Mnemosyne 指令。 |
 | 搜索结果旧或缺失 | 跑 `python3 -m mnemosyne reindex --scope all`。 |
 | FTS5 不可用 | `doctor` 会提示回退到内存 BM25；换带 SQLite FTS5 的 Python 可恢复持久索引。 |
-| `mcp serve` 提示缺依赖 | 安装 `python3 -m pip install -e ".[mcp]"`。 |
 | 切换 embedding 模型后向量未命中 | 跑 `python3 -m mnemosyne embed-backfill --scope all`。 |
 | 不想某项目自动生成 `.mnemosyne/` | 在项目根创建 `.mnemosyne-disable`。 |
 | 同一会话里记忆没有再次注入 | 会话级去重的预期行为；需要全文时用 `python3 -m mnemosyne show ID`。 |

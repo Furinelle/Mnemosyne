@@ -13,7 +13,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+# _bridge.py is vendored from integrations/ so the installed plugin stays
+# self-contained: the Hermes venv usually cannot import mnemosyne (that is
+# the whole reason the CLI bridge exists).
 _PLUGIN_FILES = ("__init__.py", "plugin.yaml", "README.md")
+_VENDORED_FILES = ("_bridge.py",)
 
 
 def _top_block_bounds(lines: List[str], key: str) -> Tuple[Optional[int], int]:
@@ -133,6 +137,8 @@ def install_hermes(*, hermes_home: Path, python_path: Optional[str] = None,
         plugin_dir.mkdir(parents=True, exist_ok=True)
         for fname in _PLUGIN_FILES:
             shutil.copy2(src / fname, plugin_dir / fname)
+        for fname in _VENDORED_FILES:
+            shutil.copy2(src.parent / fname, plugin_dir / fname)
 
     if write_config:
         cfg_path = hermes_home / "config.yaml"

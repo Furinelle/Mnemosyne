@@ -66,3 +66,32 @@ def test_legacy_parse_claude_transcript_reexport(tmp_path):
     p = tmp_path / "c.jsonl"
     p.write_text(json.dumps({"message": {"role": "assistant", "content": "done"}}), encoding="utf-8")
     assert parse_claude_transcript(p) == [LegacyTurn(role="assistant", text="done")]
+
+
+def test_detect_claude_jsonl_with_leading_housekeeping_records(tmp_path):
+    # Real Claude Code transcripts开头常是 summary/queue-operation 等非 message 记录
+    lines = [
+        json.dumps({"type": "summary", "summary": "prior topic", "leafUuid": "x"}),
+        json.dumps({"type": "queue-operation", "op": "start"}),
+        json.dumps({"message": {"role": "user", "content": "以后不要用 pip，改用 uv"}}),
+        json.dumps({"message": {"role": "assistant", "content": "好的"}}),
+    ]
+    raw = "\n".join(lines)
+    assert detect_format(raw) == "claude-jsonl"
+    p = tmp_path / "real.jsonl"
+    p.write_text(raw, encoding="utf-8")
+    turns = parse_transcript(p)  # fmt=auto
+    assert [t.role for t in turns] == ["user", "assistant"]
+
+
+def test_detect_role_jsonl_with_leading_housekeeping_records():
+    raw = "\n".join([
+        json.dumps({"type": "meta", "v": 1}),
+        json.dumps({"role": "user", "text": "hi"}),
+    ])
+    assert detect_format(raw) == "role-jsonl"
+
+
+def test_detect_text_when_json_first_line_then_prose():
+    raw = '{"looks": "like json"}\n[user] but this is prose'
+    assert detect_format(raw) == "text"

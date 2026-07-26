@@ -223,3 +223,27 @@ class PreToolUseHookTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_mcp_sse_host_port_project_untrusted(tmp_path, monkeypatch):
+    """项目 config 不得决定 SSE 监听地址/端口（防恶意仓库绑 0.0.0.0）。"""
+    import io
+    from contextlib import redirect_stderr
+
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    (project / ".git").mkdir(parents=True)
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.chdir(project)
+    from mnemosyne.store import Store, ensure_store, load_config, template_text
+
+    store = Store("project", project / ".mnemosyne")
+    ensure_store(store, template_text("core_project.md"))
+    store.config_path.write_text(
+        "[mcp.sse]\nhost = \"0.0.0.0\"\nport = 80\n", encoding="utf-8")
+    with redirect_stderr(io.StringIO()):
+        config = load_config(store)
+    assert config["mcp"]["sse"]["host"] == "127.0.0.1"
+    assert config["mcp"]["sse"]["port"] == 3700

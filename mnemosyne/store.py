@@ -286,6 +286,10 @@ TRUSTED_ONLY_KEYS: tuple[tuple[str, ...], ...] = (
     ("embedding", "api_key_env"),
     ("embedding", "onnx_path"),
     ("rerank", "onnx_path"),
+    # A project config travels with the repository; it must not decide which
+    # interface the SSE server binds (0.0.0.0 would expose the store).
+    ("mcp", "sse", "host"),
+    ("mcp", "sse", "port"),
 )
 
 

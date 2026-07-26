@@ -184,9 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
             help='findings block format (default: auto-detect)')
         ingest_parser.set_defaults(func=cmd_ingest)
 
+    from mnemosyne.integrations._registry import INSTALLERS
+
     install_parser = subparsers.add_parser(
         "install", help="Install a Mnemosyne adapter into an agent host")
-    install_parser.add_argument("agent", choices=["hermes", "claude-code"])
+    install_parser.add_argument("agent", choices=sorted(INSTALLERS))
     _add_install_options(install_parser)
     install_parser.set_defaults(func=cmd_install)
 
@@ -830,9 +832,12 @@ def cmd_inject(args: argparse.Namespace) -> int:
             raise ValueError("inject payload must be a JSON object")
         result = handle_event(args.event, payload, session=args.session, channel=args.channel)
     except Exception as exc:
+        # Even in fail-safe mode, say what broke on stderr: session_end
+        # persists memories, and a silently-swallowed failure there looks
+        # identical to "nothing worth saving".
+        print(f"inject failed: {exc}", file=sys.stderr)
         if args.fail_safe:
             return 0
-        print(f"inject failed: {exc}", file=sys.stderr)
         return 1
     if args.fmt == "json":
         print(json.dumps(

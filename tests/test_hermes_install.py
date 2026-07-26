@@ -97,3 +97,36 @@ class InstallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_installed_plugin_is_self_contained(tmp_path):
+    """Hermes venv 通常没有 mnemosyne 包：安装产物必须能独立加载。"""
+    import importlib.util
+    import sys
+
+    from mnemosyne.integrations.hermes._install import install_hermes
+
+    home = tmp_path / "hermes_home"
+    result = install_hermes(hermes_home=home, write_config=False)
+    plugin_dir = Path(result["plugin_dir"])
+    assert (plugin_dir / "_bridge.py").exists()
+
+    poisoned = ["mnemosyne", "mnemosyne.integrations", "mnemosyne.integrations._bridge"]
+    saved = {name: sys.modules.get(name) for name in poisoned}
+    try:
+        for name in poisoned:
+            sys.modules[name] = None  # 使 import 抛 ImportError，模拟宿主 venv 缺包
+        spec = importlib.util.spec_from_file_location(
+            "hermes_plugin_standalone_test", plugin_dir / "__init__.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, "MnemosyneMemoryProvider")
+        assert module.MnemosyneMemoryProvider().name == "mnemosyne"
+    finally:
+        for name, original in saved.items():
+            if original is None and name not in poisoned:
+                continue
+            if saved[name] is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = original

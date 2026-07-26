@@ -3,7 +3,8 @@
 Any agent can report new durable knowledge back to Mnemosyne by emitting a
 *findings block*. `mnemosyne ingest` (alias: `codex-ingest`) parses the block
 from stdin and writes each finding as a memory, with dedup and supersede
-handling applied.
+handling applied. Ingest is a **dry-run preview by default** — pass
+`--commit` to actually persist.
 
 Two equivalent representations exist. `--format auto` (the default) picks the
 right parser: input starting with `{` or `[` that parses as JSON is treated

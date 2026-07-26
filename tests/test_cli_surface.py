@@ -54,3 +54,25 @@ def test_write_source_normalized(tmp_store, capsys):
     from mnemosyne.store import find_memory, stores_for_scope
     found = find_memory(memory_id, stores_for_scope("all"), include_archive=False)
     assert found[2].source == "myagent:dev"
+
+
+def test_install_choices_follow_registry(monkeypatch):
+    from mnemosyne.integrations import _registry
+
+    monkeypatch.setitem(_registry.INSTALLERS, "myagent", lambda args: 0)
+    from mnemosyne.cli import build_parser
+    args = build_parser().parse_args(["install", "myagent"])
+    assert args.agent == "myagent"
+
+
+def test_inject_fail_safe_reports_to_stderr(tmp_store, capsys, monkeypatch):
+    import io
+    import sys
+
+    from mnemosyne.cli import main
+
+    monkeypatch.setattr(sys, "stdin", io.StringIO("not json"))
+    assert main(["inject", "--event", "turn_start", "--fail-safe"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "inject failed" in captured.err

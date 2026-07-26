@@ -18,9 +18,11 @@ Mnemosyne store without importing the Python package.
 ## Memory file format
 
 Markdown with YAML frontmatter. The frontmatter parser is **handwritten**
-(no PyYAML): only the subset below is supported — flat `key: value` pairs,
-inline string lists (`[a, b]`), and one level of `extra:` nesting. Do not
-emit anchors, multi-line scalars, or deep nesting.
+(no PyYAML): only the subset below is supported — flat `key: value` pairs
+and inline lists (`[a, b]`, `[{id: x, rel: y}]`). Do not emit anchors,
+multi-line scalars, or nested mappings. Unknown *flat top-level* keys
+(e.g. `invalidated_by`, `evidence`) are preserved on read/write and exposed
+as the `extra` dict in the Python API — there is no `extra:` key on disk.
 
 ```markdown
 ---
@@ -46,8 +48,8 @@ expires: ''                          # optional ISO date for auto-archive
 
 Relations: `caused_by`, `refines`, `supersedes`, `contradicts`, `related`
 (asymmetric ones get reverse names like `superseded_by` on the other end).
-Superseded memories keep their files; `status: superseded` plus
-`extra.invalidated_by` mark them.
+Superseded memories keep their files; `status: superseded` plus a flat
+`invalidated_by: <memory-id>` key mark them.
 
 **Concurrency**: if you write files directly, take the store lock the same
 way the kernel does (portalocker on `<root>/.lock`) or route through the

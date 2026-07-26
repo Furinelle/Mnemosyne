@@ -28,6 +28,11 @@
 
 ### 修复 (Fixed)
 
+- **transcript 自动检测不再只看首行**：真实 Claude Code 会话 JSONL 的首行几乎总是 summary/queue-operation 等非 message 记录，旧的 `detect_format` 会据此误判为纯文本，令 `distill --transcript`（默认 auto）与 `inject --event session_end` 静默丢失全部轮次；现改为跳过 JSON 管理记录继续扫描（发布前对抗审查发现并实测复现）。
+- **Hermes 插件安装产物恢复自包含**：`_bridge.py` 随插件一并复制，插件文件带 vendored 回退导入——否则宿主 venv 没有 mnemosyne 包时插件加载即 ImportError、记忆功能整体静默失效（发布前对抗审查发现并实测复现）。
+- **SSE 监听地址纳入配置信任边界**：`mcp.sse.host`/`port` 只信任全局配置，恶意仓库的项目 config 不能再把 SSE server 绑到 0.0.0.0。
+- `mnemosyne install` 的 agent 候选改为从安装器注册表动态派生，注册新适配器即生效（与 docs/adapters.md 的承诺一致）。
+- `inject --fail-safe` 失败时仍向 stderr 报告原因（stdout 保持为空、退出码 0）：session_end 会落盘写入，静默吞错与「没有可保存内容」不可区分。
 - MCP `_write`/`_maintain`/`_link` 不再解析 CLI stdout 文案取结果（文案改动即静默破坏），改调结构化 API。
 - 移除人为的 MCP SDK 存在性检查：server 本就是纯 stdlib 实现，`mcp serve` 现在开箱可用（`MNEMOSYNE_MCP_ALLOW_STDLIB` 逃生舱一并移除）。
 - Hermes 工具描述去除具名 agent 绑定措辞；桥接解释器候选可配置。

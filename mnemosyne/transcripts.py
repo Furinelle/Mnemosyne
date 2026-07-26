@@ -136,12 +136,16 @@ def detect_format(sample: str) -> str:
             record = json.loads(line)
         except json.JSONDecodeError:
             return "text"
-        if isinstance(record, dict):
-            if isinstance(record.get("message"), dict):
-                return "claude-jsonl"
-            if "role" in record and "text" in record:
-                return "role-jsonl"
-        return "text"
+        if not isinstance(record, dict):
+            return "text"
+        if isinstance(record.get("message"), dict):
+            return "claude-jsonl"
+        if "role" in record and "text" in record:
+            return "role-jsonl"
+        # JSON housekeeping record (summary / queue-operation / snapshot …):
+        # real Claude Code transcripts rarely START with a message line, so
+        # keep scanning instead of concluding "text" from the first line.
+        continue
     return "text"
 
 

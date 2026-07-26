@@ -13,7 +13,21 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from mnemosyne.integrations._bridge import CLIBridge
+try:
+    from mnemosyne.integrations._bridge import CLIBridge
+except ImportError:
+    # Standalone plugin copy inside a host venv without the mnemosyne
+    # package: load the vendored _bridge.py sitting next to this file.
+    # ImportError (not just ModuleNotFoundError) so a shadowing package
+    # named `mnemosyne` on the host's sys.path also falls through.
+    import importlib.util as _importlib_util
+    from pathlib import Path as _Path
+
+    _bridge_spec = _importlib_util.spec_from_file_location(
+        "mnemosyne_hermes_vendored_bridge", _Path(__file__).resolve().parent / "_bridge.py")
+    _bridge_module = _importlib_util.module_from_spec(_bridge_spec)
+    _bridge_spec.loader.exec_module(_bridge_module)
+    CLIBridge = _bridge_module.CLIBridge
 
 logger = logging.getLogger(__name__)
 
