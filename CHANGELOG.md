@@ -2,6 +2,36 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.7.0] - 2026-07-26
+
+定位调整：从「Claude Code/Codex/Hermes 专用记忆桥」转为「本地优先、agent 无关的通用记忆内核 + 平级适配器」。存储格式与目录布局不变；所有旧命令、模块路径与 MCP 工具名保留 alias/shim。
+
+### 新增 (Added)
+
+- **稳定 Python API**（`mnemosyne.api`）：`write_entry` / `search_entries` / `maintain` / `link_entries` / `prep_context` / `ingest_findings` 返回结构化结果，公开承诺兼容；CLI 与 MCP 全部改为消费该层。
+- **通用注入事件接口**：`mnemosyne inject --event session_start|turn_start|file_touch|session_end`，stdin 传 JSON 事件，`--session` 跨轮去重、`--channel cli|mcp|none` 通道感知提示、`--fail-safe` 保证不阻塞宿主；`mnemosyne.events.handle_event` 为 Python 入口。
+- **JSON findings 交接变体**：`ingest --format auto|markdown|json`；`docs/handoff-format.md` 发布 v1 正式规范。
+- **transcript 解析注册表**（`mnemosyne.transcripts`）：`claude-jsonl` / 中立 `role-jsonl` / `text` 三格式 + 自动检测；`distill --format`。
+- **通用 CLI 表面**：`prep` / `ingest` / `install <agent>`（`codex-prep` / `codex-ingest` / `install-hermes` 保留为 alias）；`init --agent generic|codex|claude-code|hermes` 与 `--no-agent-files`，默认写中立 generic `AGENTS.md`。
+- **模板分目录**：`templates/agents/{generic,codex,claude_code}/`。
+- **通用 CLIBridge**（`integrations/_bridge.py`）供宿主进程内适配器复用，`MNEMOSYNE_BRIDGE_PYTHON` 可覆盖解释器。
+- **文档**：英文 `README.md`（中文迁至 `README.zh.md`）、`docs/adapters.md` 适配器契约、`docs/interface.md` 语言无关接口规范。
+- **MCP 工具行为注解**（readOnlyHint/destructiveHint 等）；`mnemosyne_prep_context` 工具（`mnemosyne_codex_prep` 保留 alias 一个 minor 周期）。
+
+### 变更 (Changed)
+
+- Claude Code hooks 迁入 `integrations/claude_code/` 成为第一个适配器；`mnemosyne.hooks.*` 保留 import shim，用户 settings.json 无需改动。`pre_tool_use` 匹配的工具名改由 `[hooks].write_tools` 配置。
+- `codex.py` 更名 `handoff.py`（原模块保留 re-export）；`Finding` 移入中立的 `findings.py`，消除 distill→codex 反向依赖。
+- 记忆类型枚举统一从 config `memory.types` 派生：`parse_findings`、LLM 蒸馏提示词与解析不再硬编码 `ALLOWED_TYPES`，自定义类型全链路生效。
+- `distill --source` 默认值 `claude-code` → 中立的 `agent`；`--source` 在 write/ingest/distill 入口按 `<agent>[:<profile>]` 归一化。
+- 注入尾注不再硬编码 shell 命令：按通道生成（MCP 客户端提示 `mnemosyne_show` 工具），`[injection].show_command_template` 可覆盖。
+
+### 修复 (Fixed)
+
+- MCP `_write`/`_maintain`/`_link` 不再解析 CLI stdout 文案取结果（文案改动即静默破坏），改调结构化 API。
+- 移除人为的 MCP SDK 存在性检查：server 本就是纯 stdlib 实现，`mcp serve` 现在开箱可用（`MNEMOSYNE_MCP_ALLOW_STDLIB` 逃生舱一并移除）。
+- Hermes 工具描述去除具名 agent 绑定措辞；桥接解释器候选可配置。
+
 ## [0.6.2] - 2026-07-26
 
 ### 安全 (Security)

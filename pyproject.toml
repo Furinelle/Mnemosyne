@@ -7,7 +7,7 @@ requires-python = '>=3.11'
 license = 'MIT'
 license-files = ['LICENSE']
 authors = [{ name = 'Furinelle' }]
-keywords = ['llm', 'agent', 'memory', 'claude-code', 'mcp']
+keywords = ['agent-memory', 'llm', 'agent', 'memory', 'mcp', 'claude-code', 'codex']
 classifiers = [
     'Development Status :: 4 - Beta',
     'Intended Audience :: Developers',

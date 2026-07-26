@@ -1,5 +1,5 @@
 name: mnemosyne
-version: 0.6.2
+version: 0.7.0
 description: "Mnemosyne shared memory — read/write the same Mnemosyne store used by Claude Code and Codex, via the mnemosyne CLI bridge."
 hooks:
   - on_memory_write

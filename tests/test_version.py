@@ -32,5 +32,8 @@ def test_release_notes_and_readme_name_current_version() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
+    readme_zh = (ROOT / "README.zh.md").read_text(encoding="utf-8")
+
     assert f"## [{mnemosyne.__version__}] - " in changelog
-    assert f"当前版本 {mnemosyne.__version__}" in readme
+    assert f"Current version: {mnemosyne.__version__}" in readme
+    assert f"当前版本 {mnemosyne.__version__}" in readme_zh
