@@ -211,7 +211,7 @@ def test_user_prompt_submit_skips_already_injected(tmp_path, monkeypatch, capsys
 
 
 def test_maybe_run_maintain_throttles_global_across_projects(tmp_path, monkeypatch):
-    from mnemosyne.hooks import session_start
+    from mnemosyne.integrations.claude_code import session_start
 
     home = tmp_path / "home"
     home.mkdir()
@@ -238,7 +238,7 @@ def test_maybe_run_maintain_throttles_global_across_projects(tmp_path, monkeypat
 def test_maybe_run_maintain_runs_again_after_interval(tmp_path, monkeypatch):
     from datetime import datetime, timedelta
 
-    from mnemosyne.hooks import session_start
+    from mnemosyne.integrations.claude_code import session_start
 
     home = tmp_path / "home"
     home.mkdir()
@@ -279,3 +279,17 @@ def test_stop_hook_skips_when_stop_hook_active(tmp_path, monkeypatch):
 
     assert load_memories(store) == []
 
+
+
+def test_hook_shims_delegate_to_integration():
+    from mnemosyne.hooks import pre_tool_use, session_start, stop, user_prompt_submit
+    from mnemosyne.integrations.claude_code import (
+        pre_tool_use as new_pre,
+        session_start as new_session,
+        stop as new_stop,
+        user_prompt_submit as new_prompt,
+    )
+    assert session_start.main is new_session.main
+    assert user_prompt_submit.main is new_prompt.main
+    assert pre_tool_use.main is new_pre.main
+    assert stop.main is new_stop.main

@@ -42,7 +42,7 @@ def _race_maintenance(root: str, home: str, start: multiprocessing.synchronize.E
 
     import portalocker
 
-    from mnemosyne.hooks import session_start
+    from mnemosyne.integrations.claude_code import session_start
 
     calls_path = Path(home) / "maintain-calls"
 
