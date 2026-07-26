@@ -1,7 +1,7 @@
 # Mnemosyne 通用化设计：通用内核 + 适配器架构
 
 日期：2026-07-26
-状态：待评审
+状态：已批准（用户确认方案 B；开放问题已裁决，见第 9 节）
 关联决策：`arch_decision-2026-07-26-ce46b30a`（用户指示：定位为所有 agent 通用的记忆系统）
 
 ## 1. 背景与目标
@@ -174,8 +174,10 @@ CLI 的 `cmd_*` 与 MCP handler 全部改为消费 api.py（`cmd_*` 只负责参
 
 - `codex-prep` / `codex-ingest` → 通用 `prep` / `ingest`（旧名保留 alias）。
 - `install-hermes` → `install <agent>`（见 4.3）。
-- `init` 增加 `--agent <name|generic>`：按所选 agent 落地对应模板与
-  Next steps 文案；不再无条件在项目根写 Codex 协议的 `AGENTS.md`。
+- `init` 增加 `--agent <name>`：按所选 agent 落地对应模板与 Next steps 文案。
+  零参数 `init` 默认写一份 agent 无关的 generic `AGENTS.md`（AGENTS.md 是
+  20+ 工具通读的行业标准文件名，但内容改为中立的记忆使用协议，不再是
+  Codex 专属措辞）；`--no-agent-files` 可跳过。
 - `distill` 帮助文案去除「Claude Code JSONL」措辞（改为列支持的格式）。
 - `source` 字段定命名规范 `<agent>[:<profile>]`，write 入口归一化，README
   文档化保留值；为未来 `search --source` 过滤留口。
@@ -189,20 +191,18 @@ CLI 的 `cmd_*` 与 MCP handler 全部改为消费 api.py（`cmd_*` 只负责参
 - README 叙事重写：首段定位「本地优先的通用 agent 记忆内核」，新增
   「接入任意 agent」章节，分别给出 MCP（一条命令）、CLI、直接读写文件三条
   路径的最小步骤；Claude Code / Codex / Hermes 改述为「官方适配器」。
-- 双语：README 保持中文主体，新增独立 `README.en.md`（定位 + quickstart +
-  三条接入路径），互相链接。
+- 双语：README 反转为英文主体（`README.md` 英文，利于 GitHub 传播），
+  中文版迁为 `README.zh.md`，互相链接。
 - 语言无关接口规范集中成 `docs/interface.md`：frontmatter 字段说明（含手写
   YAML 解析器支持的子集）、`search --format json` 输出 schema、findings
   grammar 引用、config.toml 键表。
 - `pyproject.toml` keywords 调整（`agent-memory`、`mcp` 等，`claude-code`
   降为其一）。
 
-### 4.10 PyPI 发布（附加项）
+### 4.10 PyPI 发布（已暂缓）
 
-`mnemosyne` 包名在 PyPI 已被占用，需以别名发布（推荐 `mnemosyne-memory`，
-见开放问题）；console script 仍为 `mnemosyne`。README 与 MCP 客户端模板
-提供 `uvx mnemosyne-memory mcp serve` 一键运行写法，并保留绝对路径写法作
-退路。发布走现有 CI 增加 release workflow（tag 触发，`pypa/gh-action-pypi-publish`）。
+用户裁决（2026-07-26）：暂不处理 PyPI 发布。`mnemosyne` 包名在 PyPI 已被
+占用，未来发布需以别名（如 `mnemosyne-memory`）另行立项。本次交付不含 P5。
 
 ## 5. 兼容性策略
 
@@ -242,14 +242,13 @@ CLI 的 `cmd_*` 与 MCP handler 全部改为消费 api.py（`cmd_*` 只负责参
    hooks 迁入 `integrations/claude_code/`（留 shim）。
 3. **P3 交换**：`handoff.py` + JSON findings + transcript 注册表 + 类型统一。
 4. **P4 表面**：CLI `prep/ingest/install` + `init --agent` + 模板重排 +
-   README/文档重写（双语）+ `docs/adapters.md`、`docs/interface.md`。
-5. **P5 发布**：PyPI 名称确定 → 发布 → uvx 文档与 release workflow。
+   README/文档重写（英文为主 + `README.zh.md`）+ `docs/adapters.md`、
+   `docs/interface.md`。
+5. ~~P5 发布~~：已暂缓（见 4.10）。
 
-## 9. 开放问题
+## 9. 开放问题（已全部裁决，2026-07-26）
 
-1. **PyPI 包名**：推荐 `mnemosyne-memory`；备选 `mnemosyne-agent-memory`、
-   `pymnemosyne`。需用户拍板（P5 前决定即可）。
-2. **README 双语形式**：本设计选独立 `README.en.md`；若希望英文为主
-   （利于 GitHub 传播），可反转主次。
-3. **`init` 默认引导文件**：本设计改为 `--agent` 显式选择；若希望零参数
-   `init` 仍写一份 generic 引导文件，可在评审时指定。
+1. **PyPI 包名**：暂缓，本次不做（用户裁决）。
+2. **README 双语形式**：英文为主 `README.md` + 中文 `README.zh.md`（用户裁决）。
+3. **`init` 默认引导文件**：零参数 `init` 写 generic 中立 `AGENTS.md`，
+   `--agent` 叠加特定模板，`--no-agent-files` 跳过（实施方裁决）。
