@@ -36,7 +36,7 @@ class MCPServerTests(unittest.TestCase):
                 "mnemosyne_link",
                 "mnemosyne_graph",
                 "mnemosyne_maintain",
-                "mnemosyne_codex_prep",
+                "mnemosyne_prep_context",
             ],
             names,
         )
@@ -289,23 +289,12 @@ class MCPServerTests(unittest.TestCase):
 
             self.assertIn("# Shared core", call("mnemosyne_read_core", {"scope": "project"}, 10)["project"])
             self.assertIn("id: first", call("mnemosyne_show", {"id": "first"}, 11))
-            self.assertEqual({"ok": True}, call("mnemosyne_link", {"id1": "first", "id2": "second"}, 12))
+            self.assertEqual({"ok": True, "rel": "related"}, call("mnemosyne_link", {"id1": "first", "id2": "second"}, 12))
             self.assertIn("graph LR", call("mnemosyne_graph", {"id": "first"}, 13))
             self.assertEqual(2, call("mnemosyne_maintain", {"scope": "project"}, 14)["processed"])
-            self.assertIn("Project memory", call("mnemosyne_codex_prep", {"task": "linked graph"}, 15))
-
-    def test_missing_extra_has_friendly_cli_error(self) -> None:
-        from mnemosyne.mcp.server import MissingMCPDependency
-
-        stderr = io.StringIO()
-        with patch(
-            "mnemosyne.mcp.server._require_mcp_sdk",
-            side_effect=MissingMCPDependency(),
-        ), redirect_stderr(stderr):
-            code = main(["mcp", "serve"])
-
-        self.assertEqual(1, code)
-        self.assertIn("pip install mnemosyne[mcp]", stderr.getvalue())
+            self.assertIn("Project memory", call("mnemosyne_prep_context", {"task": "linked graph"}, 15))
+            # legacy alias keeps working for one minor cycle
+            self.assertIn("Project memory", call("mnemosyne_codex_prep", {"task": "linked graph"}, 16))
 
     def test_stdio_child_responds_and_exits_on_eof(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -339,3 +328,28 @@ class MCPServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUniversalMcpSurface:
+    def test_prep_context_tool_listed_with_alias(self) -> None:
+        from mnemosyne.mcp.server import TOOL_HANDLERS, TOOL_SCHEMAS
+        names = {schema["name"] for schema in TOOL_SCHEMAS}
+        assert "mnemosyne_prep_context" in names
+        assert "mnemosyne_codex_prep" not in names
+        assert "mnemosyne_codex_prep" in TOOL_HANDLERS
+
+    def test_tools_have_annotations(self) -> None:
+        from mnemosyne.mcp.server import TOOL_SCHEMAS
+        by_name = {schema["name"]: schema for schema in TOOL_SCHEMAS}
+        assert by_name["mnemosyne_search"]["annotations"]["readOnlyHint"] is True
+        assert by_name["mnemosyne_write"]["annotations"]["readOnlyHint"] is False
+
+    def test_serve_no_longer_requires_mcp_sdk(self, monkeypatch) -> None:
+        import mnemosyne.mcp.server as server
+        monkeypatch.delenv("MNEMOSYNE_MCP_ALLOW_STDLIB", raising=False)
+        assert not hasattr(server, "_require_mcp_sdk")
+
+    def test_write_returns_structured_result(self, tmp_store) -> None:
+        from mnemosyne.mcp.server import _write
+        payload = _write({"type": "pitfall", "importance": 60, "content": "mcp body one", "title": "M"})
+        assert payload["status"] == "created" and payload["id"].startswith("pitfall-")

@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import argparse
-import io
 import json
-import os
 import queue
 import sys
 import uuid
-from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
-from mnemosyne import __version__
+from mnemosyne import __version__, api
 from mnemosyne.codex import prep
 from mnemosyne.fusion import search
 from mnemosyne.graph import build_graph, render_graph
@@ -23,16 +18,20 @@ from mnemosyne.store import find_memory, load_config, read_core, stores_for_scop
 
 
 class MissingMCPDependency(RuntimeError):
-    pass
+    """Kept for import compatibility; the stdlib server no longer raises it."""
 
 
 SERVER_VERSION = __version__
 
 
+READ_ONLY = {"readOnlyHint": True}
+WRITES = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False}
+
 TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_search",
         "description": "Search durable memories.",
+        "annotations": READ_ONLY,
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -48,6 +47,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_write",
         "description": "Write one durable memory.",
+        "annotations": WRITES,
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -65,6 +65,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_read_core",
         "description": "Read core memory markdown.",
+        "annotations": READ_ONLY,
         "inputSchema": {
             "type": "object",
             "properties": {"scope": {"type": "string", "enum": ["global", "project", "all"], "default": "all"}},
@@ -73,6 +74,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_show",
         "description": "Show a memory by ID.",
+        "annotations": READ_ONLY,
         "inputSchema": {
             "type": "object",
             "properties": {"id": {"type": "string"}},
@@ -82,6 +84,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_link",
         "description": "Link two memories with a typed relation.",
+        "annotations": WRITES,
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -95,6 +98,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_graph",
         "description": "Render linked memories as Mermaid, ASCII, or JSON.",
+        "annotations": READ_ONLY,
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -108,6 +112,7 @@ TOOL_SCHEMAS = [
     {
         "name": "mnemosyne_maintain",
         "description": "Run memory lifecycle maintenance.",
+        "annotations": {"readOnlyHint": False, "destructiveHint": True},
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -117,8 +122,9 @@ TOOL_SCHEMAS = [
         },
     },
     {
-        "name": "mnemosyne_codex_prep",
-        "description": "Prepare a prompt prefix for another coding agent.",
+        "name": "mnemosyne_prep_context",
+        "description": "Assemble a memory context block (core + relevant memories) for any agent task.",
+        "annotations": READ_ONLY,
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -132,8 +138,6 @@ TOOL_SCHEMAS = [
 
 
 def serve(sse: bool = False) -> int:
-    if not os.environ.get("MNEMOSYNE_MCP_ALLOW_STDLIB"):
-        _require_mcp_sdk()
     if sse:
         config = load_config().get("mcp", {}).get("sse", {})
         return serve_sse(str(config.get("host", "127.0.0.1")), int(config.get("port", 3700)))
@@ -292,30 +296,23 @@ def _search(arguments: dict) -> list[dict]:
 
 
 def _write(arguments: dict) -> dict:
-    from mnemosyne.cli import cmd_write
-
     scope = str(arguments.get("scope", "project"))
     _allowed_stores(scope)
-    args = argparse.Namespace(
+    tags = [tag.strip() for tag in str(arguments.get("tags", "")).split(",") if tag.strip()]
+    result = api.write_entry(
         type=str(arguments["type"]),
         importance=int(arguments["importance"]),
+        content=str(arguments["content"]),
+        title=str(arguments.get("title", "")),
+        tags=tags,
         scope=scope,
         source=str(arguments.get("source", "mcp")),
-        tags=str(arguments.get("tags", "")),
-        title=str(arguments.get("title", "")),
-        content=str(arguments["content"]),
         expires=str(arguments.get("expires", "")),
-        force=True,
-        allow_duplicate=False,
     )
-    output = _capture_command(lambda: cmd_write(args))
-    for line in reversed(output.strip().splitlines()):
-        if line.startswith("Wrote "):
-            return {"status": "created", "id": line.removeprefix("Wrote ").strip()}
-        if line.startswith("Duplicate of "):
-            memory_id = line.removeprefix("Duplicate of ").split(";", 1)[0].strip()
-            return {"status": "duplicate", "id": memory_id}
-    raise ValueError(f"Unexpected write output: {output.strip()}")
+    payload = {"status": result.status, "id": result.id}
+    if result.superseded:
+        payload["superseded"] = result.superseded
+    return payload
 
 
 def _read_core(arguments: dict) -> dict:
@@ -333,21 +330,21 @@ def _show(arguments: dict) -> str:
 
 
 def _link(arguments: dict) -> dict:
-    from mnemosyne.cli import cmd_link
-
     stores = _allowed_stores("all")
     for key in ("id1", "id2"):
         if find_memory(str(arguments[key]), stores, include_archive=True) is None:
             raise ValueError(f"Memory not found in exposed stores: {arguments[key]}")
-    args = argparse.Namespace(
-        id1=str(arguments["id1"]),
-        id2=str(arguments["id2"]),
-        rel=str(arguments.get("rel", "related")),
-        allow_custom=bool(arguments.get("allow_custom", False)),
-        stores=stores,
-    )
-    _capture_command(lambda: cmd_link(args))
-    return {"ok": True}
+    try:
+        result = api.link_entries(
+            str(arguments["id1"]),
+            str(arguments["id2"]),
+            rel=str(arguments.get("rel", "related")),
+            allow_custom=bool(arguments.get("allow_custom", False)),
+            stores=stores,
+        )
+    except api.MnemosyneError as exc:
+        raise ValueError(str(exc)) from exc
+    return {"ok": True, "rel": result["rel"]}
 
 
 def _graph(arguments: dict) -> str:
@@ -356,25 +353,15 @@ def _graph(arguments: dict) -> str:
 
 
 def _maintain(arguments: dict) -> dict:
-    from mnemosyne.cli import cmd_maintain
-
     scope = str(arguments.get("scope", "all"))
-    args = argparse.Namespace(
-        scope=scope,
+    summary = api.maintain(
         stores=_allowed_stores(scope),
         dry_run=bool(arguments.get("dry_run", True)),
     )
-    output = _capture_command(lambda: cmd_maintain(args))
-    summary: dict[str, int] = {}
-    for line in output.splitlines():
-        if ": " in line:
-            key, value = line.split(": ", 1)
-            if value.isdigit():
-                summary[key] = int(value)
-    return summary
+    return {key: value for key, value in summary.items() if key != "core_candidates"}
 
 
-def _codex_prep(arguments: dict) -> str:
+def _prep_context(arguments: dict) -> str:
     return prep(
         str(arguments["task"]),
         max_memories=int(arguments.get("limit", 5)),
@@ -396,22 +383,6 @@ def _allowed_stores(scope: str) -> list:
     return allowed
 
 
-def _capture_command(command: Callable[[], int]) -> str:
-    output = io.StringIO()
-    with redirect_stdout(output):
-        code = command()
-    if code:
-        raise ValueError(output.getvalue().strip() or f"command exited {code}")
-    return output.getvalue()
-
-
-def _require_mcp_sdk() -> None:
-    try:
-        import mcp  # noqa: F401
-    except ModuleNotFoundError as exc:
-        raise MissingMCPDependency() from exc
-
-
 def _result(request_id, result: object) -> dict:
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
@@ -428,5 +399,8 @@ TOOL_HANDLERS = {
     "mnemosyne_link": _link,
     "mnemosyne_graph": _graph,
     "mnemosyne_maintain": _maintain,
-    "mnemosyne_codex_prep": _codex_prep,
+    "mnemosyne_prep_context": _prep_context,
+    # Legacy alias kept for one minor cycle; clients should migrate to
+    # mnemosyne_prep_context.
+    "mnemosyne_codex_prep": _prep_context,
 }

@@ -56,8 +56,8 @@ Mnemosyne 会把 float16 向量保存到 SQLite 元数据表，并用 RRF 融合
 `codex-prep` 暴露为 MCP tools。默认传输是 stdio，适合本地编辑器和 Agent；
 `mnemosyne mcp serve --sse` 可用于调试或远程接入。
 
-MCP SDK 是可选 extra。没有安装时，原有 CLI 和 hooks 完全不受影响；只有启动 MCP
-server 时会提示安装 `mnemosyne[mcp]`。仓库内的 `mnemosyne/templates/mcp_clients/` 提供
+MCP server 是纯 stdlib 实现，无需安装任何额外依赖即可直接
+`mnemosyne mcp serve`。仓库内的 `mnemosyne/templates/mcp_clients/` 提供
 Cursor、Cline、Continue 和 Windsurf 的配置片段。
 
 ### 关系图谱

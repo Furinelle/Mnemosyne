@@ -479,8 +479,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "configured" if importlib.util.find_spec("onnxruntime") else "configured; install mnemosyne[rerank]"
     )
     checks.append(("reranker", True, rerank_detail, False))
-    mcp_available = importlib.util.find_spec("mcp") is not None
-    checks.append(("mcp", True, "available" if mcp_available else "install mnemosyne[mcp] to enable", False))
+    checks.append(("mcp", True, "stdlib server built-in", False))
     try:
         template_text("core_project.md")
         template_text("AGENTS.md")
@@ -561,13 +560,9 @@ def cmd_graph(args: argparse.Namespace) -> int:
 
 
 def cmd_mcp_serve(args: argparse.Namespace) -> int:
-    from mnemosyne.mcp.server import MissingMCPDependency, serve
+    from mnemosyne.mcp.server import serve
 
-    try:
-        return serve(sse=args.sse)
-    except MissingMCPDependency:
-        print("MCP support is optional; please pip install mnemosyne[mcp].", file=sys.stderr)
-        return 1
+    return serve(sse=args.sse)
 
 
 def cmd_codex_prep(args: argparse.Namespace) -> int:
