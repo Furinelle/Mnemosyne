@@ -169,6 +169,9 @@ def build_parser() -> argparse.ArgumentParser:
     codex_ingest_parser.add_argument('--source', default='codex')
     codex_ingest_parser.add_argument('--commit', action='store_true',
         help='actually write (default: dry-run preview)')
+    codex_ingest_parser.add_argument('--format', dest='fmt',
+        choices=['auto', 'markdown', 'json'], default='auto',
+        help='findings block format (default: auto-detect)')
     codex_ingest_parser.set_defaults(func=cmd_codex_ingest)
 
     install_hermes_parser = subparsers.add_parser(
@@ -590,7 +593,7 @@ def cmd_codex_ingest(args: argparse.Namespace) -> int:
     if not text.strip():
         print('No input on stdin.', file=sys.stderr)
         return 2
-    actions = ingest(text, source=args.source, commit=args.commit)
+    actions = ingest(text, source=args.source, commit=args.commit, fmt=getattr(args, 'fmt', 'auto'))
     if not actions:
         print('No findings parsed.')
         return 0

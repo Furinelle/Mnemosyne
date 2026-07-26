@@ -7,18 +7,21 @@ from __future__ import annotations
 import json
 import os
 
-from mnemosyne.findings import FALLBACK_TYPES as ALLOWED_TYPES, Finding
+from mnemosyne.findings import FALLBACK_TYPES, Finding, allowed_types
 
-_BASE_PROMPT = (
-    "You extract durable memories from a developer/agent conversation. "
-    "Return ONLY a JSON array. Each element: "
-    '{"type": one of '
-    + "|".join(ALLOWED_TYPES)
-    + ', "importance": 50-90, "title": <=80 chars, "tags": [..], "content": "...",'
-    ' "evidence": short verbatim quote from the conversation supporting this memory}. '
-    "Only include genuinely reusable facts (pitfalls, decisions, preferences, codebase, handoff). "
-    "Empty array if nothing is worth saving."
-)
+
+def _base_prompt(types: tuple[str, ...]) -> str:
+    return (
+        "You extract durable memories from a developer/agent conversation. "
+        "Return ONLY a JSON array. Each element: "
+        '{"type": one of '
+        + "|".join(types)
+        + ', "importance": 50-90, "title": <=80 chars, "tags": [..], "content": "...",'
+        ' "evidence": short verbatim quote from the conversation supporting this memory}. '
+        "Only include genuinely reusable facts (pitfalls, decisions, preferences, codebase, handoff). "
+        "Empty array if nothing is worth saving."
+    )
+
 
 _SUMMARY_INSTRUCTION = (
     ' Additionally, include exactly one element with type "session_summary": '
@@ -26,14 +29,18 @@ _SUMMARY_INSTRUCTION = (
 )
 
 
-def _build_prompt(conversation: str, include_session_summary: bool) -> str:
-    prompt = _BASE_PROMPT
+def _build_prompt(
+    conversation: str,
+    include_session_summary: bool,
+    types: tuple[str, ...] = FALLBACK_TYPES,
+) -> str:
+    prompt = _base_prompt(types)
     if include_session_summary:
         prompt += _SUMMARY_INSTRUCTION
     return prompt + "\n\nCONVERSATION:\n" + conversation
 
 
-def _parse_llm_json(payload: str) -> list[Finding]:
+def _parse_llm_json(payload: str, types: tuple[str, ...] = FALLBACK_TYPES) -> list[Finding]:
     payload = payload.strip()
     start, end = payload.find("["), payload.rfind("]")
     if start == -1 or end == -1:
@@ -47,7 +54,7 @@ def _parse_llm_json(payload: str) -> list[Finding]:
         if not isinstance(item, dict):
             continue
         type_value = str(item.get("type", "")).strip()
-        if type_value not in ALLOWED_TYPES:
+        if type_value not in types:
             continue
         title = str(item.get("title", "")).strip()[:80]
         content = str(item.get("content", "")).strip()
@@ -69,6 +76,12 @@ class LLMExtractor:
         self.llm_cfg = distill_cfg.get("llm", {})
         self.include_session_summary = bool(distill_cfg.get("session_summary", False))
         self.max_findings = max_findings
+        # Types come from the store config so user-defined types survive the
+        # LLM path instead of being silently dropped on parse.
+        self._types = allowed_types(config)
+
+    def prompt_preview(self) -> str:
+        return _base_prompt(self._types)
 
     def extract(self, turns) -> list[Finding]:
         from mnemosyne.distill import turns_to_text
@@ -80,9 +93,9 @@ class LLMExtractor:
             print("mnemosyne: distill.llm enabled but API key missing; skipping", file=sys.stderr)
             return []
         payload = self._call_api(
-            _build_prompt(turns_to_text(turns), self.include_session_summary), api_key
+            _build_prompt(turns_to_text(turns), self.include_session_summary, self._types), api_key
         )
-        return _parse_llm_json(payload)[: self.max_findings]
+        return _parse_llm_json(payload, self._types)[: self.max_findings]
 
     def _call_api(self, prompt: str, api_key: str) -> str:
         import urllib.request

@@ -6,6 +6,7 @@ knowledge with a findings block (markdown or JSON; see docs/handoff-format.md).
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from datetime import date
@@ -94,7 +95,16 @@ def prep(
     return '\n'.join(parts)
 
 
-def parse_findings(text: str) -> list[Finding]:
+def _resolve_allowed(allowed: tuple[str, ...] | None) -> tuple[str, ...]:
+    if allowed is not None:
+        return tuple(allowed)
+    from mnemosyne.findings import allowed_types
+
+    return allowed_types(load_config(find_project_store() or global_store()))
+
+
+def parse_findings(text: str, allowed: tuple[str, ...] | None = None) -> list[Finding]:
+    allowed = _resolve_allowed(allowed)
     text = text.lstrip('﻿')
     header_match = FINDINGS_HEADER_RE.search(text)
     if not header_match:
@@ -110,7 +120,7 @@ def parse_findings(text: str) -> list[Finding]:
         if current is None:
             return
         type_value = current.get('type', '').strip()
-        if type_value not in ALLOWED_TYPES:
+        if type_value not in allowed:
             print(f'mnemosyne: dropping finding, unknown type {type_value!r}', file=sys.stderr)
             return
         try:
@@ -202,6 +212,52 @@ def parse_findings(text: str) -> list[Finding]:
     return findings
 
 
+def parse_findings_json(text: str, allowed: tuple[str, ...] | None = None) -> list[Finding]:
+    """Parse the JSON findings variant: {"findings": [...]} or a bare array."""
+    allowed = _resolve_allowed(allowed)
+    try:
+        payload = json.loads(text.lstrip('\ufeff'))
+    except json.JSONDecodeError:
+        return []
+    items = payload.get('findings') if isinstance(payload, dict) else payload
+    if not isinstance(items, list):
+        return []
+    findings: list[Finding] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        type_value = str(item.get('type', '')).strip()
+        if type_value not in allowed:
+            print(f'mnemosyne: dropping finding, unknown type {type_value!r}', file=sys.stderr)
+            continue
+        title = str(item.get('title', '')).strip()[:80]
+        content = str(item.get('content', '')).strip()
+        if not title or not content:
+            print('mnemosyne: dropping finding, empty title or content', file=sys.stderr)
+            continue
+        try:
+            importance = max(0, min(100, int(item.get('importance', 50))))
+        except (TypeError, ValueError):
+            importance = 50
+        tags = [str(t).strip() for t in item.get('tags', []) if str(t).strip()]
+        evidence = str(item.get('evidence', '')).strip()[:200]
+        findings.append(Finding(type_value, importance, title, tags, content, evidence))
+    return findings
+
+
+def parse_findings_auto(text: str, allowed: tuple[str, ...] | None = None) -> list[Finding]:
+    """Detect the findings format: JSON when the text is a JSON object/array."""
+    stripped = text.lstrip('\ufeff').strip()
+    if stripped.startswith(('{', '[')):
+        try:
+            json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+        else:
+            return parse_findings_json(stripped, allowed)
+    return parse_findings(text, allowed)
+
+
 def write_finding(
     finding: Finding,
     source: str,
@@ -244,10 +300,18 @@ def write_finding(
     return memory_id
 
 
-def ingest(text: str, source: str = 'codex', commit: bool = False) -> list[dict]:
-    findings = parse_findings(text)
+def ingest(text: str, source: str = 'codex', commit: bool = False, fmt: str = 'auto') -> list[dict]:
     store = find_project_store() or global_store()
     config = load_config(store)
+    from mnemosyne.findings import allowed_types
+
+    allowed = allowed_types(config)
+    if fmt == 'json':
+        findings = parse_findings_json(text, allowed)
+    elif fmt == 'markdown':
+        findings = parse_findings(text, allowed)
+    else:
+        findings = parse_findings_auto(text, allowed)
     distill_cfg = config.get("distill", {})
     from mnemosyne.distill import process_finding
 

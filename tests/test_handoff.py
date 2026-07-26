@@ -25,3 +25,37 @@ def test_codex_shim():
     assert codex.parse_findings is handoff.parse_findings
     assert codex.ingest is handoff.ingest
     assert codex.write_finding is handoff.write_finding
+
+
+def test_parse_findings_json_roundtrip(tmp_store):
+    from mnemosyne.handoff import parse_findings_auto
+    text = '{"findings": [{"type": "pitfall", "importance": 66, "title": "T", "tags": ["a"], "content": "C"}]}'
+    findings = parse_findings_auto(text)
+    assert findings[0].type == "pitfall" and findings[0].importance == 66
+    assert findings[0].tags == ["a"] and findings[0].content == "C"
+
+
+def test_parse_findings_json_bare_array(tmp_store):
+    from mnemosyne.handoff import parse_findings_json
+    text = '[{"type": "codebase", "importance": 55, "title": "B", "tags": [], "content": "body"}]'
+    assert parse_findings_json(text)[0].type == "codebase"
+
+
+def test_parse_findings_respects_custom_types(tmp_store):
+    from mnemosyne.handoff import parse_findings
+    block = "**Findings:**\n- type: custom_kind\n- importance: 60\n- title: T\n- tags: a\n- content: |\n    body\n"
+    assert parse_findings(block, allowed=("custom_kind",))[0].type == "custom_kind"
+    assert parse_findings(block, allowed=("pitfall",)) == []
+
+
+def test_ingest_json_format(tmp_store):
+    from mnemosyne.handoff import ingest
+    text = '{"findings": [{"type": "pitfall", "importance": 60, "title": "J", "tags": [], "content": "json body"}]}'
+    actions = ingest(text, commit=False, fmt="auto")
+    assert actions and actions[0]["title"] == "J"
+
+
+def test_llm_prompt_uses_config_types():
+    from mnemosyne.distill.llm import LLMExtractor
+    extractor = LLMExtractor({"memory": {"types": ["alpha", "beta"]}, "distill": {"llm": {}}})
+    assert "alpha|beta" in extractor.prompt_preview()
