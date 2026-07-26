@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 
-from mnemosyne.codex import ALLOWED_TYPES, Finding
+from mnemosyne.findings import FALLBACK_TYPES as ALLOWED_TYPES, Finding
 
 _BASE_PROMPT = (
     "You extract durable memories from a developer/agent conversation. "

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass
 from datetime import date
 
 from mnemosyne.cli import make_memory_id, summarize, update_memory_index_file
+from mnemosyne.findings import FALLBACK_TYPES, Finding
 from mnemosyne.hooks._common import (
     collect_stores,
     extract_keywords,
@@ -30,17 +30,7 @@ from mnemosyne.store import (
 FINDINGS_HEADER_RE = re.compile(r'^\s*\*\*(?:新发现|Findings)[:：]\*\*\s*$', re.MULTILINE)
 FIELD_RE = re.compile(r'^\s*-\s*(\w+)\s*:\s*(.*)$')
 CONTENT_OPEN_RE = re.compile(r'^\s*-\s*content\s*:\s*\|\s*$')
-ALLOWED_TYPES = ('arch_decision', 'pitfall', 'codebase', 'preference', 'handoff', 'session_summary')
-
-
-@dataclass
-class Finding:
-    type: str
-    importance: int
-    title: str
-    tags: list[str]
-    content: str
-    evidence: str = ""
+ALLOWED_TYPES = FALLBACK_TYPES
 
 
 def prep(task: str, max_memories: int = 5, stores: list[Store] | None = None) -> str:

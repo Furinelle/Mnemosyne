@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from mnemosyne.codex import Finding
+from mnemosyne.findings import Finding
 from mnemosyne.search import tokenize
 from mnemosyne.store import (
     Store,
