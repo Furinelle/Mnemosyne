@@ -211,7 +211,7 @@ def process_finding(
             if commit and target:
                 record["id"] = target
             return record
-        from mnemosyne.codex import write_finding
+        from mnemosyne.handoff import write_finding
 
         record["id"] = write_finding(finding, source, store=destination, _locked=True)
         if verdict == "supersede" and target:
@@ -269,7 +269,7 @@ def _findings_from_text(text: str, config: dict) -> list[Finding]:
     distill_cfg = config.get("distill", {})
     engine = distill_cfg.get("engine", "heuristic")
     if engine == "host":
-        from mnemosyne.codex import parse_findings
+        from mnemosyne.handoff import parse_findings
 
         return parse_findings(text)
     turns = _parse_role_lines(text)

@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from mnemosyne import __version__, api
-from mnemosyne.codex import prep
+from mnemosyne.handoff import prep
 from mnemosyne.fusion import search
 from mnemosyne.graph import build_graph, render_graph
 from mnemosyne.schema import serialize_memory
@@ -366,6 +366,7 @@ def _prep_context(arguments: dict) -> str:
         str(arguments["task"]),
         max_memories=int(arguments.get("limit", 5)),
         stores=_allowed_stores("all"),
+        channel="mcp",
     )
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from mnemosyne.codex import Finding
+from mnemosyne.findings import Finding
 from mnemosyne.distill import Turn
 
 # Preference: user corrects the agent's default choice.

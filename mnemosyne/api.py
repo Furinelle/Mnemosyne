@@ -329,3 +329,17 @@ def link_entries(
         update_search_index(first[0], first_path, first_memory)
         update_search_index(second[0], second_path, second_memory)
     return {"ok": True, "rel": rel, "id1": first_memory.id, "id2": second_memory.id}
+
+
+def prep_context(task: str, max_memories: int = 5, channel: str = "cli") -> str:
+    """Stable alias for handoff.prep: assemble a context block for any agent."""
+    from mnemosyne.handoff import prep
+
+    return prep(task, max_memories=max_memories, channel=channel)
+
+
+def ingest_findings(text: str, source: str = "agent", commit: bool = False) -> list[dict]:
+    """Stable alias for handoff.ingest: parse a findings block and persist it."""
+    from mnemosyne.handoff import ingest
+
+    return ingest(text, source=source, commit=commit)

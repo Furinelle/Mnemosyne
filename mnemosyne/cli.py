@@ -579,13 +579,13 @@ def cmd_mcp_serve(args: argparse.Namespace) -> int:
 
 
 def cmd_codex_prep(args: argparse.Namespace) -> int:
-    from mnemosyne.codex import prep
-    print(prep(args.task, max_memories=args.limit))
+    from mnemosyne.handoff import prep
+    print(prep(args.task, max_memories=args.limit, channel='cli'))
     return 0
 
 
 def cmd_codex_ingest(args: argparse.Namespace) -> int:
-    from mnemosyne.codex import ingest
+    from mnemosyne.handoff import ingest
     text = sys.stdin.read()
     if not text.strip():
         print('No input on stdin.', file=sys.stderr)
