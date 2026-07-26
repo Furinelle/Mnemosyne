@@ -18,6 +18,7 @@ from mnemosyne.embedding.base import call_with_timeout
 from mnemosyne.schema import Memory, parse_memory
 from mnemosyne.search import memory_search_text, tokenize
 from mnemosyne.store import Store, iter_memory_paths, load_config, load_memories
+from mnemosyne.tokenizer import script_runs
 
 
 INDEX_FILENAME = "index.sqlite"
@@ -267,7 +268,13 @@ def search_index(
     include_superseded: bool = False,
 ) -> list[IndexedSearchResult]:
     expression = _query_expression(query)
-    if not expression:
+    # Tokens the FTS expression cannot represent (dense-script runs shorter than
+    # a trigram) always get their own LIKE pass, whose hits are merged in rather
+    # than used only as an all-or-nothing fallback: in a mixed query like
+    # "并发锁 portalocker" the English term matches, and gating the fallback on
+    # "no rows at all" silently dropped the Chinese half of the query.
+    like_tokens = [token for token in tokenize(query) if _needs_like_fallback(token)]
+    if not expression and not like_tokens:
         return []
 
     results: list[IndexedSearchResult] = []
@@ -275,22 +282,30 @@ def search_index(
         sync_index(store)
         with closing(_connect(index_path(store))) as connection:
             connection.row_factory = sqlite3.Row
-            rows = _search_rows(
-                connection,
-                expression,
-                limit,
-                memory_type,
-                include_archive,
-                include_superseded,
-            )
-            if not rows and any(_needs_like_fallback(token) for token in tokenize(query)):
-                rows = _search_rows_like(
+            rows = (
+                _search_rows(
                     connection,
-                    tokenize(query),
+                    expression,
                     limit,
                     memory_type,
                     include_archive,
                     include_superseded,
+                )
+                if expression
+                else []
+            )
+            if like_tokens:
+                rows = _merge_rows(
+                    rows,
+                    _search_rows_like(
+                        connection,
+                        like_tokens,
+                        limit,
+                        memory_type,
+                        include_archive,
+                        include_superseded,
+                    ),
+                    limit,
                 )
         for row in rows:
             path = Path(row["path"])
@@ -451,11 +466,17 @@ def _search_rows_like(
         return []
     fields = ("title", "summary", "body", "tags", "type")
     token_filters: list[str] = []
-    params: list[object] = []
+    token_params: list[object] = []
     for token in short_tokens:
         pattern = f"%{_escape_like(token)}%"
         token_filters.append("(" + " OR ".join(f"memories_fts.{field} LIKE ? ESCAPE '\\'" for field in fields) + ")")
-        params.extend([pattern] * len(fields))
+        token_params.extend([pattern] * len(fields))
+    # Rank by how many query tokens a row matches. Ordering by strength alone
+    # let a high-strength row that happens to contain one fragment outrank a row
+    # matching the whole query.
+    hits = " + ".join(f"(CASE WHEN {condition} THEN 1 ELSE 0 END)" for condition in token_filters)
+    params: list[object] = [*token_params]
+    params.extend(token_params)
     filters = ["(" + " OR ".join(token_filters) + ")"]
     if memory_type:
         filters.append("m.type = ?")
@@ -473,7 +494,7 @@ def _search_rows_like(
                 m.path,
                 m.summary,
                 m.type,
-                (m.strength / 1000.0) AS score,
+                ({hits}) + (m.strength / 1000.0) AS score,
                 m.summary AS why_matched
             FROM memories_fts
             JOIN memories_meta m ON m.document_id = memories_fts.document_id
@@ -486,11 +507,49 @@ def _search_rows_like(
     )
 
 
+def _merge_rows(primary: list, secondary: list, limit: int) -> list[dict]:
+    """Combine FTS and LIKE hits, summing the score of rows both lanes found."""
+    merged: dict[str, dict] = {}
+    for row in (*primary, *secondary):
+        key = str(row["path"])
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = {
+                "path": row["path"],
+                "summary": row["summary"],
+                "type": row["type"],
+                "score": float(row["score"]),
+                "why_matched": row["why_matched"],
+            }
+            continue
+        existing["score"] += float(row["score"])
+    ordered = sorted(merged.values(), key=lambda item: item["score"], reverse=True)
+    return ordered[:limit]
+
+
 def _query_expression(query: str) -> str:
-    tokens = tokenize(query)
-    if not tokens:
+    """Build an FTS5 MATCH expression for the trigram-tokenized index.
+
+    The trigram tokenizer only matches substrings of three characters or more,
+    so feeding it the bigrams `tokenize` produces makes every dense-script
+    (e.g. Chinese) query match nothing at all. Emit sliding trigrams for recall
+    plus the whole run as an exact-substring signal — bm25 sums the matched
+    terms, so a row containing the full run outscores one matching a fragment.
+    Runs shorter than three characters are left to the LIKE lane.
+    """
+    terms: list[str] = []
+    for chunk, dense in script_runs(query):
+        if not dense:
+            terms.append(chunk)
+            continue
+        if len(chunk) < 3:
+            continue
+        terms.extend(chunk[index : index + 3] for index in range(len(chunk) - 2))
+        if len(chunk) > 3:
+            terms.append(chunk)
+    if not terms:
         return ""
-    return " OR ".join(f'"{token}"' for token in tokens)
+    return " OR ".join(f'"{term}"' for term in dict.fromkeys(terms))
 
 
 def encode_embedding(vector: list[float]) -> bytes:
@@ -674,7 +733,11 @@ def _index_fts(connection: sqlite3.Connection, document_id: str, memory: Memory,
 
 
 def _needs_like_fallback(token: str) -> bool:
-    return len(token) < 3 and any("\u4e00" <= character <= "\u9fff" for character in token)
+    """True for dense-script tokens too short for the trigram tokenizer to match."""
+    if len(token) >= 3:
+        return False
+    runs = script_runs(token)
+    return bool(runs) and runs[0][1]
 
 
 def _escape_like(token: str) -> str:

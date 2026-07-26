@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 from mnemosyne.hooks._common import (
@@ -47,10 +46,12 @@ def main() -> None:
             results, max_tokens=max_tokens, summary_chars=summary_chars
         )
         record_injected_ids(session_id, [item['id'] for item in results])
+        # No permissionDecision: this hook only injects context. Emitting
+        # 'allow' here would bypass the user's tool-approval prompt for every
+        # Edit/Write whose target happens to match a memory.
         output = {
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',
-                'permissionDecision': 'allow',
                 'additionalContext': context,
             }
         }

@@ -57,7 +57,7 @@ Mnemosyne 会把 float16 向量保存到 SQLite 元数据表，并用 RRF 融合
 `mnemosyne mcp serve --sse` 可用于调试或远程接入。
 
 MCP SDK 是可选 extra。没有安装时，原有 CLI 和 hooks 完全不受影响；只有启动 MCP
-server 时会提示安装 `mnemosyne[mcp]`。仓库内的 `templates/mcp_clients/` 提供
+server 时会提示安装 `mnemosyne[mcp]`。仓库内的 `mnemosyne/templates/mcp_clients/` 提供
 Cursor、Cline、Continue 和 Windsurf 的配置片段。
 
 ### 关系图谱
@@ -188,7 +188,7 @@ Mnemosyne 的共享方式很朴素：Claude Code 和 Codex 都读写同一套
 把 hooks 模板合并到 Claude Code 的全局或项目 settings：
 
 ```bash
-cat templates/settings.json
+cat mnemosyne/templates/settings.json
 ```
 
 常用目标文件：
@@ -208,7 +208,7 @@ cat templates/settings.json
 | Edit / Write 前 | `PreToolUse` | 根据目标文件名搜索相关记忆并注入。 |
 | 会话结束 | `Stop` | dry-run 维护，提示可晋升到 core memory 的候选；若 `[distill].enabled = true`，自动从 transcript 蒸馏并写入记忆。 |
 
-再把 `templates/CLAUDE.md` 的规则加入你的 `~/.claude/CLAUDE.md`，Claude Code 就会在
+再把 `mnemosyne/templates/CLAUDE.md` 的规则加入你的 `~/.claude/CLAUDE.md`，Claude Code 就会在
 遇到踩坑、架构决策、用户偏好、代码库知识或交接信息时主动写入记忆。
 
 ### Codex Desktop
@@ -220,10 +220,10 @@ Mnemosyne CLI。
 
 ```bash
 mkdir -p ~/.codex
-[ -f ~/.codex/AGENTS.md ] || cp templates/AGENTS.md ~/.codex/AGENTS.md
+[ -f ~/.codex/AGENTS.md ] || cp mnemosyne/templates/AGENTS.md ~/.codex/AGENTS.md
 ```
 
-如果 `~/.codex/AGENTS.md` 已经存在，把 `templates/AGENTS.md` 里的 Mnemosyne 规则合并进去即可。
+如果 `~/.codex/AGENTS.md` 已经存在，把 `mnemosyne/templates/AGENTS.md` 里的 Mnemosyne 规则合并进去即可。
 如果你还想给某个项目单独配置，运行 `python3 -m mnemosyne init` 后会生成项目级 `AGENTS.md`。
 
 Codex 也可以手动走交接命令：
@@ -265,7 +265,7 @@ export MNEMOSYNE_AUTO_INIT=0
 
 ```bash
 python3 -m pip install -e ".[mcp]"
-cat templates/mcp_clients/cursor.json
+cat mnemosyne/templates/mcp_clients/cursor.json
 ```
 
 模板默认启动 `mnemosyne mcp serve`。把对应 JSON 片段合并到 Cursor、Cline、
@@ -389,13 +389,13 @@ summary_chars = 120
 [search]
 index_enabled = true
 
+# 以下三类键只从全局 ~/.mnemosyne/config.toml 读取，项目内 config.toml 里会被忽略：
+# api_base、api_key_env、onnx_path（以及 distill.llm.backend）。
+# 原因见「配置的信任边界」一节。
 [embedding]
 enabled = false
 backend = "onnx"
 model = "BAAI/bge-small-zh-v1.5"
-onnx_path = ""
-api_base = "https://api.openai.com/v1"
-api_key_env = "OPENAI_API_KEY"
 dimensions = 384
 batch_size = 32
 
@@ -403,7 +403,6 @@ batch_size = 32
 enabled = false
 backend = "cross_encoder"
 model = "BAAI/bge-reranker-base"
-onnx_path = ""
 top_n = 5
 
 [distill]
@@ -416,10 +415,7 @@ dedup_threshold = 0.85
 subject_threshold = 0.5
 
 [distill.llm]
-backend = "openai"
 model = ""
-api_base = "https://api.openai.com/v1"
-api_key_env = "OPENAI_API_KEY"
 
 [fusion]
 rrf_k = 60
@@ -451,10 +447,23 @@ port = 3700
 - `injection.summary_chars` 控制注入摘要的单条截断长度（默认 120）。注入是"目录"而非全文：每条记忆一行，完整内容用 `python3 -m mnemosyne show ID` 按需获取。同一会话内已注入过的记忆不会重复注入。
 - `search.index_enabled = false` 可关闭 SQLite FTS5，强制使用内存 BM25。
 - `embedding.enabled` 与 `rerank.enabled` 默认关闭，基础安装不需要额外依赖；`embedding.batch_size` 控制 backfill 每批嵌入的记忆数，每批独立超时。
-- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需配置 `[distill.llm]` 的 backend/model/api_base/api_key_env）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。`distill.session_summary` 开启后（需 `engine = "llm"`），每次蒸馏额外产出一条 `session_summary` 会话摘要；LLM findings 会带 `evidence` 原文引用便于溯源。Stop hook 的蒸馏是增量的：按 transcript 记录已处理轮次（`.distill_state.json`），每轮只处理新增内容。
+- `distill.enabled` 默认关闭（opt-in）；启用后由 Stop hook / `codex-ingest` / Hermes `on_session_end` 触发自动记忆形成。`engine` 可选 `heuristic`（默认，stdlib 启发式）、`llm`（需在**全局** config 配置 `[distill.llm]` 的 backend/api_base/api_key_env，见下方「配置的信任边界」）或 `host`（解析 agent 输出的 `**新发现:**` 块）。`confidence_threshold` 过滤低置信度候选，`max_findings_per_session` 限制单次会话写入条数，`dedup_threshold`/`subject_threshold` 控制写入前的去重与 supersede 判定。`heuristic` 引擎为高精度设计：pitfall 仅在较短、错误与修复标记相邻、且非分步指令式的 turn 上触发，避免把长篇对话解释误当记忆。`distill.session_summary` 开启后（需 `engine = "llm"`），每次蒸馏额外产出一条 `session_summary` 会话摘要；LLM findings 会带 `evidence` 原文引用便于溯源。Stop hook 的蒸馏是增量的：按 transcript 记录已处理轮次（`.distill_state.json`），每轮只处理新增内容。
 - `fusion.link_expansion` 控制 typed links 是否参与召回扩展；`link_expansion_decay_fallback` 是多跳扩展时每跳的衰减系数；`bm25_pool_size`/`vec_pool_size` 控制各检索通路在融合前各自召回的候选池大小。
 - `relations.allow_custom` 控制 `link` 是否默认接受非预定义关系。
 - `mcp.expose_global`/`mcp.expose_project` 控制 MCP server 是否暴露对应作用域；`mcp.sse` 控制可选 SSE 地址，stdio 始终是 `mcp serve` 默认值。
+
+### 配置的信任边界
+
+项目内的 `.mnemosyne/config.toml` 是跟着仓库走的文件——clone 别人的仓库就等于加载了对方写的配置。因此以下这些"决定数据发往哪里、读哪个密钥、加载哪个模型文件"的键**只从全局 `~/.mnemosyne/config.toml` 读取**：
+
+| 键 | 为什么只信全局 |
+|---|---|
+| `distill.llm.api_base`、`distill.llm.backend` | 否则一个恶意仓库可以把整段会话 transcript 发往任意主机 |
+| `distill.llm.api_key_env`、`embedding.api_key_env` | 否则可以指定任意环境变量（如云厂商密钥）作为 Bearer token 送出 |
+| `embedding.api_base` | 同上，向量化会把记忆正文发往该地址 |
+| `embedding.onnx_path`、`rerank.onnx_path` | 否则可以指向仓库内的任意文件作为模型加载 |
+
+项目 config 里出现这些键时会被忽略；值与默认不同（即像是被人刻意改过）时还会向 stderr 打一条提示。其余配置（含 `distill.enabled` 与 `distill.engine`）仍可按项目设置。
 
 全局 store 默认在 `~/.mnemosyne/`，可以覆盖：
 
@@ -571,7 +580,7 @@ python3 -m mnemosyne doctor --scope all
 
 | 现象 | 处理 |
 |---|---|
-| Claude hook 没输出 | 确认 `templates/settings.json` 已合并，且里面的 `python` 在 Claude Code 环境可用。 |
+| Claude hook 没输出 | 确认 `mnemosyne/templates/settings.json` 已合并，且里面的 `python` 在 Claude Code 环境可用。 |
 | Codex 没自动读记忆 | 确认 `~/.codex/AGENTS.md` 或项目 `AGENTS.md` 中有 Mnemosyne 指令。 |
 | 搜索结果旧或缺失 | 跑 `python3 -m mnemosyne reindex --scope all`。 |
 | FTS5 不可用 | `doctor` 会提示回退到内存 BM25；换带 SQLite FTS5 的 Python 可恢复持久索引。 |
@@ -584,7 +593,7 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.1 是审查修复版本：关闭并发写回、维护调度与 supersede 事务竞态；统一 CLI、Codex、distill 和 MCP 的作用域/类型去重；落实 MCP 暴露边界；修复混合检索候选池过滤、无损 consolidate 及 FTS v3 索引对账；包、运行时、MCP 与 Hermes 插件版本统一为 0.6.1。0.6.0 带来 superseded 失效过滤、`consolidate` 与检索质量 CI 门槛。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.6.2 是安全与检索修复版本：PreToolUse hook 不再输出 `permissionDecision: allow`（此前会绕过 Edit/Write 的权限确认）；`api_base`/`api_key_env` 等网络配置改为仅信任全局 store，项目内 config.toml 不能再指定外传端点与凭证环境变量；修复中文查询在 FTS 通道恒零命中导致排序退化为按 strength、混合中英查询静默丢弃中文词、链接扩展加分无上限把 hub 记忆顶到第一；`templates/` 移入包内避免污染 site-packages，补 LICENSE 与打包元数据；CI 增加走真实检索管线的 recall 门槛。0.6.1 关闭了并发写回、维护调度与 supersede 事务竞态并统一各入口的去重与作用域边界。
 
 ## License
 

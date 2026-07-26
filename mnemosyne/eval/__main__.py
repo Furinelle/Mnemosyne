@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
         "--min-recall",
         type=float,
         default=None,
-        help="Exit non-zero if bm25 recall@5 falls below this threshold (CI regression gate)",
+        help="Exit non-zero if recall@5 falls below this threshold (CI regression gate)",
     )
 
     convert_parser = subparsers.add_parser("convert")
@@ -64,6 +64,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         if args.by_type:
             for qtype, metrics in sorted(report["by_type"].items()):
                 print(f"  [{qtype or 'unknown'}] recall@5={metrics['recall@5']:.3f}")
+        if args.min_recall is not None and report["recall@5"] < args.min_recall:
+            print(f"FAIL: recall@5 {report['recall@5']:.3f} < required {args.min_recall:.3f}")
+            return 1
         return 0
     legacy = run_evaluation(args.corpus, tokenizer=legacy_tokenize)
     current = run_evaluation(args.corpus)

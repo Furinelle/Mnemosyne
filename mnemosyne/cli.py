@@ -8,7 +8,6 @@ from contextlib import suppress
 from dataclasses import fields
 import importlib.util
 import json
-import os
 import uuid
 import sys
 from datetime import date
@@ -23,7 +22,6 @@ from mnemosyne.index import (
     index_enabled,
     index_path,
     reindex_store,
-    search_index,
     update_memory_index as update_search_index,
 )
 from mnemosyne.embedding import get_embedder
@@ -46,6 +44,7 @@ from mnemosyne.store import (
     read_core,
     stores_for_scope,
     template_text,
+    templates_dir,
     working_path,
     write_memory,
 )
@@ -204,14 +203,13 @@ def cmd_init(args: argparse.Namespace) -> int:
             print(f"Wrote {agents_path}")
         except FileNotFoundError:
             pass
-    templates_dir = Path(__file__).resolve().parent.parent / "templates"
-    settings_path = templates_dir / "settings.json"
+    settings_path = templates_dir() / "settings.json"
     print()
     print("Next steps:")
     print("  1. Ensure mnemosyne is importable from any cwd (recommended):")
     print("       pip install -e .")
     print("  2. To enable Claude Code auto-injection, merge this hooks config")
-    print(f"     into ~/.claude/settings.json or .claude/settings.json:")
+    print("     into ~/.claude/settings.json or .claude/settings.json:")
     print(f"       {settings_path}")
     return 0
 
@@ -747,7 +745,10 @@ def print_search_results(indexed_results, output_format: str, config: dict) -> i
         path = result.path
         is_archive = result.store.archive_dir in path.parents
         bonus = recall_bonus if is_archive else threshold_bonus
-        with suppress(portalocker.exceptions.LockException):
+        # OSError too: a concurrent `maintain` can archive (move) the file
+        # between retrieval and the access bump. Failing to bump must not take
+        # the whole search down with it.
+        with suppress(portalocker.exceptions.LockException, OSError):
             memory = bump_memory_access(
                 result.store,
                 path,

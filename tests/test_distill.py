@@ -1,7 +1,7 @@
 from mnemosyne.codex import Finding
 from mnemosyne.distill import Turn, classify_against_store, distill_text, jaccard, parse_claude_transcript
 from mnemosyne.distill.heuristic import HeuristicExtractor
-from mnemosyne.distill.llm import LLMExtractor, _parse_llm_json
+from mnemosyne.distill.llm import _parse_llm_json
 
 
 def test_parse_claude_transcript_extracts_role_and_text(tmp_path):

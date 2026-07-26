@@ -45,7 +45,12 @@ def convert(raw_path: Path, out_dir: Path, *, max_instances: int | None = None) 
                     )
                     + "\n"
                 )
-            expected = [f"lme-{qid}-{sid}" for sid in inst["answer_session_ids"]]
+            expected = [f"lme-{qid}-{sid}" for sid in inst.get("answer_session_ids", [])]
+            if not expected:
+                # Abstention questions ("*_abs") have no evidence session. Scoring
+                # them would count a fixed recall/MRR of 0 for every one of them,
+                # making the aggregate incomparable to published numbers.
+                continue
             corpus_handle.write(
                 json.dumps(
                     {

@@ -115,6 +115,11 @@ def split_frontmatter(text: str) -> tuple[str, str]:
         return "", normalized
     end = normalized.find("\n---\n", 4)
     if end == -1:
+        # A closing "---" on the last line without a trailing newline is still a
+        # valid close; treating it as "no frontmatter" would silently drop the
+        # whole header (and with it the memory id).
+        if normalized.endswith("\n---"):
+            return normalized[4 : len(normalized) - 4], ""
         return "", normalized
     frontmatter = normalized[4:end]
     body = normalized[end + 5 :]

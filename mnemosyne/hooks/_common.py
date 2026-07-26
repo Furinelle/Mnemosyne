@@ -222,7 +222,7 @@ def _run_search_indexed(
     """
     try:
         from mnemosyne.fusion import search as fusion_search
-        from mnemosyne.index import fts_available, update_memory_index
+        from mnemosyne.index import fts_available
     except ImportError:
         return None
     if not fts_available():

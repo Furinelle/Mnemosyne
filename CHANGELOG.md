@@ -2,6 +2,32 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [0.6.2] - 2026-07-26
+
+### 安全 (Security)
+
+- **PreToolUse hook 不再放行工具调用**：该 hook 只负责注入记忆，此前输出的 `permissionDecision: "allow"` 会绕过 Claude Code 对 Edit/Write 的权限确认——只要目标文件名检索命中任意记忆（弱 token 如 `py` 也会命中），写入就被静默自动批准。现在只输出 `additionalContext`。
+- **网络相关配置仅信任全局 store**：`api_base`、`api_key_env`、`distill.llm.backend`、`embedding.onnx_path`、`rerank.onnx_path` 只从 `~/.mnemosyne/config.toml` 读取。此前项目内 `.mnemosyne/config.toml` 可指定任意端点与任意环境变量作为 Bearer token，clone 一个恶意仓库即可在会话结束时把环境变量与整段 transcript 外传。项目配置中出现这些键时会被忽略并在值非默认时告警。
+
+### 修复 (Fixed)
+
+- **中文检索排序失效**：FTS5 trigram tokenizer 无法匹配少于 3 字符的查询 token，而查询构造把中文切成 2 字 bigram，导致纯中文查询 MATCH 恒为 0 命中、排序退化为按 strength，持久索引反而比内存 BM25 更差。查询构造改为对 ≥3 字的连续中文串发滑窗 trigram 加整段 phrase（作强信号），1-2 字串交给 LIKE 通道。
+- **混合中英查询丢弃中文词**：LIKE 兜底此前以「FTS 零命中」为触发条件，混合查询中英文 token 一旦命中，中文部分即被静默忽略。现在两条通道的结果按路径合并、分数相加。
+- **LIKE 通道无相关性信号**：此前仅按 strength 排序，高 strength 的片段命中会压过完整命中；改为按命中 query token 数排序，strength 仅作 tie-break。
+- **链接扩展加分失控**：单个目标的累计 link boost 现在以最佳直接命中的 0.8 倍为上限，且只从 top-10 候选出发扩展（此前遍历整个 50 候选池并无上限累加，多个中游候选可把一个与查询无关的 hub 记忆推到第一）。`supersedes` 不再给被取代的旧记忆加分（也不再把它拉进结果），`contradicts` 加分降为 0 但保留矛盾标注。
+- **文件末尾无换行时 frontmatter 整体丢失**：`split_frontmatter` 现在也接受作为最后一行、无结尾换行的 `---`。此前少一个换行就会让整条记忆的 id 变空，进而从索引与检索中消失。
+- **并发归档使 search 崩溃**：`search` 的访问加分路径此前只抑制 `LockException`，另一进程的 `maintain` 归档该文件时抛出的 `FileNotFoundError` 会让整个命令带 traceback 退出、已检索结果全部丢失。
+- **write_memory 释放锁后删除锁文件**：这会破坏互斥（等待者持旧 inode、新来者建新 inode，两者同时进入临界区并争用同一 tmp 路径）。锁文件现在常驻，与 `lock_store` 策略一致。
+- **cross-encoder 输入被截空**：`max_length` 从 64 提到 256，并给 query 设独立上限（64），此前较长的查询会把文档配额压到只剩摘要开头几个词，rerank 分数接近噪声却无条件覆盖融合分数。
+- **tokenizer 覆盖面**：新增假名、谚文、CJK 扩展 A 与兼容表意文字，以及带重音的拉丁字母；此前这些内容写入后永久不可检索。
+- **LongMemEval abstention 拉低指标**：转换时跳过无证据 session 的 `*_abs` 实例，此前它们恒计 recall/MRR = 0，使整体数字与公开口径不可比。
+
+### 变更 (Changed)
+
+- **`templates/` 移入包内**：改为 `mnemosyne/templates/`，通过包内相对路径定位。此前作为 wheel 顶层目录安装到 site-packages 根下，会与任何同名顶层目录的包冲突，卸载对方时会连带删除本项目模板。
+- **打包元数据补全**：新增 LICENSE 文件（README 早已声明 MIT）、`readme`/`license`/`authors`/`classifiers`/`urls`，以及 `dev` extra（pytest）。
+- **CI**：新增走真实管线（SQLite FTS5 + fusion）的 recall@5 门槛——此前唯一的门槛只测内存 BM25，上述检索缺陷全部存在时它依然全绿；另加 macOS job、`ruff check`（仅 E9/F 规则）、optional extras 的安装与导入验证、pip 缓存。
+
 ## [0.6.1] - 2026-07-18
 
 ### 修复 (Fixed)

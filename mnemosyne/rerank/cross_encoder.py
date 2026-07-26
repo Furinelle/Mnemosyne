@@ -63,7 +63,8 @@ def _encode_pair(
     query: str,
     doc: str,
     vocab: dict[str, int],
-    max_length: int = 64,
+    max_length: int = 256,
+    query_limit: int = 64,
 ) -> tuple[list[int], list[int], list[int]]:
     cls_id = vocab.get("[CLS]", 101)
     sep_id = vocab.get("[SEP]", 102)
@@ -71,7 +72,10 @@ def _encode_pair(
     query_ids = _text_token_ids(query, vocab)
     doc_ids = _text_token_ids(doc, vocab)
     content_limit = max(0, max_length - 3)
-    query_ids = query_ids[:content_limit]
+    # Cap the query separately so a long question cannot starve the document:
+    # with a shared budget the doc was left with a few tokens of summary and the
+    # reranker scored noise.
+    query_ids = query_ids[: min(content_limit, query_limit)]
     doc_ids = doc_ids[: max(0, content_limit - len(query_ids))]
     input_ids = [cls_id, *query_ids, sep_id, *doc_ids, sep_id]
     token_types = [0] * (len(query_ids) + 2) + [1] * (len(doc_ids) + 1)

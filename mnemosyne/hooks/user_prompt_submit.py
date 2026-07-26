@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 
 from mnemosyne.hooks._common import (
     collect_stores,

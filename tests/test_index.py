@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import unittest
-from pathlib import Path
 
 from mnemosyne.cli import main
 from tests.helpers import isolated_workspace

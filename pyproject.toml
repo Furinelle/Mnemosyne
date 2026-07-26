@@ -2,14 +2,33 @@
 name = 'mnemosyne'
 dynamic = ['version']
 description = 'Portable dual-agent memory system for LLM agents'
+readme = 'README.md'
 requires-python = '>=3.11'
+license = 'MIT'
+license-files = ['LICENSE']
+authors = [{ name = 'Furinelle' }]
+keywords = ['llm', 'agent', 'memory', 'claude-code', 'mcp']
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Software Development :: Libraries',
+]
 dependencies = ['portalocker>=2.8']
+
+[project.urls]
+Homepage = 'https://github.com/Furinelle/Mnemosyne'
+Source = 'https://github.com/Furinelle/Mnemosyne'
+Changelog = 'https://github.com/Furinelle/Mnemosyne/blob/master/CHANGELOG.md'
 
 [project.optional-dependencies]
 vector = ['numpy>=1.26', 'onnxruntime>=1.17']
 rerank = ['numpy>=1.26', 'onnxruntime>=1.17']
 mcp = ['mcp>=0.4,<1']
 distill = []
+dev = ['pytest>=7']
 
 [project.scripts]
 mnemosyne = 'mnemosyne.cli:main'
@@ -21,8 +40,18 @@ build-backend = 'hatchling.build'
 [tool.hatch.version]
 path = 'mnemosyne/__init__.py'
 
+[tool.ruff]
+target-version = 'py311'
+line-length = 120
+
+[tool.ruff.lint]
+# Syntax errors plus pyflakes only: catches real defects (undefined names,
+# unused imports, redefinitions) without imposing a formatting opinion that
+# would churn the whole tree.
+select = ['E9', 'F']
+
 [tool.hatch.build.targets.wheel]
-include = ['mnemosyne/**', 'templates/**']
+include = ['mnemosyne/**']
 
 [tool.hatch.build.targets.sdist]
-include = ['mnemosyne/**', 'templates/**', 'tests/**', 'README.md', 'pyproject.toml']
+include = ['mnemosyne/**', 'tests/**', 'README.md', 'LICENSE', 'pyproject.toml']

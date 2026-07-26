@@ -15,7 +15,7 @@ from mnemosyne.index import (
     lookup_indexed_memory,
     search_index,
 )
-from mnemosyne.relations import warns, weight
+from mnemosyne.relations import is_demoting, warns, weight
 from mnemosyne.rerank import get_reranker
 from mnemosyne.schema import Memory
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
@@ -130,7 +130,15 @@ def expand_links(
     overrides = fusion_config.get("relation_weight_override", {})
     decay = float(fusion_config.get("link_expansion_decay_fallback", 0.5))
     max_hops = max(0, int(fusion_config.get("link_expansion_max_hops", 1)))
-    frontier = list(candidates.values())
+    max_sources = max(0, int(fusion_config.get("link_expansion_max_sources", 10)))
+    boost_ratio = float(fusion_config.get("link_expansion_max_boost_ratio", 0.8))
+
+    ranked = sorted(candidates.values(), key=lambda item: item.score, reverse=True)
+    # Cap each target's accumulated boost against the best direct hit, and expand
+    # only from the strongest candidates. Without both, a hub memory linked from
+    # several mid-ranked candidates could sum its way past every real match.
+    boost_cap = ranked[0].score * boost_ratio if ranked else 0.0
+    frontier = ranked[:max_sources] if max_sources else ranked
     visited_sources: set[str] = set()
 
     # Resolve link targets through the SQLite meta table (with a per-call
@@ -158,21 +166,35 @@ def expand_links(
                     continue
                 target_store, target_path, target_memory = found
                 document_id = f"{target_store.scope}:{target_memory.id}"
-                boost = source.score * weight(relation, overrides) * (decay ** hop)
+                # `supersedes` points at the stale memory and `contradicts` at a
+                # conflicting one; neither deserves a positive boost. A
+                # contradiction is still annotated on targets already retrieved.
+                if is_demoting(relation) or warns(relation):
+                    boost = 0.0
+                else:
+                    boost = source.score * weight(relation, overrides) * (decay ** hop)
                 target = candidates.get(document_id)
                 if target is None:
+                    # A contradiction is worth surfacing as a warning even at
+                    # zero boost; a superseded target is not worth pulling in.
+                    if boost <= 0 and not warns(relation):
+                        continue
                     target = FusionSearchResult(
                         store=target_store,
                         path=target_path,
                         memory=target_memory,
-                        score=boost,
-                        score_breakdown={"link_boost": boost},
+                        score=0.0,
+                        score_breakdown={"link_boost": 0.0},
                     )
                     candidates[document_id] = target
                     next_frontier.append(target)
-                else:
-                    target.score += boost
-                    target.score_breakdown["link_boost"] = target.score_breakdown.get("link_boost", 0.0) + boost
+                accumulated = target.score_breakdown.get("link_boost", 0.0)
+                base = target.score - accumulated
+                total = accumulated + boost
+                if boost_cap > 0:
+                    total = min(total, boost_cap)
+                target.score = base + total
+                target.score_breakdown["link_boost"] = total
                 if warns(relation):
                     contradictions = target.score_breakdown.setdefault("contradicts_with", [])
                     if source.memory.id not in contradictions:
