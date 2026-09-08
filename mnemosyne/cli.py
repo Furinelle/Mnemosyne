@@ -212,10 +212,10 @@ def build_parser() -> argparse.ArgumentParser:
     distill_parser = subparsers.add_parser("distill", help="Extract memories from a conversation transcript")
     distill_group = distill_parser.add_mutually_exclusive_group(required=True)
     distill_group.add_argument("--transcript", type=Path,
-        help="Path to a transcript (claude-jsonl, role-jsonl, or plain text)")
+        help="Path to a transcript (Claude/Codex/Grok JSONL, role JSONL, or plain text)")
     distill_group.add_argument("--stdin", action="store_true", help="Read plain transcript text from stdin")
     distill_parser.add_argument("--format", dest="fmt",
-        choices=["auto", "claude-jsonl", "role-jsonl", "text"], default="auto",
+        choices=["auto", "claude-jsonl", "codex-jsonl", "grok-jsonl", "role-jsonl", "text"], default="auto",
         help="transcript format (default: auto-detect)")
     distill_parser.add_argument("--source", default="agent")
     distill_parser.add_argument("--commit", action="store_true", help="Persist findings (default: dry-run)")

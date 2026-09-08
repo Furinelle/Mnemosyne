@@ -104,6 +104,60 @@ def test_stop_hook_distills_when_enabled(tmp_path, monkeypatch, capsys):
     assert any(m.type == "preference" for _, m in saved)
 
 
+def test_stop_hook_distills_grok_transcript_with_grok_source(tmp_path, monkeypatch):
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    store = project_store()
+    ensure_store(store)
+    store.config_path.write_text(
+        store.config_path.read_text(encoding="utf-8").replace(
+            "enabled = false\nengine", "enabled = true\nengine"
+        ),
+        encoding="utf-8",
+    )
+    transcript = tmp_path / "chat_history.jsonl"
+    transcript.write_text("\n".join([
+        json.dumps({"type": "system", "content": "instructions"}),
+        json.dumps({
+            "type": "user",
+            "content": [{"type": "text", "text": "不要用 print 调试，改用 logging"}],
+        }),
+        json.dumps({"type": "assistant", "content": "知道了"}),
+    ]), encoding="utf-8")
+    event = {"transcript_path": str(transcript), "stop_hook_active": False}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(event)))
+
+    stop.main()
+
+    saved = load_memories(store)
+    assert len(saved) == 1
+    assert saved[0][1].source == "grok-build"
+
+
+def test_stop_hook_does_not_surface_core_candidates(tmp_path, monkeypatch, capsys):
+    from mnemosyne.schema import Memory
+    from mnemosyne.store import working_path, write_memory
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    store = project_store()
+    ensure_store(store)
+    memory = Memory(
+        id="frequent-memory",
+        type="codebase",
+        strength=100,
+        access_count=10,
+        injection_summary="Frequently recalled project detail",
+        body="## Frequently recalled project detail",
+    )
+    write_memory(working_path(store, memory), memory)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+
+    stop.main()
+
+    assert capsys.readouterr().out == ""
+
+
 def test_processed_turns_roundtrip(tmp_path, monkeypatch):
     from mnemosyne import distill
 

@@ -202,13 +202,19 @@ def handle_request(request: dict) -> dict | None:
         return _error(request_id, -32602, f"Invalid tool arguments: {exc}")
     except Exception as exc:
         return _error(request_id, -32603, f"Internal error: {exc}")
-    return _result(
-        request_id,
-        {
-            "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}],
-            "structuredContent": payload,
-        },
-    )
+    # Strict MCP clients require structuredContent to be an object/record.
+    # Keep the legacy JSON-encoded text content for every payload shape.
+    text = json.dumps(payload, ensure_ascii=False)
+    if isinstance(payload, dict):
+        structured_content = payload
+    elif isinstance(payload, list):
+        structured_content = {"items": payload}
+    else:
+        structured_content = {"text": payload}
+    return _result(request_id, {
+        "content": [{"type": "text", "text": text}],
+        "structuredContent": structured_content,
+    })
 
 
 def serve_sse(host: str, port: int) -> int:

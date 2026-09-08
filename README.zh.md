@@ -101,6 +101,8 @@ Mermaid、ASCII 或 JSON；自定义关系默认拒绝，需要显式加 `--allo
 ### 跨 agent 自动记忆形成（distill）
 
 `distill` 可以从会话 transcript 里抽取值得长期保留的记忆，默认关闭（opt-in）。
+内置支持 Claude Code JSONL、Codex rollout JSONL、Grok Build chat history
+JSONL、中立 role JSONL 和纯文本，默认自动识别格式。
 启用方式是把项目 `config.toml` 里的 `[distill].enabled` 设为 `true`，并选择引擎：
 `heuristic`（默认，纯 stdlib 启发式，无额外依赖）、`llm`（调用 `[distill.llm]`
 配置的 API）或 `host`（解析 agent 输出里的 `**新发现:**` 块）。写入前会先做
@@ -232,7 +234,7 @@ cat mnemosyne/templates/settings.json
 | 会话开始 | `SessionStart` | 注入 global + project core memory，后台维护记忆，并按需自动创建 `.mnemosyne/`。 |
 | 用户提交 prompt | `UserPromptSubmit` | 根据 prompt 搜索相关记忆并注入上下文。 |
 | Edit / Write 前 | `PreToolUse` | 根据目标文件名搜索相关记忆并注入。 |
-| 会话结束 | `Stop` | dry-run 维护，提示可晋升到 core memory 的候选；若 `[distill].enabled = true`，自动从 transcript 蒸馏并写入记忆。 |
+| 会话结束 | `Stop` | 若 `[distill].enabled = true`，自动从 transcript 增量蒸馏并写入记忆。core 候选仅由手动 `maintain --dry-run` 查看。 |
 
 再把 `mnemosyne/templates/CLAUDE.md` 的规则加入你的 `~/.claude/CLAUDE.md`，Claude Code 就会在
 遇到踩坑、架构决策、用户偏好、代码库知识或交接信息时主动写入记忆。

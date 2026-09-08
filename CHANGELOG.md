@@ -2,6 +2,21 @@
 
 本文件记录 Mnemosyne 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循语义化版本。
 
+## [Unreleased]
+
+### 新增 (Added)
+
+- transcript 注册表新增 Codex rollout JSONL 与 Grok Build chat history JSONL 的解析和自动检测；共享 Stop hook 会按格式标记正确的 `codex` / `grok-build` 来源。
+
+### 变更 (Changed)
+
+- Codex `AGENTS.md` 模板改为按需显式读取记忆，不再错误承诺宿主一定预注入上下文或自动写入 findings。
+
+### 修复 (Fixed)
+
+- Stop hook 不再每轮遍历并输出全部 core promotion candidates；候选仍可通过 `maintain --dry-run` 按需查看，自动蒸馏保持不变。
+- MCP 工具对非对象结果提供对象形态的 `structuredContent`，同时保留所有结果原有的 JSON 编码 text content，兼容严格客户端与旧消费者。
+
 ## [0.7.0] - 2026-07-26
 
 定位调整：从「Claude Code/Codex/Hermes 专用记忆桥」转为「本地优先、agent 无关的通用记忆内核 + 平级适配器」。存储格式与目录布局不变；所有旧命令、模块路径与 MCP 工具名保留 alias/shim。

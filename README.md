@@ -117,8 +117,9 @@ another agent is a thin mapping layer; see [docs/adapters.md](docs/adapters.md).
 - **Temporal validity**: superseded memories are marked invalid but kept;
   default retrieval filters them, `--include-superseded` looks back.
 - **Auto memory formation**: opt-in `distill` extracts durable memories from
-  transcripts (`claude-jsonl`, neutral `role-jsonl`, plain text) with dedup
-  and supersede handling before every write.
+  transcripts (`claude-jsonl`, `codex-jsonl`, `grok-jsonl`, neutral
+  `role-jsonl`, plain text) with dedup and supersede handling before every
+  write.
 - **Reproducible evaluation**: `eval run` reports recall/MRR on a fixed
   corpus; `eval convert longmemeval` + `eval run --longmemeval` benchmark
   against LongMemEval; CI enforces a recall@5 regression gate.

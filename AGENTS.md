@@ -1,34 +1,5 @@
-# Agent Coordination via Mnemosyne
+# Mnemosyne project context
 
-When you receive a task, the prompt prefix already includes:
-1. Global and project core memory
-2. Relevant prior memories matched against your task keywords
+Use current source and tests as the authority. Do not assume a prompt prefix has already loaded memory: if relevant history is missing, run `python3 -m mnemosyne read --scope all` and a focused `python3 -m mnemosyne search "<keywords>" --format json --limit 5`.
 
-If you need more context during the task:
-
-    python3 -m mnemosyne search "<keywords>" --format json --limit 3
-
-## When you finish - report new findings
-
-If you discovered something worth persisting, append a block in this exact format
-at the END of your reply (multiple blocks allowed; skip if there is nothing):
-
-**新发现:**
-- type: pitfall|arch_decision|codebase|handoff
-- importance: 50-90
-- title: <=80 chars
-- tags: tag1, tag2
-- content: |
-    multi-line content here
-    keep 4-space indent under "content: |"
-
-Claude Code will automatically ingest these via:
-
-    python3 -m mnemosyne codex-ingest --source codex --commit
-
-## Do NOT report
-
-- One-off task results
-- Speculative or unverified content
-- Anything already in core memory
-- Restatements of the task itself
+Follow the active host's memory-write policy. Save only verified, reusable findings after checking for duplicates; exclude secrets, speculation, one-off task results, and restatements of the request. A findings block is saved only if a consumer actually runs `codex-ingest --commit`.

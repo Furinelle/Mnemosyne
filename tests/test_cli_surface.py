@@ -42,7 +42,8 @@ def test_init_agent_codex_writes_codex_protocol(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert main(["init", "--agent", "codex"]) == 0
     text = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
-    assert "Agent Coordination via Mnemosyne" in text
+    assert "python3 -m mnemosyne read --scope all" in text
+    assert "codex-ingest --source codex --commit" in text
 
 
 def test_write_source_normalized(tmp_store, capsys):

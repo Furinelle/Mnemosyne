@@ -1,42 +1,24 @@
-# Agent Coordination via Mnemosyne
+# Mnemosyne for Codex
 
-When you receive a task, the prompt prefix already includes:
-1. Global and project core memory
-2. Relevant prior memories matched against your task keywords
+For work that depends on project history, load missing context from the current project directory:
 
-If you need more context during the task:
+```bash
+python3 -m mnemosyne read --scope all
+python3 -m mnemosyne search "<task keywords>" --format json --limit 5
+```
 
-    python3 -m mnemosyne search "<keywords>" --format json --limit 3
+Skip this when relevant memory is already included or the question is self-contained. Verify time-sensitive facts against current state.
 
-## When you finish - report new findings
+Follow the host's memory-write policy. Report only verified, reusable findings after checking for duplicates; omit secrets, speculation and one-off task results. When the handoff consumer is configured to ingest findings, use:
 
-If you discovered something worth persisting, append a block in this exact format
-at the END of your reply (multiple blocks allowed; skip if there is nothing):
-
+```text
 **新发现:**
 - type: pitfall|arch_decision|codebase|handoff
 - importance: 50-90
 - title: <=80 chars
 - tags: tag1, tag2
 - content: |
-    multi-line content here
-    keep 4-space indent under "content: |"
+    Verified finding, indented four spaces.
+```
 
-Claude Code will automatically ingest these via:
-
-    python3 -m mnemosyne codex-ingest --source codex --commit
-
-## Do NOT report
-
-- One-off task results
-- Speculative or unverified content
-- Anything already in core memory
-- Restatements of the task itself
-
-## Auto-distill
-
-For Codex, emitting the `**新发现:**` block above and running
-`python3 -m mnemosyne codex-ingest --commit` is the Codex-side auto-distill path.
-Hermes does this natively after `install-hermes`: its MemoryProvider's
-`on_session_end()` hook auto-distills the finished conversation when
-`[distill].enabled = true` in the shared Mnemosyne config — no manual block needed.
+A consumer must run `python3 -m mnemosyne codex-ingest --source codex --commit` to save these blocks. Do not claim automatic memory injection or successful ingestion without evidence.

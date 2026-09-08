@@ -1,8 +1,10 @@
 """Transcript parser registry: turn any agent's session log into Turns.
 
-Three first-class formats:
+Four first-class formats:
 
 - ``claude-jsonl``: Claude Code session JSONL ({"message": {"role", "content"}})
+- ``codex-jsonl``: Codex rollout JSONL (``response_item`` message records)
+- ``grok-jsonl``: Grok Build chat history JSONL (top-level ``type`` + ``content``)
 - ``role-jsonl``:   neutral one-object-per-line format ({"role", "text"}) —
                     preprocess any agent's transcript into this to get the
                     full distill pipeline
@@ -31,7 +33,7 @@ def _block_text(content: object) -> str:
     if isinstance(content, list):
         parts: list[str] = []
         for block in content:
-            if isinstance(block, dict) and block.get("type") == "text":
+            if isinstance(block, dict) and block.get("type") in {"text", "input_text", "output_text"}:
                 parts.append(str(block.get("text", "")))
         return "\n".join(p for p in parts if p).strip()
     return ""
@@ -56,6 +58,47 @@ def parse_claude_jsonl(raw: str) -> list[Turn]:
         text = _block_text(message.get("content"))
         if text:
             turns.append(Turn(role=role, text=text))
+    return turns
+
+
+def parse_codex_jsonl(raw: str) -> list[Turn]:
+    """Parse Codex rollout JSONL message records into turns."""
+    turns: list[Turn] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("type") != "response_item":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict) or payload.get("type") != "message":
+            continue
+        role = payload.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        text = _block_text(payload.get("content"))
+        if text:
+            turns.append(Turn(role=role, text=text))
+    return turns
+
+
+def parse_grok_jsonl(raw: str) -> list[Turn]:
+    """Parse Grok Build chat_history.jsonl user and assistant records."""
+    turns: list[Turn] = []
+    for line in raw.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("type") not in ("user", "assistant"):
+            continue
+        text = _block_text(record.get("content"))
+        if text:
+            turns.append(Turn(role=str(record["type"]), text=text))
     return turns
 
 
@@ -122,6 +165,8 @@ def parse_text(raw: str) -> list[Turn]:
 
 PARSERS = {
     "claude-jsonl": parse_claude_jsonl,
+    "codex-jsonl": parse_codex_jsonl,
+    "grok-jsonl": parse_grok_jsonl,
     "role-jsonl": parse_role_jsonl,
     "text": parse_text,
 }
@@ -140,6 +185,15 @@ def detect_format(sample: str) -> str:
             return "text"
         if isinstance(record.get("message"), dict):
             return "claude-jsonl"
+        payload = record.get("payload")
+        if (
+            record.get("type") == "response_item"
+            and isinstance(payload, dict)
+            and payload.get("type") == "message"
+        ):
+            return "codex-jsonl"
+        if record.get("type") in ("user", "assistant") and "content" in record:
+            return "grok-jsonl"
         if "role" in record and "text" in record:
             return "role-jsonl"
         # JSON housekeeping record (summary / queue-operation / snapshot …):

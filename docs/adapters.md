@@ -21,7 +21,7 @@ as JSON on stdin (CLI).
 | `session_start` | a session opens | `{}` | core memory block (`## Mnemosyne Memory` + global/project core) |
 | `turn_start` | the user submits a prompt | `{"prompt": str}` | ≤3 relevant memories, one line each |
 | `file_touch` | the agent is about to modify files | `{"files": [str, ...]}` | ≤2 memories per file basename |
-| `session_end` | the session closes | `{"text": str}` or `{"transcript": {"path": str, "format": "auto\|claude-jsonl\|role-jsonl\|text"}, "source": str}` | auto-distill summary (requires `[distill].enabled = true`) |
+| `session_end` | the session closes | `{"text": str}` or `{"transcript": {"path": str, "format": "auto\|claude-jsonl\|codex-jsonl\|grok-jsonl\|role-jsonl\|text"}, "source": str}` | auto-distill summary (requires `[distill].enabled = true`) |
 
 `InjectionResult` / JSON output: `{"context": str, "memory_ids": [str],
 "approx_tokens": int}`. Empty `context` means "inject nothing".

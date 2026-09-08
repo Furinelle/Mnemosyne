@@ -22,6 +22,50 @@ def test_claude_jsonl(tmp_path):
     assert turns == [Turn(role="user", text="hello there")]
 
 
+def test_codex_jsonl(tmp_path):
+    p = tmp_path / "codex.jsonl"
+    p.write_text("\n".join([
+        json.dumps({"type": "session_meta", "payload": {"id": "s"}}),
+        json.dumps({
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": "请记住这个修复"}],
+            },
+        }),
+        json.dumps({
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "已记录"}],
+            },
+        }),
+    ]), encoding="utf-8")
+    assert parse_transcript(p) == [
+        Turn(role="user", text="请记住这个修复"),
+        Turn(role="assistant", text="已记录"),
+    ]
+
+
+def test_grok_jsonl(tmp_path):
+    p = tmp_path / "grok.jsonl"
+    p.write_text("\n".join([
+        json.dumps({"type": "system", "content": "instructions"}),
+        json.dumps({
+            "type": "user",
+            "content": [{"type": "text", "text": "请记住这个修复"}],
+        }),
+        json.dumps({"type": "assistant", "content": "已记录", "tool_calls": []}),
+        json.dumps({"type": "tool_result", "content": "ignored"}),
+    ]), encoding="utf-8")
+    assert parse_transcript(p) == [
+        Turn(role="user", text="请记住这个修复"),
+        Turn(role="assistant", text="已记录"),
+    ]
+
+
 def test_plain_text(tmp_path):
     p = tmp_path / "t.txt"
     p.write_text("[user] hello\n[assistant] hi there", encoding="utf-8")
@@ -32,6 +76,22 @@ def test_plain_text(tmp_path):
 def test_detect_claude_jsonl():
     line = json.dumps({"message": {"role": "user", "content": "hi"}})
     assert detect_format(line) == "claude-jsonl"
+
+
+def test_detect_codex_jsonl():
+    line = json.dumps({
+        "type": "response_item",
+        "payload": {"type": "message", "role": "user", "content": []},
+    })
+    assert detect_format(line) == "codex-jsonl"
+
+
+def test_detect_grok_jsonl_after_system_record():
+    raw = "\n".join([
+        json.dumps({"type": "system", "content": "instructions"}),
+        json.dumps({"type": "user", "content": [{"type": "text", "text": "hi"}]}),
+    ])
+    assert detect_format(raw) == "grok-jsonl"
 
 
 def test_detect_role_jsonl():

@@ -65,6 +65,32 @@ class MCPServerTests(unittest.TestCase):
 
             self.assertEqual(["mcp-search"], [item["id"] for item in _result_payload(response)])
 
+    def test_non_object_results_keep_json_text_and_object_structured_content(self) -> None:
+        from mnemosyne.mcp.server import handle_request
+
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            memory = Memory(id="mcp-shape", type="codebase", body="shape contract")
+            write_memory(working_path(store, memory), memory)
+
+            def call(name: str, arguments: dict, request_id: int) -> dict:
+                return handle_request({
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                })
+
+            shown = call("mnemosyne_show", {"id": "mcp-shape"}, 21)
+            shown_payload = _result_payload(shown)
+            self.assertIn("id: mcp-shape", shown_payload)
+            self.assertEqual({"text": shown_payload}, shown["result"]["structuredContent"])
+
+            searched = call("mnemosyne_search", {"query": "shape contract"}, 22)
+            searched_payload = _result_payload(searched)
+            self.assertEqual({"items": searched_payload}, searched["result"]["structuredContent"])
+
     def test_write_tool_can_be_searched(self) -> None:
         from mnemosyne.mcp.server import handle_request
 
