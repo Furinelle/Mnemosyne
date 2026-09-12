@@ -67,6 +67,28 @@ class SearchV2Tests(unittest.TestCase):
 
             self.assertEqual(["hook-target"], [item["id"] for item in results])
 
+    def test_hook_fallback_omits_superseded_and_expired_before_limit(self) -> None:
+        with isolated_workspace():
+            store = project_store()
+            ensure_store(store)
+            store.config_path.write_text("[search]\nindex_enabled = false\n", encoding="utf-8")
+            for memory_id in ("a-superseded", "b-expired", "current"):
+                memory = _memory(memory_id, "server address")
+                if memory_id == "a-superseded":
+                    memory.status = "superseded"
+                elif memory_id == "b-expired":
+                    memory.expires = "2000-01-01"
+                else:
+                    memory.source = "codex"
+                    memory.created = "2026-09-12"
+                write_memory(working_path(store, memory), memory)
+
+            results = run_search("server address", stores=[store], limit=1)
+
+            self.assertEqual(["current"], [item["id"] for item in results])
+            self.assertEqual("codex", results[0]["source"])
+            self.assertEqual("2026-09-12", results[0]["created"])
+
 
 if __name__ == "__main__":
     unittest.main()

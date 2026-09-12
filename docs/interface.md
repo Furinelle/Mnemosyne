@@ -65,6 +65,13 @@ Array of objects:
 | `id` | str | memory id |
 | `scope` | str | `global` or `project` |
 | `type` | str | memory type |
+| `source` | str | recording agent, optionally with a profile |
+| `created` | str | recorded ISO date; not the date the fact was last verified |
+| `status` | str | stored lifecycle status |
+| `expires` | str | inclusive ISO expiry date, or a human-readable note |
+| `expired` | bool | whether an ISO expiry date is before today |
+| `evidence` | str | optional source reference or short supporting excerpt |
+| `invalidated_by` | str | replacement memory ID, if superseded |
 | `score` | float | fused relevance score |
 | `strength` | int | current lifecycle strength |
 | `tags` | [str] | tags |
@@ -73,6 +80,19 @@ Array of objects:
 | `path` | str | absolute file path |
 | `why_matched` | str | human-readable match explanation |
 | `score_breakdown` | object | per-lane scores (bm25 / vector / rrf …) |
+
+These fields are shared by Python, CLI and MCP search. Normal retrieval
+excludes expired and superseded memories before candidate limits.
+`--archive` / MCP `include_archive` also allows expired history;
+`--include-superseded` / MCP `include_superseded` allows replaced history.
+Expiry dates remain valid through that date. A non-date expiry note requires
+human interpretation. Retrieval does not delete or rewrite expired records.
+
+`write --evidence` (Python/MCP `evidence`) stores up to 200 characters in the
+existing flat frontmatter field. Use a secret-free file/line, report or source
+reference. Existing findings evidence remains compatible. Evidence is caller
+supplied, not automatically verified; a duplicate write keeps the existing
+record. A stored date or high strength is never proof of current service state.
 
 ## `inject --format json` output
 

@@ -4,16 +4,26 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-12
+
 ### 新增 (Added)
 
-- transcript 注册表新增 Codex rollout JSONL 与 Grok Build chat history JSONL 的解析和自动检测；共享 Stop hook 会按格式标记正确的 `codex` / `grok-build` 来源。
+- CLI / Python / MCP 写入支持简短 `evidence` 来源引用；搜索统一返回 `source`、`created`、`status`、`expires`、`expired`、`evidence`、`invalidated_by`。MCP 暴露 `expires` 和 `include_superseded` 参数，搜索保持只读。
+- transcript 注册表新增 Codex rollout JSONL 与 Grok Build chat history JSONL 的解析和自动检测；共享 Stop hook 按格式标记 `codex` / `grok-build` 来源。
+- 与 Mem0、Letta/MemFS、Graphiti、Basic Memory、claude-mem 的官方项目对比及取舍说明，见 `docs/comparison-2026-09.md`。
 
 ### 变更 (Changed)
 
-- Codex `AGENTS.md` 模板改为按需显式读取记忆，不再错误承诺宿主一定预注入上下文或自动写入 findings。
+- Codex `AGENTS.md` 模板改为按需显式读取记忆，不再承诺宿主一定预注入上下文或自动写入 findings。
+- SQLite 派生索引升级至 v4 并自动回填过期元数据，保留 embedding 和原始 Markdown 文件。
 
 ### 修复 (Fixed)
 
+- 中文关键词提取不再让开头的 bigram 耗尽全部名额，保留后面的项目名和技术词。
+- 注入预算覆盖中文截断与文件标题，去重和访问加分只记录实际输出的记忆；session 状态读写加锁并在读取时检查过期，避免多代理丢写。
+- 已过 `expires` 日期的记忆在检索时直接过滤，无需等维护；覆盖 FTS、LIKE、BM25、向量与图扩展，默认降级检索也排除被替代记忆。过期记录不再拦截刷新写入，历史记录保留，可显式回看。
+- Codex transcript 排除内部推理与发往工具的消息；蒸馏全链路保留结构化角色，正文中的 `[user]` 不再伪造新用户消息。
+- LLM 蒸馏配置或响应失败时不推进已处理游标，修复配置后可以重试；错误不输出原始响应内容。
 - Stop hook 不再每轮遍历并输出全部 core promotion candidates；候选仍可通过 `maintain --dry-run` 按需查看，自动蒸馏保持不变。
 - MCP 工具对非对象结果提供对象形态的 `structuredContent`，同时保留所有结果原有的 JSON 编码 text content，兼容严格客户端与旧消费者。
 

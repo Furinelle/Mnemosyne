@@ -80,6 +80,11 @@ def parse_codex_jsonl(raw: str) -> list[Turn]:
         role = payload.get("role")
         if role not in ("user", "assistant"):
             continue
+        if role == "assistant" and (
+            payload.get("channel") not in (None, "final", "commentary")
+            or payload.get("recipient") not in (None, "all")
+        ):
+            continue
         text = _block_text(payload.get("content"))
         if text:
             turns.append(Turn(role=role, text=text))

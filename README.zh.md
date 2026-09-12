@@ -51,7 +51,8 @@ MemoryProvider 插件，`mnemosyne install hermes`）。
 | 混合检索 | CJK bigram、可选向量 lane、RRF 融合、关系扩展和可选 reranker。 |
 | MCP 服务 | 通过 stdio 或可选 SSE 向 Cursor、Cline、Continue、Windsurf 等客户端暴露记忆工具。 |
 | 关系图谱 | typed links、关系权重扩展，以及 Mermaid、ASCII、JSON 三种 graph 输出。 |
-| 生命周期管理 | 记忆会按强度衰减、归档、召回，过期（`expires`）记忆自动归档，并提示可晋升到 core memory 的候选。 |
+| 生命周期管理 | 记忆会按强度衰减、归档、召回；检索直接排除过期（`expires`）记录，维护时归档，手动维护可查看 core 候选。 |
+| 来源与时效 | 搜索返回来源、记录日期、有效状态和证据；`write --evidence` 保存简短来源引用。记录日期不等于最近验证日期。 |
 | 通用注入事件 | `mnemosyne inject` 承载 session_start / turn_start / file_touch / session_end 四个中立事件，任何宿主的 hooks 都能映射。 |
 | Claude Code 适配器 | hooks 协议壳映射到通用事件：SessionStart、UserPromptSubmit、PreToolUse、Stop。 |
 | 交接通道 | `prep` / `ingest`（旧名 `codex-prep` / `codex-ingest` 保留），findings 块有 Markdown 与 JSON 双格式规范。 |
@@ -619,7 +620,9 @@ python3 -m mnemosyne doctor --scope all
 
 ## 更新日志
 
-详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.7.0 是「通用记忆内核」重构版：稳定 `mnemosyne.api`、中立注入事件（`mnemosyne inject`）、JSON findings 变体、transcript 解析注册表、平级适配器与分目录模板、英文文档主导；存储格式不变，所有旧命令/模块路径/MCP 工具名经 alias 继续可用。0.6.2 是安全与检索修复版本：PreToolUse hook 不再输出 `permissionDecision: allow`（此前会绕过 Edit/Write 的权限确认）；`api_base`/`api_key_env` 等网络配置改为仅信任全局 store，项目内 config.toml 不能再指定外传端点与凭证环境变量；修复中文查询在 FTS 通道恒零命中导致排序退化为按 strength、混合中英查询静默丢弃中文词、链接扩展加分无上限把 hub 记忆顶到第一；`templates/` 移入包内避免污染 site-packages，补 LICENSE 与打包元数据；CI 增加走真实检索管线的 recall 门槛。0.6.1 关闭了并发写回、维护调度与 supersede 事务竞态并统一各入口的去重与作用域边界。
+详见 [CHANGELOG.md](CHANGELOG.md)。当前版本 0.8.0 改善中文关键词保留、注入预算和多代理去重，检索直接排除过期事实并返回来源与记录日期，自动蒸馏保留消息角色边界，失败后可重试。Markdown 格式及旧接口继续兼容。
+
+[GitHub 同类项目对比与本次改进取舍](docs/comparison-2026-09.md)。
 
 ## License
 

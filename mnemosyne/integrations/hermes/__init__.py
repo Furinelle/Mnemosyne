@@ -57,7 +57,7 @@ def _message_text(content: Any) -> str:
 
 
 def _messages_to_text(messages: Optional[List[Dict[str, Any]]]) -> str:
-    """Render OpenAI-style messages as ``[role] text`` lines for distill_text."""
+    """Encode role JSONL without treating message content as role delimiters."""
     lines: List[str] = []
     for message in messages or []:
         role = message.get("role")
@@ -65,8 +65,8 @@ def _messages_to_text(messages: Optional[List[Dict[str, Any]]]) -> str:
             continue
         text = _message_text(message.get("content"))
         if text:
-            lines.append(f"[{role}] {text}")
-    return "\n\n".join(lines)
+            lines.append(json.dumps({"role": role, "text": text}, ensure_ascii=False))
+    return "\n".join(lines)
 
 
 MNEMOSYNE_TOOL: Dict[str, Any] = {
@@ -281,7 +281,7 @@ class MnemosyneMemoryProvider(MemoryProvider):
         text = _messages_to_text(messages)
         if not text.strip():
             return
-        self._run(["distill", "--stdin", "--commit", "--source", self._source],
+        self._run(["distill", "--stdin", "--format", "role-jsonl", "--commit", "--source", self._source],
                    input_text=text)
 
     def shutdown(self) -> None:

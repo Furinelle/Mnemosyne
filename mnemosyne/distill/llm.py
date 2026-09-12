@@ -44,11 +44,11 @@ def _parse_llm_json(payload: str, types: tuple[str, ...] = FALLBACK_TYPES) -> li
     payload = payload.strip()
     start, end = payload.find("["), payload.rfind("]")
     if start == -1 or end == -1:
-        return []
+        raise ValueError("LLM extraction did not return a JSON array")
     try:
         items = json.loads(payload[start : end + 1])
     except json.JSONDecodeError:
-        return []
+        raise ValueError("LLM extraction returned invalid JSON") from None
     findings: list[Finding] = []
     for item in items:
         if not isinstance(item, dict):
@@ -84,16 +84,14 @@ class LLMExtractor:
         return _base_prompt(self._types)
 
     def extract(self, turns) -> list[Finding]:
-        from mnemosyne.distill import turns_to_text
-
         api_key = os.environ.get(self.llm_cfg.get("api_key_env", "OPENAI_API_KEY"), "")
         if not api_key:
-            import sys
-
-            print("mnemosyne: distill.llm enabled but API key missing; skipping", file=sys.stderr)
-            return []
+            raise ValueError("LLM extraction API key is missing")
+        conversation = json.dumps(
+            [{"role": turn.role, "text": turn.text} for turn in turns], ensure_ascii=False
+        )
         payload = self._call_api(
-            _build_prompt(turns_to_text(turns), self.include_session_summary, self._types), api_key
+            _build_prompt(conversation, self.include_session_summary, self._types), api_key
         )
         return _parse_llm_json(payload, self._types)[: self.max_findings]
 

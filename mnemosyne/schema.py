@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 
@@ -22,6 +23,16 @@ FRONTMATTER_ORDER = [
     "status",
     "expires",
 ]
+
+
+def is_date_expiry(value: str) -> bool:
+    """Only ISO date-shaped expiry values are dates; other text is a note."""
+    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", value.strip()))
+
+
+def is_expired(value: str, today: date | None = None) -> bool:
+    """A dated expiry remains valid through that day, including on reads."""
+    return is_date_expiry(value) and value.strip() < (today or date.today()).isoformat()
 
 
 @dataclass

@@ -40,6 +40,7 @@ TOOL_SCHEMAS = [
                 "type": {"type": "string", "default": ""},
                 "scope": {"type": "string", "enum": ["global", "project", "all"], "default": "all"},
                 "include_archive": {"type": "boolean", "default": False},
+                "include_superseded": {"type": "boolean", "default": False},
             },
             "required": ["query"],
         },
@@ -58,6 +59,8 @@ TOOL_SCHEMAS = [
                 "tags": {"type": "string", "default": ""},
                 "scope": {"type": "string", "enum": ["global", "project"], "default": "project"},
                 "source": {"type": "string", "default": "mcp"},
+                "expires": {"type": "string", "default": "", "description": "Inclusive ISO expiry date or a note."},
+                "evidence": {"type": "string", "default": "", "description": "Secret-free source reference (max 200 chars)."},
             },
             "required": ["type", "importance", "content"],
         },
@@ -281,24 +284,10 @@ def _search(arguments: dict) -> list[dict]:
         limit=limit,
         type_filter=str(arguments.get("type", "")),
         include_archive=bool(arguments.get("include_archive", False)),
+        include_superseded=bool(arguments.get("include_superseded", False)),
         config=config,
     )
-    return [
-        {
-            "id": result.memory.id,
-            "scope": result.store.scope,
-            "type": result.memory.type,
-            "score": round(result.score, 4),
-            "strength": result.memory.strength,
-            "tags": result.memory.tags,
-            "links": result.memory.links,
-            "summary": result.memory.injection_summary,
-            "path": str(result.path),
-            "why_matched": result.why_matched,
-            "score_breakdown": result.score_breakdown,
-        }
-        for result in results
-    ]
+    return api.results_to_dicts(results, config, update_access=False)
 
 
 def _write(arguments: dict) -> dict:
@@ -314,6 +303,7 @@ def _write(arguments: dict) -> dict:
         scope=scope,
         source=str(arguments.get("source", "mcp")),
         expires=str(arguments.get("expires", "")),
+        evidence=str(arguments.get("evidence", "")),
     )
     payload = {"status": result.status, "id": result.id}
     if result.superseded:

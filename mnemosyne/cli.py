@@ -90,6 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
     write_parser.add_argument("--title", default="")
     write_parser.add_argument("--content", default="")
     write_parser.add_argument("--expires", default="")
+    write_parser.add_argument("--evidence", default="", help="short, secret-free source reference (max 200 chars)")
     write_parser.add_argument("--force", action="store_true")
     write_parser.add_argument("--allow-duplicate", action="store_true",
         help="skip duplicate detection and write anyway")
@@ -213,7 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
     distill_group = distill_parser.add_mutually_exclusive_group(required=True)
     distill_group.add_argument("--transcript", type=Path,
         help="Path to a transcript (Claude/Codex/Grok JSONL, role JSONL, or plain text)")
-    distill_group.add_argument("--stdin", action="store_true", help="Read plain transcript text from stdin")
+    distill_group.add_argument("--stdin", action="store_true", help="Read transcript text from stdin (honors --format)")
     distill_parser.add_argument("--format", dest="fmt",
         choices=["auto", "claude-jsonl", "codex-jsonl", "grok-jsonl", "role-jsonl", "text"], default="auto",
         help="transcript format (default: auto-detect)")
@@ -334,6 +335,8 @@ def cmd_write(args: argparse.Namespace) -> int:
             body=f"## {title}\n\n{content}",
             expires=args.expires,
         )
+        if args.evidence.strip():
+            probe.extra["evidence"] = args.evidence.strip()[:200]
         duplicate = duplicate_prompt(store, probe)
         if duplicate == "cancel":
             print("Cancelled.")
@@ -355,6 +358,7 @@ def cmd_write(args: argparse.Namespace) -> int:
         scope=args.scope,
         source=_normalize_source(args.source),
         expires=args.expires,
+        evidence=args.evidence,
         allow_duplicate=args.allow_duplicate,
     )
     if result.status == "duplicate":
@@ -853,14 +857,15 @@ def cmd_inject(args: argparse.Namespace) -> int:
 
 
 def cmd_distill(args: argparse.Namespace) -> int:
-    from mnemosyne.distill import distill_text, turns_to_text
+    from mnemosyne.distill import distill_turns
     from mnemosyne.transcripts import parse_transcript
 
-    if args.stdin:
-        text = sys.stdin.read()
-    else:
-        text = turns_to_text(parse_transcript(args.transcript, getattr(args, "fmt", "auto")))
-    actions = distill_text(text, source=_normalize_source(args.source), commit=args.commit)
+    raw = sys.stdin.read() if args.stdin else args.transcript
+    actions = distill_turns(
+        parse_transcript(raw, getattr(args, "fmt", "auto")),
+        source=_normalize_source(args.source),
+        commit=args.commit,
+    )
     if not actions:
         print("No findings extracted.")
         return 0

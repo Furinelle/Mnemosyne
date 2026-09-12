@@ -216,3 +216,45 @@ def test_build_prompt_toggles_session_summary():
     assert "exactly one" in with_summary
     assert "exactly one" not in without_summary
     assert with_summary.endswith("[user] hi")
+
+
+def test_expired_memory_can_be_renewed_without_superseding_history(tmp_path, monkeypatch):
+    from mnemosyne import api
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    fields = dict(type="codebase", importance=70, title="relayprobe endpoint binds port", content="relayprobe binds port 8444")
+    old = api.write_entry(**fields, expires="2020-01-01")
+    api.write_entry(type="codebase", importance=70, title="database maintenance", content="vacuum sqlite monthly")
+    other_type = api.write_entry(**{**fields, "type": "preference"})
+    changed = Finding("codebase", 70, fields["title"], [], "relayprobe binds port 9444")
+    assert classify_against_store(changed) == ("new", None)
+
+    renewed = api.write_entry(**fields, expires="2999-01-01", evidence="synthetic-recheck.md:1")
+
+    assert renewed.status == "created" and renewed.id != old.id
+    assert renewed.superseded is None
+    hits = api.search_entries("relayprobe", type_filter="codebase", update_access=False)
+    assert [item["id"] for item in hits] == [renewed.id]
+    assert hits[0]["expires"] == "2999-01-01"
+    assert hits[0]["evidence"] == "synthetic-recheck.md:1"
+    history = api.search_entries("relayprobe", type_filter="codebase", include_archive=True, update_access=False)
+    assert {item["id"] for item in history} == {old.id, renewed.id}
+    assert all(item["status"] == "active" for item in history)
+    assert api.search_entries("relayprobe", type_filter="preference", update_access=False)[0]["id"] == other_type.id
+
+
+def test_memory_expiring_today_still_deduplicates(tmp_path, monkeypatch):
+    from datetime import date
+
+    from mnemosyne import api
+
+    monkeypatch.setenv("MNEMOSYNE_HOME", str(tmp_path / "global"))
+    monkeypatch.chdir(tmp_path)
+    fields = dict(type="codebase", importance=70, title="relayprobe endpoint", content="relayprobe binds port 8444")
+    today = api.write_entry(**fields, expires=date.today().isoformat())
+
+    duplicate = api.write_entry(**fields)
+
+    assert duplicate.status == "duplicate" and duplicate.id == today.id
+    assert len(api.search_entries("relayprobe", update_access=False)) == 1

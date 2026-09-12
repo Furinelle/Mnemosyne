@@ -25,7 +25,7 @@ from mnemosyne.index import (
 from mnemosyne.findings import Finding
 from mnemosyne.lifecycle import MaintainSummary, maintain_memory
 from mnemosyne.relations import PREDEFINED, is_demoting, reverse
-from mnemosyne.schema import Memory
+from mnemosyne.schema import Memory, is_expired
 from mnemosyne.store import (
     Store,
     bump_memory_access,
@@ -133,6 +133,7 @@ def write_entry(
     scope: str = "project",
     source: str = "agent",
     expires: str = "",
+    evidence: str = "",
     allow_duplicate: bool = False,
 ) -> WriteResult:
     """Classify-and-write one memory as a single locked transaction."""
@@ -164,6 +165,8 @@ def write_entry(
         body=f"## {title}\n\n{content}",
         expires=expires,
     )
+    if evidence.strip():
+        memory.extra["evidence"] = evidence.strip()[:200]
 
     from mnemosyne.distill import _apply_supersedes, classify_against_store
 
@@ -218,6 +221,13 @@ def results_to_dicts(indexed_results, config: dict, *, update_access: bool = Tru
                 "id": memory.id,
                 "scope": result.store.scope,
                 "type": memory.type,
+                "source": memory.source,
+                "created": memory.created,
+                "status": memory.status,
+                "expires": memory.expires,
+                "expired": is_expired(memory.expires),
+                "evidence": memory.extra.get("evidence", ""),
+                "invalidated_by": memory.extra.get("invalidated_by", ""),
                 "score": round(result.score, 4),
                 "strength": memory.strength,
                 "tags": memory.tags,

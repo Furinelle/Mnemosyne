@@ -15,14 +15,14 @@ from typing import Iterable
 import portalocker
 
 from mnemosyne.embedding.base import call_with_timeout
-from mnemosyne.schema import Memory, parse_memory
+from mnemosyne.schema import Memory, is_expired, parse_memory
 from mnemosyne.search import memory_search_text, tokenize
 from mnemosyne.store import Store, iter_memory_paths, load_config, load_memories
 from mnemosyne.tokenizer import script_runs
 
 
 INDEX_FILENAME = "index.sqlite"
-INDEX_VERSION = 3
+INDEX_VERSION = 4
 
 
 def _connect(path: Path) -> sqlite3.Connection:
@@ -34,6 +34,7 @@ def _connect(path: Path) -> sqlite3.Connection:
     wait briefly instead of immediately raising 'database is locked'.
     """
     connection = sqlite3.connect(str(path), timeout=5.0)
+    connection.create_function("is_expired", 1, is_expired)
     connection.execute("PRAGMA busy_timeout=5000")
     if str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "wal":
         deadline = time.monotonic() + 5.0
@@ -115,6 +116,7 @@ def ensure_index(store: Store) -> None:
                     path TEXT NOT NULL,
                     type TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'active',
+                    expires TEXT NOT NULL DEFAULT '',
                     archived INTEGER NOT NULL,
                     strength INTEGER NOT NULL,
                     tags TEXT NOT NULL,
@@ -131,6 +133,7 @@ def ensure_index(store: Store) -> None:
             migrations = {
                 "mtime": "REAL NOT NULL DEFAULT 0",
                 "status": "TEXT NOT NULL DEFAULT 'active'",
+                "expires": "TEXT NOT NULL DEFAULT ''",
                 "embedding": "BLOB",
                 "embedding_model": "TEXT NOT NULL DEFAULT ''",
                 "embedding_dim": "INTEGER NOT NULL DEFAULT 0",
@@ -139,8 +142,8 @@ def ensure_index(store: Store) -> None:
             for column, definition in migrations.items():
                 if column not in columns:
                     connection.execute(f"ALTER TABLE memories_meta ADD COLUMN {column} {definition}")
-                    if column == "status":
-                        _backfill_status(connection)
+            if "status" not in columns or "expires" not in columns:
+                _backfill_lifecycle(connection)
             _ensure_fts_table(connection)
             connection.execute(f"PRAGMA user_version={INDEX_VERSION}")
             connection.commit()
@@ -159,8 +162,8 @@ def reindex_store(store: Store, include_archive: bool = True) -> int:
     return count
 
 
-def _backfill_status(connection: sqlite3.Connection) -> None:
-    """Populate lifecycle status when migrating a pre-v3 metadata table."""
+def _backfill_lifecycle(connection: sqlite3.Connection) -> None:
+    """Populate read-time lifecycle filters without rewriting memory files."""
     rows = connection.execute("SELECT document_id, path FROM memories_meta").fetchall()
     for document_id, path_text in rows:
         try:
@@ -168,8 +171,8 @@ def _backfill_status(connection: sqlite3.Connection) -> None:
         except (OSError, ValueError):
             continue
         connection.execute(
-            "UPDATE memories_meta SET status = ? WHERE document_id = ?",
-            (memory.status, document_id),
+            "UPDATE memories_meta SET status = ?, expires = ? WHERE document_id = ?",
+            (memory.status, memory.expires, document_id),
         )
 
 
@@ -313,6 +316,8 @@ def search_index(
                 memory = parse_memory(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
+            if not include_archive and is_expired(memory.expires):
+                continue
             results.append(
                 IndexedSearchResult(
                     store=store,
@@ -343,14 +348,15 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
     connection.execute(
         """
         INSERT INTO memories_meta (
-            document_id, scope, memory_id, path, type, status, archived, strength, tags, summary, mtime
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            document_id, scope, memory_id, path, type, status, expires, archived, strength, tags, summary, mtime
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(document_id) DO UPDATE SET
             scope=excluded.scope,
             memory_id=excluded.memory_id,
             path=excluded.path,
             type=excluded.type,
             status=excluded.status,
+            expires=excluded.expires,
             archived=excluded.archived,
             strength=excluded.strength,
             tags=excluded.tags,
@@ -364,6 +370,7 @@ def index_memory(connection: sqlite3.Connection, store: Store, path: Path, memor
             str(path),
             memory.type,
             memory.status,
+            memory.expires,
             archived,
             int(memory.strength),
             tags,
@@ -429,6 +436,7 @@ def _search_rows(
         params.append(memory_type)
     if not include_archive:
         filters.append("m.archived = 0")
+        filters.append("NOT is_expired(m.expires)")
     if not include_superseded:
         filters.append("m.status != 'superseded'")
     params.append(limit)
@@ -483,6 +491,7 @@ def _search_rows_like(
         params.append(memory_type)
     if not include_archive:
         filters.append("m.archived = 0")
+        filters.append("NOT is_expired(m.expires)")
     if not include_superseded:
         filters.append("m.status != 'superseded'")
     params.append(limit)
@@ -617,6 +626,8 @@ def iter_embeddings(
             try:
                 memory = parse_memory(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
+                continue
+            if not include_archive and is_expired(memory.expires):
                 continue
             yield IndexedEmbedding(
                 store=store,

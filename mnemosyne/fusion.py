@@ -17,7 +17,7 @@ from mnemosyne.index import (
 )
 from mnemosyne.relations import is_demoting, warns, weight
 from mnemosyne.rerank import get_reranker
-from mnemosyne.schema import Memory
+from mnemosyne.schema import Memory, is_expired
 from mnemosyne.search import BM25, SearchDocument, memory_search_text
 from mnemosyne.store import Store, find_memory, load_config, load_memories
 
@@ -104,13 +104,14 @@ def search(
             candidates[document_id].score = score
 
     if fusion_config.get("link_expansion", True):
-        candidates = expand_links(candidates, stores, fusion_config)
+        candidates = expand_links(candidates, stores, fusion_config, include_archive=include_archive)
 
     results = [
         result
         for result in candidates.values()
         if (not type_filter or result.memory.type == type_filter)
         and (include_archive or result.store.archive_dir not in result.path.parents)
+        and (include_archive or not is_expired(result.memory.expires))
         and (include_superseded or result.memory.status != "superseded")
     ]
     results = _sorted_results(results)
@@ -124,6 +125,7 @@ def expand_links(
     candidates: dict[str, FusionSearchResult],
     stores: list[Store],
     fusion_config: dict,
+    include_archive: bool = False,
 ) -> dict[str, FusionSearchResult]:
     if not fusion_config.get("link_expansion", True):
         return candidates
@@ -165,6 +167,8 @@ def expand_links(
                 if found is None:
                     continue
                 target_store, target_path, target_memory = found
+                if not include_archive and is_expired(target_memory.expires):
+                    continue
                 document_id = f"{target_store.scope}:{target_memory.id}"
                 # `supersedes` points at the stale memory and `contradicts` at a
                 # conflicting one; neither deserves a positive boost. A
@@ -238,6 +242,8 @@ def _bm25_lane(
     lookup: dict[str, tuple[Store, Path, Memory]] = {}
     for store in stores:
         for path, memory in load_memories(store, include_archive=include_archive):
+            if not include_archive and is_expired(memory.expires):
+                continue
             if type_filter and memory.type != type_filter:
                 continue
             if not include_superseded and memory.status == "superseded":

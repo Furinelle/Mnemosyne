@@ -1,7 +1,7 @@
 [project]
 name = 'mnemosyne'
 dynamic = ['version']
-description = 'Portable dual-agent memory system for LLM agents'
+description = 'Local-first, agent-agnostic memory kernel for LLM agents'
 readme = 'README.md'
 requires-python = '>=3.11'
 license = 'MIT'

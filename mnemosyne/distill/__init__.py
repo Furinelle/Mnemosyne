@@ -14,6 +14,7 @@ from mnemosyne.transcripts import (  # noqa: F401  (re-exported for backward com
     parse_transcript,
 )
 from mnemosyne.search import tokenize
+from mnemosyne.schema import is_expired
 from mnemosyne.store import (
     Store,
     find_memory,
@@ -29,6 +30,7 @@ from mnemosyne.store import (
 
 DISTILL_STATE_FILENAME = ".distill_state.json"
 DISTILL_STATE_TTL_HOURS = 168  # transcripts can span days; prune after a week
+DISTILL_STATE_VERSION = 2  # Codex cursors now count only user-visible messages.
 
 
 def _distill_state_path() -> Path:
@@ -47,6 +49,8 @@ def load_processed_turns(transcript_key: str) -> int:
     except (OSError, ValueError):
         return 0
     entry = data.get("transcripts", {}).get(transcript_key, {})
+    if entry.get("version") != DISTILL_STATE_VERSION:
+        return 0
     try:
         return max(0, int(entry.get("turns", 0)))
     except (TypeError, ValueError):
@@ -79,7 +83,9 @@ def record_processed_turns(transcript_key: str, count: int) -> None:
             stamp = None
         if stamp is None or stamp < cutoff:
             del transcripts[key]
-    transcripts[transcript_key] = {"ts": now.isoformat(), "turns": max(0, int(count))}
+    transcripts[transcript_key] = {
+        "ts": now.isoformat(), "turns": max(0, int(count)), "version": DISTILL_STATE_VERSION,
+    }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
@@ -125,7 +131,7 @@ def classify_against_store(
     supersede_target: str | None = None
     supersede_score = 0.0
     for _path, memory in load_memories(destination, include_archive=False):
-        if memory.type != finding.type or memory.status == "superseded":
+        if memory.type != finding.type or memory.status == "superseded" or is_expired(memory.expires):
             continue
         # Compare against the full stored body, not the truncated summary.
         # summarize() caps at ~220 chars, so long findings lost their tail
@@ -216,6 +222,23 @@ def distill_text(text: str, *, source: str = "claude-code", commit: bool = False
     """Extract findings from conversation text, dedup, and (optionally) persist."""
     config = load_config()
     findings = _findings_from_text(text, config)
+    return _process_findings(findings, config, source=source, commit=commit)
+
+
+def distill_turns(turns: list[Turn], *, source: str = "agent", commit: bool = False) -> list[dict]:
+    """Distill structured messages without interpreting role markers in their bodies."""
+    config = load_config()
+    if config.get("distill", {}).get("engine") == "host":
+        findings = [
+            finding for turn in turns if turn.role == "assistant"
+            for finding in _findings_from_text(turn.text, config)
+        ]
+    else:
+        findings = _make_extractor(config).extract(turns)
+    return _process_findings(findings, config, source=source, commit=commit)
+
+
+def _process_findings(findings: list[Finding], config: dict, *, source: str, commit: bool) -> list[dict]:
     distill_cfg = config.get("distill", {})
     dedup = float(distill_cfg.get("dedup_threshold", 0.85))
     subject = float(distill_cfg.get("subject_threshold", 0.5))

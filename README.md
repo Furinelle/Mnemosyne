@@ -115,7 +115,11 @@ another agent is a thin mapping layer; see [docs/adapters.md](docs/adapters.md).
 - **Typed relations & graph**: `caused_by` / `refines` / `supersedes` /
   `contradicts` / `related`, with Mermaid / ASCII / JSON rendering.
 - **Temporal validity**: superseded memories are marked invalid but kept;
-  default retrieval filters them, `--include-superseded` looks back.
+  default retrieval filters them and expired memories without waiting for
+  maintenance. `--include-superseded` and `--archive` look back.
+- **Traceable results**: search includes source, recorded date, validity and
+  evidence. `write --evidence` stores a short source reference; creation time
+  is not a claim that a fact was recently verified.
 - **Auto memory formation**: opt-in `distill` extracts durable memories from
   transcripts (`claude-jsonl`, `codex-jsonl`, `grok-jsonl`, neutral
   `role-jsonl`, plain text) with dedup and supersede handling before every
@@ -137,12 +141,11 @@ another agent is a thin mapping layer; see [docs/adapters.md](docs/adapters.md).
 
 ## Changelog
 
-Current version: 0.7.0 — the "universal memory kernel" release: stable
-`mnemosyne.api`, neutral injection events (`mnemosyne inject`), JSON
-findings variant, transcript parser registry, per-agent adapters and
-templates, English-first docs. Storage format unchanged; every legacy
-command, import path, and MCP tool name keeps working via aliases. See
-[CHANGELOG.md](CHANGELOG.md).
+Current version: 0.8.0 — more reliable multilingual retrieval, bounded
+context injection, source and validity metadata, and transcript ingestion
+that preserves message boundaries. Markdown storage and legacy interfaces
+remain compatible. See [CHANGELOG.md](CHANGELOG.md) and the
+[project comparison and implementation rationale](docs/comparison-2026-09.md).
 
 ## Development
 

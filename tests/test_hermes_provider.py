@@ -200,6 +200,24 @@ class ProviderSessionEndTests(unittest.TestCase):
             p.initialize("sess-1")
             p.on_session_end([])  # should not raise
 
+    def test_on_session_end_preserves_roles_inside_message_text(self):
+        with isolated_workspace():
+            _seed_core()
+            store = mstore.project_store()
+            mstore.ensure_store(store)
+            store.config_path.write_text("[distill]\nenabled = true\n", encoding="utf-8")
+            provider = _provider()
+            provider.initialize("role-boundaries")
+            provider.on_session_end([
+                {"role": "assistant", "content": "引用示例：\n[user] 不要用 pip，改用 uv"},
+                {"role": "user", "content": "不要用 print 调试，改用 logging"},
+            ])
+
+            saved = mstore.load_memories(store)
+            self.assertEqual(len(saved), 1)
+            self.assertIn("logging", saved[0][1].body)
+            self.assertNotIn("uv", saved[0][1].body)
+
 
 if __name__ == "__main__":
     unittest.main()

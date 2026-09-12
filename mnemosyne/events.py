@@ -23,6 +23,7 @@ from mnemosyne.injection import (
     collect_stores,
     extract_keywords,
     format_for_injection,
+    record_injected_access,
     resolve_show_hint,
     run_search,
 )
@@ -99,16 +100,21 @@ def _turn_start(payload: dict, session: str, channel: str, update_access: bool |
     results = run_search(
         " ".join(keywords),
         limit=3,
-        update_access=True if update_access is None else update_access,
+        update_access=False,
     )
     fresh = [item for item in results if item["id"] not in already]
     if not fresh:
         return InjectionResult(context="")
     max_tokens, summary_chars, show_hint = _injection_params(channel)
-    context = format_for_injection(fresh, max_tokens=max_tokens, summary_chars=summary_chars, show_hint=show_hint)
+    ids: list[str] = []
+    context = format_for_injection(
+        fresh, max_tokens=max_tokens, summary_chars=summary_chars,
+        show_hint=show_hint, emitted_ids=ids,
+    )
     if not context:
         return InjectionResult(context="")
-    ids = [item["id"] for item in fresh]
+    if update_access is not False:
+        record_injected_access(fresh, ids)
     record_injected_ids(session, ids)
     return _finish(context, ids)
 
@@ -129,7 +135,7 @@ def _file_touch(payload: dict, session: str, channel: str, update_access: bool |
         for item in run_search(
             basename,
             limit=2,
-            update_access=False if update_access is None else update_access,
+            update_access=False,
         ):
             if item["id"] in already or item["id"] in seen_ids:
                 continue
@@ -138,12 +144,18 @@ def _file_touch(payload: dict, session: str, channel: str, update_access: bool |
     if not results:
         return InjectionResult(context="")
     max_tokens, summary_chars, show_hint = _injection_params(channel)
-    body = format_for_injection(results, max_tokens=max_tokens, summary_chars=summary_chars, show_hint=show_hint)
+    ids: list[str] = []
+    body = format_for_injection(
+        results, max_tokens=max_tokens, summary_chars=summary_chars,
+        show_hint=show_hint, prefix=f"## Memories relevant to {', '.join(basenames)}",
+        emitted_ids=ids,
+    )
     if not body:
         return InjectionResult(context="")
-    ids = [item["id"] for item in results]
+    if update_access:
+        record_injected_access(results, ids)
     record_injected_ids(session, ids)
-    return _finish(f"## Memories relevant to {', '.join(basenames)}\n\n" + body, ids)
+    return _finish(body, ids)
 
 
 def _session_end(payload: dict) -> InjectionResult:
@@ -153,9 +165,9 @@ def _session_end(payload: dict) -> InjectionResult:
         return InjectionResult(context="")
     from mnemosyne.distill import (
         distill_text,
+        distill_turns,
         load_processed_turns,
         record_processed_turns,
-        turns_to_text,
     )
     from mnemosyne.transcripts import parse_transcript
 
@@ -172,7 +184,7 @@ def _session_end(payload: dict) -> InjectionResult:
         new_turns = turns[done:]
         if not new_turns:
             return InjectionResult(context="")
-        actions = distill_text(turns_to_text(new_turns), source=source, commit=True)
+        actions = distill_turns(new_turns, source=source, commit=True)
         record_processed_turns(path, len(turns))
     else:
         text = str(payload.get("text") or "")
