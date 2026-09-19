@@ -1,57 +1,43 @@
 name: CI
-
 on:
   push:
-    branches: [master]
+    branches: [master, 'codex/rust-migration']
   pull_request:
-
 jobs:
-  test:
-    runs-on: ${{ matrix.os }}
+  native:
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13"]
-        include:
-          # macOS is the primary development platform, and both SQLite FTS5
-          # compile options and portalocker's locking semantics differ there.
-          - os: macos-latest
-            python-version: "3.12"
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - name: Toolchain
+        run: rustup show
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Isolated native tests and retrieval gates
+        shell: bash
+        run: |
+          export CARGO_HOME="$HOME/.cargo"
+          export RUSTUP_HOME="$HOME/.rustup"
+          export HOME="$(mktemp -d)"
+          export MNEMOSYNE_HOME="$HOME/global"
+          cargo test --locked --all-targets
+          python3 tests/native_transport_smoke.py target/debug/mnemosyne
+          python3 tests/native_http_models_smoke.py target/debug/mnemosyne
+          cargo run --locked -- eval run --min-recall 0.95
+          cargo run --locked -- eval run --pipeline full --min-recall 0.95
+          cargo run --locked -- eval run --longmemeval --pipeline full --min-recall 0.95
+      - run: cargo build --locked --release --features onnx
+      - name: Package native binary
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          target=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p release
+          tar -czf "release/mnemosyne-${version}-${target}.tar.gz" -C target/release mnemosyne -C "$GITHUB_WORKSPACE" LICENSE README.md
+      - uses: actions/upload-artifact@v4
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-      - run: python -m pip install -e .[dev]
-      - run: python -m pytest -q
-      # Retrieval quality regression gates on the fixed 50-query corpus. The
-      # bm25 gate covers the in-memory scorer; the full gate goes through
-      # SQLite FTS5 + fusion, i.e. the path search and the hooks actually take.
-      - run: python -m mnemosyne eval run --min-recall 0.95
-      - run: python -m mnemosyne eval run --longmemeval --pipeline full --min-recall 0.95
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install ruff
-      - run: ruff check mnemosyne tests
-
-  extras:
-    # Verify the optional dependency sets still install and import; their
-    # upstreams (numpy/onnxruntime/mcp) are otherwise never exercised in CI.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install -e .[vector,rerank,mcp]
-      - run: python -c "import mnemosyne.embedding.onnx, mnemosyne.rerank.cross_encoder, mnemosyne.mcp.server"
+          name: native-${{ matrix.os }}
+          path: release/*.tar.gz
+          if-no-files-found: error

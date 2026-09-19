@@ -1,0 +1,30 @@
+[package]
+name = "mnemosyne"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Local-first, agent-agnostic memory kernel"
+repository = "https://github.com/Furinelle/Mnemosyne"
+homepage = "https://github.com/Furinelle/Mnemosyne"
+include = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "src/**", "assets/**", "README.md", "LICENSE", "docs/rust-*.md", "tests/*.rs", "tests/native_*_smoke.py"]
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+regex = "1"
+rusqlite = { version = "0.38", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.9"
+uuid = { version = "1", features = ["v4"] }
+ureq = { version = "3", features = ["json"] }
+ort = { version = "=2.0.0-rc.13", optional = true, default-features = false, features = ["std", "load-dynamic", "api-24"] }
+tempfile = "3"
+tiny_http = "0.12"
+
+[features]
+onnx = ["dep:ort"]

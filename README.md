@@ -2,157 +2,147 @@
 
 [![CI](https://github.com/Furinelle/Mnemosyne/actions/workflows/ci.yml/badge.svg)](https://github.com/Furinelle/Mnemosyne/actions/workflows/ci.yml)
 
-> Greek goddess of memory, mother of the nine Muses.
+**Mnemosyne is a local-first memory kernel written in Rust.** Codex, Claude Code,
+Grok Build and Antigravity share readable Markdown memories through a native CLI,
+MCP tools and lifecycle events. Memory operations do not require Python, a
+background daemon, an LLM account or a separate database server.
 
-**Mnemosyne is a local-first, agent-agnostic memory kernel.** Long-term
-memories are plain Markdown files on your disk, indexed by SQLite FTS5 hybrid
-retrieval, shared by every agent you use — Claude Code, Codex CLI, Cursor,
-Hermes, or anything that can speak MCP, run a shell command, or read a file.
+[中文文档](README.zh.md) · [Migration and compatibility](docs/rust-migration.md)
 
-[中文文档 → README.zh.md](README.zh.md)
+## Build and install
 
-## Why Mnemosyne
+```sh
+git clone https://github.com/Furinelle/Mnemosyne
+cd Mnemosyne
+cargo build --locked --release --features onnx
+mkdir -p "$HOME/.local/bin"
+cp target/release/mnemosyne "$HOME/.local/bin/mnemosyne"
+export PATH="$HOME/.local/bin:$PATH"
+mnemosyne --help
+```
 
-Most agent memory systems make you choose between heavy infrastructure
-(Postgres + vector DB + Docker), an LLM key on every write, or a single
-vendor's ecosystem. Mnemosyne refuses all three:
+The `onnx` feature enables optional local model inference. Using those models
+also requires a compatible ONNX Runtime shared library and existing model files
+with `vocab.txt`. Put `libonnxruntime.dylib` (macOS) or `libonnxruntime.so` (Linux)
+next to the executable, or set `ORT_DYLIB_PATH`. Models are not downloaded
+automatically. Basic memory operations work without the library; omit
+`--features onnx` when local inference is unnecessary.
 
-- **Files are the source of truth.** Every memory is Markdown + YAML
-  frontmatter. Read it, grep it, `git diff` it, edit it by hand. Your
-  memories stay readable forever, with or without Mnemosyne.
-- **Zero heavy dependencies.** Python 3.11+ and `portalocker`. Retrieval is
-  SQLite FTS5 (CJK-aware hybrid search, optional vector lane and reranker);
-  it degrades gracefully to a pure-stdlib BM25 when FTS5 is unavailable.
-- **No LLM in the loop by default.** Auto-distillation is heuristic-first;
-  an LLM engine is opt-in, never required.
-- **Agent-neutral core, adapters at the edge.** One kernel, one store, many
-  doors: MCP tools, a CLI, lifecycle injection events, and direct file access.
+Existing Python installations and host settings are not changed by building the
+binary. Use its absolute path in host configuration to avoid resolving an old
+executable on `PATH`.
 
 ## Quickstart
 
-```bash
-git clone https://github.com/Furinelle/Mnemosyne && cd Mnemosyne
-pip install -e .
+```sh
 cd /path/to/your/project
-python3 -m mnemosyne init          # creates .mnemosyne/ + a generic AGENTS.md
-python3 -m mnemosyne write --type pitfall --importance 70 \
-  --title "Example" --content "The auth token expires after 15 minutes."
-python3 -m mnemosyne search "auth token"
+mnemosyne init --agent codex
+mnemosyne write --type codebase --importance 70 \
+  --title "Auth service" --content "The auth token expires after 15 minutes."
+mnemosyne search "auth token" --format json
+mnemosyne prep "Investigate the auth callback"
 ```
 
-Global preferences live in `~/.mnemosyne/`, project knowledge in the
-repository's `.mnemosyne/`.
+Global memory lives in `~/.mnemosyne/` (`MNEMOSYNE_HOME` overrides it). Project
+memory lives in `.mnemosyne/`. `core.md` holds the small shared core;
+`working/*.md` and `archive/` hold individual memories. Markdown is authoritative;
+SQLite search and vector caches can be rebuilt with `mnemosyne reindex` and
+`mnemosyne embed-backfill`.
 
-## Integrate any agent
+## Connect your host
 
-Three access paths, pick what your agent has. All of them share the same
-store and the same retrieval kernel.
-
-### 1. MCP (works with Claude Code, Codex CLI, Cursor, Cline, Windsurf, Gemini CLI, …)
-
-```bash
-python3 -m mnemosyne mcp serve      # stdio, stdlib-only, no extra installs
-```
-
-Tools: `mnemosyne_search`, `mnemosyne_write`, `mnemosyne_read_core`,
-`mnemosyne_show`, `mnemosyne_link`, `mnemosyne_graph`, `mnemosyne_maintain`,
-`mnemosyne_prep_context`. Client config snippets for Cursor / Cline /
-Continue / Windsurf are in `mnemosyne/templates/mcp_clients/`.
-
-A pure-MCP client gets a full workflow with two calls: `mnemosyne_read_core`
-at session start, `mnemosyne_search` whenever context is needed.
-
-### 2. CLI + injection events (any agent with a shell or hooks)
-
-Every capability is a subcommand (`write`, `search`, `show`, `link`,
-`graph`, `distill`, `prep`, `ingest`, …) with `--format json` output where
-it matters. On top of that, four agent-neutral lifecycle events power
-automatic injection:
-
-| Event | When | Payload (stdin JSON) |
+| Host | Entry points | Setup suggestion |
 |---|---|---|
-| `session_start` | session opens | `{}` → core memory block |
-| `turn_start` | user submits a prompt | `{"prompt": "..."}` → relevant memories |
-| `file_touch` | agent is about to edit files | `{"files": ["a.py"]}` → file-relevant memories |
-| `session_end` | session closes | `{"text": ...}` or `{"transcript": {"path": ...}}` → auto-distill |
+| Codex | Session/prompt/Stop hooks, project instructions, CLI or MCP | `mnemosyne init --agent codex`; `mnemosyne install codex` |
+| Claude Code | `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `Stop` hooks | `mnemosyne init --agent claude-code`; `mnemosyne install claude-code` |
+| Grok Build | Claude-compatible hooks, project instructions, Grok JSONL distillation | `mnemosyne init --agent grok`; `mnemosyne install grok` |
+| Antigravity | MCP with an explicit project directory | `mnemosyne init --agent antigravity`; `mnemosyne install antigravity` |
 
-```bash
-echo '{"prompt": "why does portalocker deadlock"}' | \
-  python3 -m mnemosyne inject --event turn_start --session my-session --format json
+`init` creates project files and preserves existing instruction files. `install`
+prints configuration suggestions; it does not edit host settings or claim that
+the host has loaded them. Templates are in `assets/templates/`.
+
+Start the native MCP server with `mnemosyne mcp serve`. Its eight tools are
+`mnemosyne_search`, `mnemosyne_write`, `mnemosyne_read_core`, `mnemosyne_show`,
+`mnemosyne_link`, `mnemosyne_graph`, `mnemosyne_maintain` and
+`mnemosyne_prep_context`. Tools accept an absolute `project_path` when the host
+launches the server outside the project, including Antigravity. Project requests
+without a project context fail explicitly. Project configuration can restrict
+MCP exposure using `mcp.expose_global` and `mcp.expose_project`.
+
+For CLI integrations, send JSON on stdin:
+
+```sh
+printf '%s\n' '{"prompt":"Investigate the auth callback"}' |
+  mnemosyne inject --event turn_start --session my-session --format json
 ```
 
-`--fail-safe` makes it exit 0 with empty output on any error, so a hook can
-never block the host. See [docs/adapters.md](docs/adapters.md) for the full
-adapter contract.
+| Neutral event | Input |
+|---|---|
+| `session_start` | `{}` |
+| `turn_start` | `{"prompt":"..."}` |
+| `file_touch` | `{"files":["src/auth.rs"]}` |
+| `session_end` | `{"text":"..."}` or `{"transcript":{"path":"...","format":"auto"}}` |
 
-### 3. Files (any agent that can read)
+`mnemosyne hook EVENT` supplies the Claude-compatible JSON envelope. Hooks never
+emit a tool permission grant. `inject --fail-safe` reports errors on stderr and
+returns empty stdout without blocking the host. Context budgets cover the
+assembled output and are **estimated**, not exact tokenizer limits.
 
-`.mnemosyne/core.md` is the always-relevant summary; one Markdown file per
-memory lives under `.mnemosyne/working/`. The frontmatter schema and the
-`search --format json` output schema are specified in
-[docs/interface.md](docs/interface.md). Findings exchange (agent → memory)
-is specified in [docs/handoff-format.md](docs/handoff-format.md), with
-Markdown and JSON variants.
+## Capabilities and boundaries
 
-## Official adapters
+- SQLite FTS5 and CJK-aware lexical retrieval, optional vectors, RRF fusion,
+  typed relation expansion and optional cross-encoder reranking.
+- Source, recorded date, expiry and evidence metadata. Expired and superseded
+  memories are excluded from default retrieval; a recorded date is not a
+  verification date.
+- Conservative writes: lexical similarity does not authorize dropping or
+  superseding a changed fact. Explicit relations and consolidation remain
+  available; consolidation previews candidates before changes.
+- Strength decay per maintenance run, archiving and core candidates. Candidates
+  do not automatically rewrite `core.md`.
+- Opt-in transcript distillation for Claude, Codex, Grok, role JSONL and text.
+  Message roles are preserved; reasoning and tool payloads are not evidence by
+  default. `distill` previews unless `--commit` is given.
+- Atomic Markdown writes, file locks and recoverable relation mutations,
+  including coordinated cross-store links. Pending operations must recover
+  before moving a store or changing the global coordinator location.
 
-| Agent | Integration | Install |
-|---|---|---|
-| Claude Code | Lifecycle hooks (SessionStart / UserPromptSubmit / PreToolUse / Stop) with deterministic injection + auto-distill | `python3 -m mnemosyne install claude-code` (prints the merge steps) |
-| Codex CLI | `AGENTS.md` protocol + `prep` / `ingest` handoff blocks | `python3 -m mnemosyne init --agent codex` |
-| Hermes | Native MemoryProvider plugin (inject, recall, tool, distill) | `python3 -m mnemosyne install hermes` |
+Endpoint addresses, credential environment-variable selectors and local model
+paths are trusted only from global configuration. LLM extraction and model
+inference are optional. The format contract is in [docs/interface.md](docs/interface.md),
+findings exchange in [docs/handoff-format.md](docs/handoff-format.md), and host
+mapping in [docs/adapters.md](docs/adapters.md).
 
-Adapters are peers on top of the same neutral events — writing one for
-another agent is a thin mapping layer; see [docs/adapters.md](docs/adapters.md).
+The runtime is native-only. The previous Python package/import API and Hermes
+Python MemoryProvider are retired. CLI aliases `codex-prep` / `codex-ingest`
+and the `mnemosyne_codex_prep` MCP alias remain. See the
+[migration guide](docs/rust-migration.md) before switching an existing deployment.
 
-## Feature highlights
+## Development and validation
 
-- **Hybrid retrieval**: SQLite FTS5 with CJK bigram handling, optional
-  embedding lane fused via RRF, optional cross-encoder rerank, typed-link
-  graph expansion.
-- **Memory lifecycle**: strength decay, archiving, recall bonus, expiry,
-  core-promotion candidates, near-duplicate consolidation.
-- **Typed relations & graph**: `caused_by` / `refines` / `supersedes` /
-  `contradicts` / `related`, with Mermaid / ASCII / JSON rendering.
-- **Temporal validity**: superseded memories are marked invalid but kept;
-  default retrieval filters them and expired memories without waiting for
-  maintenance. `--include-superseded` and `--archive` look back.
-- **Traceable results**: search includes source, recorded date, validity and
-  evidence. `write --evidence` stores a short source reference; creation time
-  is not a claim that a fact was recently verified.
-- **Auto memory formation**: opt-in `distill` extracts durable memories from
-  transcripts (`claude-jsonl`, `codex-jsonl`, `grok-jsonl`, neutral
-  `role-jsonl`, plain text) with dedup and supersede handling before every
-  write.
-- **Reproducible evaluation**: `eval run` reports recall/MRR on a fixed
-  corpus; `eval convert longmemeval` + `eval run --longmemeval` benchmark
-  against LongMemEval; CI enforces a recall@5 regression gate.
-- **Concurrency-safe by design**: atomic writes, `portalocker` lock
-  ordering, SQLite WAL — multiple agents can share one store.
-
-## Stability promises
-
-- Memory files stay readable: the storage format is stable and versioned
-  changes are append-only.
-- The `mnemosyne.api` module is the public Python API.
-- Legacy surfaces (`codex-prep` / `codex-ingest` / `install-hermes`
-  commands, `mnemosyne.codex` / `mnemosyne.hooks.*` imports, the
-  `mnemosyne_codex_prep` MCP tool) remain as aliases.
-
-## Changelog
-
-Current version: 0.8.0 — more reliable multilingual retrieval, bounded
-context injection, source and validity metadata, and transcript ingestion
-that preserves message boundaries. Markdown storage and legacy interfaces
-remain compatible. See [CHANGELOG.md](CHANGELOG.md) and the
-[project comparison and implementation rationale](docs/comparison-2026-09.md).
-
-## Development
-
-```bash
-python3 -m pytest tests/ -q
-python3 -m mnemosyne doctor
+```sh
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-targets
+cargo run --locked -- eval run --min-recall 0.95
+cargo run --locked -- eval run --pipeline full --min-recall 0.95
+cargo run --locked -- eval run --longmemeval --pipeline full --min-recall 0.95
 ```
 
-License: MIT. Contributions welcome — run the test suite and keep the
-stdlib-only core constraint.
+Templates and embedded evaluation fixtures are under `assets/templates/` and
+`assets/eval/`. `tests/native_only.rs` runs the executable with an isolated home
+and an empty `PATH`, checking event envelopes, transcript replay and MCP project
+isolation. It does not replace acceptance inside a real host.
+
+Python files named `tests/native_*_smoke.py` are optional **development test
+harnesses**, using the standard library to drive the native executable. They
+are not an installed kernel or a runtime dependency. Model smoke tests require
+separately supplied local assets; fake-provider tests do not establish real
+model quality. The embedded LongMemEval sample is not the full public benchmark.
+
+[Validation record](docs/rust-validation.md) · [Local cutover record](docs/rust-local-cutover.md)
+· [Changelog](CHANGELOG.md). These records describe their stated revisions and
+scope, not a guarantee that every later build or host has been verified.
+
+License: MIT.

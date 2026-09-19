@@ -1,1 +1,0 @@
-"""Optional MCP server integration."""

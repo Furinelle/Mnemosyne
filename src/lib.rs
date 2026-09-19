@@ -1,0 +1,12 @@
+pub mod adapters;
+pub mod api;
+pub mod context;
+pub mod eval;
+pub mod ingest;
+pub mod mcp;
+pub mod models;
+pub mod relations;
+pub mod schema;
+pub mod search;
+pub mod store;
+pub mod vectors;

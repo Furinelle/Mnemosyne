@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-19
+
+### 变更 (Changed)
+
+- 运行时迁移至原生 Rust；CLI、hooks 和 MCP 不再依赖 Python。支持 Codex、Claude Code、Grok 和 Antigravity。
+- 保留 Markdown 记忆格式，模板及评测资源移至 `assets/`；SQLite/向量索引可重建。
+- **不兼容变更**：移除 Python import API、Python 模块启动方式及 Hermes provider。旧调用方请改用 `mnemosyne` CLI 或 MCP；`install` 输出配置建议，不自动改写宿主设置。
+
+### 新增与修复 (Added / Fixed)
+
+- 跨库 typed links / supersedes、稳定加锁和崩溃恢复；保留外部编辑并校验恢复日志。
+- MCP 支持显式 `project_path`，隔离常驻进程服务的不同项目。
+- 原生 ONNX embedding / cross-encoder、HTTP embedding / LLM 蒸馏；ONNX 需匹配的动态运行库与模型。
+- 加强 transcript 角色过滤、来源保留、重复导入、注入预算、并发去重及中文检索。
+- 44 项 Rust 测试，以及无 Python 的宿主协议、SSE、HTTP 模型和真实 ONNX 验证。
+
 ## [0.8.0] - 2026-09-12
 
 ### 新增 (Added)
