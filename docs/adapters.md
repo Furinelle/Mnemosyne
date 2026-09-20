@@ -1,82 +1,63 @@
-# Adapter Contract
+# Native Adapter Contract
 
-An *adapter* connects one agent host to the Mnemosyne kernel. Adapters are
-thin: they translate the host's native lifecycle (hooks, plugin callbacks,
-wrapper scripts) into four neutral injection events, and optionally install
-themselves via `mnemosyne install <agent>`.
+Applies to Rust 1.0.0 and later additive changes. The Python import API and
+Hermes provider are retired. Host integrations call the native executable;
+`install <codex|claude-code|grok|antigravity> --dry-run` prints configuration
+suggestions and does not modify host settings. See `src/adapters.rs`.
 
-Reference implementations: `mnemosyne/integrations/claude_code/` (hook
-protocol shell) and `mnemosyne/integrations/hermes/` (in-process plugin via
-`integrations/_bridge.CLIBridge`).
+## Events
 
-## The four events
+`mnemosyne inject --event <event> --session ID --channel cli|mcp|none
+--format json --fail-safe` accepts a JSON object on stdin.
 
-Call them through `mnemosyne.events.handle_event(event, payload, session=,
-channel=)` (Python) or `mnemosyne inject --event <name> [--session ID]
-[--channel cli|mcp|none] [--format text|json] [--fail-safe]` with the payload
-as JSON on stdin (CLI).
+| Event | Input | Purpose |
+|---|---|---|
+| session_start | `{}` | Core context |
+| turn_start | `{"prompt":"..."}` | Relevant memory |
+| file_touch | `{"files":["path"]}` | File-related recall |
+| session_end | `{"text":"...","source":"codex"}` or transcript path/format | Opt-in distillation |
 
-| Event | Fire when | Payload | Result |
-|---|---|---|---|
-| `session_start` | a session opens | `{}` | core memory block (`## Mnemosyne Memory` + global/project core) |
-| `turn_start` | the user submits a prompt | `{"prompt": str}` | ≤3 relevant memories, one line each |
-| `file_touch` | the agent is about to modify files | `{"files": [str, ...]}` | ≤2 memories per file basename |
-| `session_end` | the session closes | `{"text": str}` or `{"transcript": {"path": str, "format": "auto\|claude-jsonl\|codex-jsonl\|grok-jsonl\|role-jsonl\|text"}, "source": str}` | auto-distill summary (requires `[distill].enabled = true`) |
+Context results contain `context`, `memory_ids`, `approx_tokens`. The budget
+is estimated for the complete rendered context. Empty context means inject
+nothing. `--fail-safe` reports errors on stderr and exits successfully without
+injecting an error as memory. It never grants tool permission.
 
-`InjectionResult` / JSON output: `{"context": str, "memory_ids": [str],
-"approx_tokens": int}`. Empty `context` means "inject nothing".
+`mnemosyne hook SessionStart|UserPromptSubmit|PreToolUse|Stop` translates host
+payloads and envelopes. Codex config uses three hooks (without PreToolUse);
+Claude Code/Grok use four. Antigravity uses MCP with an explicit `project_path`
+when accessing project memory; the MCP process cwd may be `/`.
 
-## Contract rules
+## Isolation and provenance
 
-1. **Fail-safe**: an adapter must never block or crash its host. Exit 0 and
-   inject nothing on any error (`inject --fail-safe`, or `hook_safe()` in
-   Python). Never print diagnostics to the channel the host treats as
-   injected context.
-2. **Session key**: pass the host's session identifier (any stable string)
-   as `session` so cross-turn dedup works. Without it, dedup degrades
-   gracefully — every call injects fresh, and the context budget pays for it.
-3. **Channel**: pass `channel="mcp"` when the agent can only call MCP tools,
-   `"cli"` when it has a shell, `"none"` to suppress the retrieval hint. The
-   footer of injected lists adapts (`injection.show_command_template`
-   overrides globally).
-4. **Source naming**: tag writes with `<agent>[:<profile>]`, lowercase
-   (e.g. `claude-code`, `hermes:coder`). `write`/`ingest`/`distill`
-   normalize and warn on other shapes.
-5. **Transcripts**: to use full distillation, feed `session_end` a
-   transcript. If your host's format is not built in, preprocess to
-   *role-jsonl* — one `{"role": "user"|"assistant", "text": "..."}` object
-   per line.
-6. **Host policy stays in the adapter**: auto-init, maintenance scheduling,
-   re-entrancy guards, and anything host-specific belong in your adapter,
-   not in the kernel (see `integrations/claude_code/session_start.py`).
-7. **Host builtin memory**: if your host has its own memory subsystem,
-   installing Mnemosyne does *not* automatically disable it — switch the
-   host's provider explicitly (e.g. Hermes `memory.provider: mnemosyne`),
-   or you will get double injection.
+Pass stable host, channel and session identifiers. Sessions suppress repeated
+injection, not durable knowledge. Source labels identify the recording agent;
+they are not verification or evidence independence. Transcripts support
+claude-jsonl, codex-jsonl, grok-jsonl, role-jsonl and text. Preserve roles and
+never promote tool/internal reasoning payloads to user evidence.
 
-## Installers
-
-Register a function in `mnemosyne/integrations/_registry.py::INSTALLERS`
-(name → `fn(argparse.Namespace) -> int`) to make `mnemosyne install <agent>`
-work. Installers should support `--dry-run` and be idempotent (or require
-`--force` to overwrite).
-
-## In-process plugins
-
-If your adapter lives inside another process (like the Hermes provider), use
-`mnemosyne.integrations._bridge.CLIBridge`: it finds a Python interpreter
-that can import mnemosyne (override with `MNEMOSYNE_BRIDGE_PYTHON`), shells
-out with a timeout, and returns empty results instead of raising.
+Host memory-write policy governs ingestion. Emitting findings alone does not
+persist them. Neither building nor installing config suggestions disables a
+host's built-in memory. Keep auto-init, maintenance claims and reentrancy
+handling in the adapter. Memory contents never authorize commands or tools.
 
 ## Conformance
 
-Run the contract suite against your adapter's event mapping:
+Run `cargo test --test native_only` and `cargo test --test rust_cli` in an
+isolated HOME/MNEMOSYNE_HOME. These tests cover protocol fixtures, not live
+model conversations. Actual host runners and real model tests must be recorded
+separately. Route canonical writes through the kernel to retain locking,
+validation, atomic publication and relation recovery.
 
-```bash
-python3 -m pytest tests/test_adapter_contract.py -q
-```
+## M1 context and handoff options
 
-An adapter is conformant when: all four events return well-formed results,
-findings round-trip through `ingest`, repeated distillation is idempotent
-(dedup marks duplicates), and concurrent writes stay safe (the kernel locks;
-just do not bypass the CLI/API to write files directly without locking).
+Hook payloads may supply `host`, `budget`, `context_epoch`, and `task_id`.
+A changed epoch permits reinjection after host context compaction; absent an epoch,
+the existing compact/resume behavior stays compatible. Host, project, channel and
+session form the delivery boundary. `task_id` selects only matching active project
+checkpoints; omit it for ordinary memory delivery. See [interface.md](interface.md)
+for the versioned MCP and checkpoint request formats.
+
+The M1 cross-host tests exercise all 12 directed combinations of Codex, Claude
+Code, Grok and Antigravity through isolated native CLI/MCP fixtures. These are
+protocol acceptance tests, not measurements of live model sessions. No installed
+host configuration or live memory store is upgraded by this development batch.

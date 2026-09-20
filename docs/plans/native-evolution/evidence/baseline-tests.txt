@@ -1,0 +1,72 @@
+
+running 33 tests
+test context::tests::mcp_exposure_filters_explicit_stores ... ok
+test adapters::tests::output_keeps_permissions_untouched_and_stop_is_not_reentrant ... ok
+test context::tests::budget_covers_mandatory_content_and_only_selects_rendered_items ... ok
+test adapters::tests::stop_detects_source_and_install_only_describes_configuration ... ok
+test ingest::tests::codex_roles_are_preserved ... ok
+test ingest::tests::findings_and_host_respect_role ... ok
+test mcp::tests::protocol_errors_and_notifications ... ok
+test models::tests::wordpiece_preserves_chinese_and_subwords ... ok
+test adapters::tests::auto_init_stays_in_nearest_repository_and_honors_opt_out ... ok
+test adapters::tests::maintenance_claim_is_per_store_and_once_per_day ... ok
+test context::tests::session_dedup_is_locked_and_distinguishes_stores ... ok
+test context::tests::only_rendered_memories_receive_access_credit ... ok
+test api::tests::complementary_facts_and_changed_values_survive ... ok
+test schema::tests::quoted_commas_and_unknown_fields_round_trip ... ok
+test relations::tests::partial_commit_recovers_but_external_edit_is_preserved ... ok
+test relations::tests::cross_store_links_keep_reverse_status_and_reject_cycles ... ok
+test relations::tests::typed_links_are_idempotent_and_graph_honors_depth ... ok
+test search::tests::cjk_bigrams_match_and_expired_entries_do_not_consume_the_limit ... ok
+test search::tests::default_indexed_search_reports_fts_not_bm25 ... ok
+test relations::tests::cross_store_recovery_preserves_external_edits_and_rejects_journal_tampering ... ok
+test search::tests::mixed_fts_and_short_cjk_lanes_are_merged ... ok
+test search::tests::graph_expansion_obeys_hops_and_boost_cap ... ok
+test store::tests::secure_atomic_round_trip ... ok
+test search::tests::legacy_bare_links_resolve_the_first_store_target ... ok
+test search::tests::incremental_sync_refreshes_manual_canonical_edits_and_removes_deleted_files ... ok
+test search::tests::superseded_is_filtered_and_vector_failure_degrades_to_lexical ... ok
+test vectors::tests::body_change_and_model_dimension_change_fail_the_write_cas ... ok
+test vectors::tests::access_only_change_reuses_the_vector_and_invalid_vectors_are_ignored ... ok
+test eval::tests::external_converted_corpus_is_used_in_longmemeval_mode ... ok
+test context::tests::busy_session_state_does_not_drop_recall ... ok
+test relations::tests::cross_store_interruption_recovers_at_every_durable_stage ... ok
+test eval::tests::default_real_search_gate_meets_the_fixed_threshold ... ok
+test eval::tests::full_names_the_actual_disabled_lanes ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.19s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test native_stop_accepts_three_transcripts_with_source_roles_and_replay_intact ... ok
+test antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate ... ok
+test native_host_event_envelopes_need_no_python_and_never_grant_tool_permission ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+
+
+running 8 tests
+test sqlite_cache_symlink_cannot_modify_another_file ... ok
+test installation_preview_does_not_modify_host_and_config_hides_endpoints ... ok
+test mcp_project_path_works_without_host_project_cwd ... ok
+test mcp_respects_exposure_and_has_no_stdout_noise ... ok
+test concurrent_replays_write_once ... ok
+test native_cli_round_trip_chinese_and_safety ... ok
+test legacy_markdown_and_aliases_work_without_python ... ok
+test consolidation_retains_different_values_and_old_evidence ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+   Compiling mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.26s
+     Running unittests src/lib.rs (target/debug/deps/mnemosyne-45c6e8529945faae)
+     Running unittests src/main.rs (target/debug/deps/mnemosyne-072e405ba4b7f1b3)
+     Running tests/native_only.rs (target/debug/deps/native_only-42b592e531e361a3)
+     Running tests/rust_cli.rs (target/debug/deps/rust_cli-a6a333a92d2b12d3)
+
+EXIT_CODE=0

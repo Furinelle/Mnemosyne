@@ -1,0 +1,87 @@
+{
+  "model": "gpt-5.6-luna",
+  "reasoning": "max",
+  "task": "Continue predecessor task Quartz-J9. Report the service database, port, and exact next action. Use only supplied context; unknown is required for missing evidence. Do not run tools or inspect files. Output JSON fields database, port, next_action. Answer budget: at most 120 words. Input context budget: at most 1200 estimated tokens.",
+  "task_sha256": "e60f1dff53ea2d3f4a44ce325755732b2f2345db3994a91b57d34fabab29a58d",
+  "binary_sha256": "50c85c30dfc64de0671f9a97f3bd7a1f3fbe3cb066f0f0de9a0f270f75a1e66f",
+  "baseline_binary_sha256": "c72768ab99845ab40be2f1ba244c6654c9ea4f86046a86c6d7cfd3a87e44a3e6",
+  "runs": [
+    {
+      "arm": "without_memory",
+      "status": "pass",
+      "answer": {
+        "database": "unknown",
+        "port": "unknown",
+        "next_action": "unknown — no context supplied"
+      },
+      "facts_correct": 0,
+      "fact_count": 2,
+      "handoff_correct": false,
+      "unsupported_answers": 0,
+      "elapsed_seconds": 12.45,
+      "context_sha256": "f1aeea2009fff83eb4b28d106306282fe4cc909000dea2d1b1ff8f1065848614",
+      "context_bytes": 20,
+      "usage": {
+        "input_tokens": 11150,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 150,
+        "reasoning_output_tokens": 120
+      }
+    },
+    {
+      "arm": "v1_retrieval",
+      "status": "pass",
+      "answer": {
+        "database": "SQLite",
+        "port": "7429",
+        "next_action": "unknown"
+      },
+      "facts_correct": 2,
+      "fact_count": 2,
+      "handoff_correct": false,
+      "unsupported_answers": 0,
+      "elapsed_seconds": 15.2,
+      "context_sha256": "9382b82aa99cf10e42d7e47e39ceb73fc40be44520ca1289685e03fd5db1cfae",
+      "context_bytes": 667,
+      "usage": {
+        "input_tokens": 11394,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 141,
+        "reasoning_output_tokens": 114
+      }
+    },
+    {
+      "arm": "candidate_handoff",
+      "status": "pass",
+      "answer": {
+        "database": "SQLite",
+        "port": "7429",
+        "next_action": "Run migration verification for Quartz-J9"
+      },
+      "facts_correct": 2,
+      "fact_count": 2,
+      "handoff_correct": true,
+      "unsupported_answers": 0,
+      "elapsed_seconds": 15.54,
+      "context_sha256": "ec14d142fe3245708e9fb1b23df7b31fb4b4f475ecb2681731603253aa8b0cf7",
+      "context_bytes": 1399,
+      "usage": {
+        "input_tokens": 11510,
+        "cached_input_tokens": 8960,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 152,
+        "reasoning_output_tokens": 119
+      }
+    }
+  ],
+  "scope": "synthetic producer checkpoint; three fresh real Codex CLI consumer sessions; equal prompt/output budgets",
+  "limitations": [
+    "one synthetic handoff task, not statistically generalizable",
+    "not live host integration or a full public benchmark",
+    "producer checkpoint is a fixture, not an independently measured producer model",
+    "output cap is a prompt budget, not exact tokenizer enforcement"
+  ],
+  "complete": true
+}

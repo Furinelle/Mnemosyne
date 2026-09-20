@@ -28,7 +28,13 @@ pub fn request_json(config: &Value, route: &str, body: &Value) -> Result<Value> 
         .map_err(|_| anyhow::anyhow!("Model HTTP request failed"))?
         .body_mut()
         .read_json()
-        .map_err(|_| anyhow::anyhow!("Invalid model JSON response"))
+        .map_err(|_| {
+            if route == "embeddings" {
+                InvalidEmbedding.into()
+            } else {
+                anyhow::anyhow!("Invalid model JSON response")
+            }
+        })
 }
 fn model_path(c: &Value) -> PathBuf {
     let configured = c["onnx_path"].as_str().unwrap_or("");
@@ -72,6 +78,78 @@ pub fn fingerprint(c: &Value) -> Result<String> {
     }
     Ok(format!("{:x}", hash.finalize()))
 }
+/// One immutable inference/cache identity. Remote alias changes require an explicit revision.
+#[derive(Clone, Debug)]
+pub struct ModelProfile {
+    settings: Value,
+    pub fingerprint: String,
+    pub dimensions: usize,
+}
+
+impl ModelProfile {
+    pub fn new(settings: &Value) -> Result<Self> {
+        Ok(Self {
+            settings: settings.clone(),
+            fingerprint: fingerprint(settings)?,
+            dimensions: settings["dimensions"].as_u64().unwrap_or(512) as usize,
+        })
+    }
+
+    pub fn settings(&self) -> &Value {
+        &self.settings
+    }
+
+    pub fn matches(&self, settings: &Value) -> bool {
+        settings["enabled"].as_bool().unwrap_or(false)
+            && fingerprint(settings).is_ok_and(|value| value == self.fingerprint)
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidEmbedding;
+impl std::fmt::Display for InvalidEmbedding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Invalid embedding response dimensions, values, or indices")
+    }
+}
+impl std::error::Error for InvalidEmbedding {}
+
+pub fn valid_vector(vector: &[f64], dimensions: usize) -> bool {
+    vector.len() == dimensions
+        && vector.iter().all(|value| value.is_finite())
+        && vector.iter().any(|value| *value != 0.0)
+}
+
+fn response_vectors(response: &Value, count: usize) -> Result<Vec<Vec<f64>>> {
+    let rows = response["data"]
+        .as_array()
+        .context("Missing embedding data")?;
+    ensure!(rows.len() == count, "Embedding count mismatch");
+    let mut ordered = vec![None; count];
+    for (position, row) in rows.iter().enumerate() {
+        let index = match row.get("index") {
+            Some(value) => value.as_u64().context("Invalid embedding response index")? as usize,
+            None => position,
+        };
+        ensure!(
+            index < ordered.len() && ordered[index].is_none(),
+            "Invalid embedding response index"
+        );
+        ordered[index] = Some(
+            row["embedding"]
+                .as_array()
+                .context("Missing vector")?
+                .iter()
+                .map(|v| v.as_f64().context("Invalid embedding value"))
+                .collect::<Result<Vec<_>>>()?,
+        );
+    }
+    ordered
+        .into_iter()
+        .map(|v| v.context("Missing embedding"))
+        .collect()
+}
+
 pub fn embed(c: &Value, texts: &[String]) -> Result<Vec<Vec<f64>>> {
     if texts.is_empty() {
         return Ok(vec![]);
@@ -80,42 +158,15 @@ pub fn embed(c: &Value, texts: &[String]) -> Result<Vec<Vec<f64>>> {
         "openai" | "openai-compatible" => {
             let response =
                 request_json(c, "embeddings", &json!({"model":c["model"],"input":texts}))?;
-            let rows = response["data"]
-                .as_array()
-                .context("Missing embedding data")?;
-            ensure!(rows.len() == texts.len(), "Embedding count mismatch");
-            let mut ordered = vec![None; texts.len()];
-            for (position, row) in rows.iter().enumerate() {
-                let index = row["index"].as_u64().unwrap_or(position as u64) as usize;
-                ensure!(
-                    index < ordered.len() && ordered[index].is_none(),
-                    "Invalid embedding response index"
-                );
-                ordered[index] = Some(
-                    row["embedding"]
-                        .as_array()
-                        .context("Missing vector")?
-                        .iter()
-                        .map(|v| v.as_f64().context("Invalid embedding value"))
-                        .collect::<Result<Vec<_>>>()?,
-                );
-            }
-            ordered
-                .into_iter()
-                .map(|v| v.context("Missing embedding"))
-                .collect::<Result<Vec<_>>>()?
+            response_vectors(&response, texts.len()).map_err(|_| InvalidEmbedding)?
         }
         "onnx" => local_inference(c, texts, None)?,
         other => bail!("Unknown embedding backend: {other}"),
     };
     let dim = c["dimensions"].as_u64().unwrap_or(512) as usize;
-    ensure!(
-        vectors.len() == texts.len()
-            && vectors.iter().all(|v| v.len() == dim
-                && v.iter().all(|x| x.is_finite())
-                && v.iter().any(|x| *x != 0.0)),
-        "Invalid embedding dimensions or values"
-    );
+    if vectors.len() != texts.len() || !vectors.iter().all(|v| valid_vector(v, dim)) {
+        return Err(InvalidEmbedding.into());
+    }
     Ok(vectors)
 }
 pub fn rerank(c: &Value, query: &str, docs: &[String]) -> Result<Vec<f64>> {
@@ -274,6 +325,50 @@ fn local_inference(c: &Value, texts: &[String], query: Option<&str>) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn http_vectors_reorder_and_reject_invalid_indices_and_values() {
+        let rows = json!({"data":[{"index":1,"embedding":[0,1]}, {"index":0,"embedding":[1,0]}]});
+        assert_eq!(
+            response_vectors(&rows, 2).unwrap(),
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]]
+        );
+        for indices in [
+            json!([0, 0]),
+            json!([0, 2]),
+            json!([-1, 1]),
+            json!(["0", 1]),
+        ] {
+            let rows = json!({"data":[{"index":indices[0],"embedding":[1,0]}, {"index":indices[1],"embedding":[0,1]}]});
+            assert!(response_vectors(&rows, 2).is_err());
+        }
+        assert!(response_vectors(&json!({"data":[{"embedding":[null,1]}]}), 1).is_err());
+        for vector in [
+            vec![0.0, 0.0],
+            vec![1.0],
+            vec![f64::NAN, 1.0],
+            vec![f64::INFINITY, 1.0],
+        ] {
+            assert!(!valid_vector(&vector, 2));
+        }
+    }
+
+    #[test]
+    fn explicit_revision_and_same_size_local_asset_changes_invalidate_profile() {
+        let settings = json!({"enabled":true,"backend":"openai","model":"alias","dimensions":2});
+        let profile = ModelProfile::new(&settings).unwrap();
+        let mut changed = settings.clone();
+        changed["revision"] = json!("2026-09-19");
+        assert!(!profile.matches(&changed));
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("model.onnx");
+        std::fs::write(&path, "aaaa").unwrap();
+        std::fs::write(path.with_file_name("vocab.txt"), "bbbb").unwrap();
+        let settings = json!({"enabled":true,"backend":"onnx","onnx_path":path,"dimensions":2});
+        let profile = ModelProfile::new(&settings).unwrap();
+        std::fs::write(&path, "cccc").unwrap();
+        assert!(!profile.matches(&settings));
+    }
+
     #[test]
     fn wordpiece_preserves_chinese_and_subwords() {
         let vocab = HashMap::from([

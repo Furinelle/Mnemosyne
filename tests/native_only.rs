@@ -383,6 +383,7 @@ impl Mcp {
         let response = self.call(name, args);
         assert!(response.get("error").is_none(), "{name}: {response}");
         let result = &response["result"];
+        assert_ne!(result["isError"], true, "{name}: {response}");
         assert!(result["content"].is_array());
         assert!(result["structuredContent"].is_object());
         result["structuredContent"].clone()
@@ -473,31 +474,31 @@ fn antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate()
         "MCP search must stay read-only"
     );
     assert!(
-        mcp.call("mnemosyne_show", json!({"project_path":b,"id":first}))
-            .get("error")
-            .is_some()
+        mcp.call("mnemosyne_show", json!({"project_path":b,"id":first}))["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
     assert!(
-        mcp.call("mnemosyne_show", json!({"project_path":a,"id":global}))
-            .get("error")
-            .is_some()
+        mcp.call("mnemosyne_show", json!({"project_path":a,"id":global}))["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
     assert!(
         mcp.call(
             "mnemosyne_read_core",
             json!({"project_path":a,"scope":"global"})
-        )
-        .get("error")
-        .is_some()
+        )["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
-    assert!(mcp.call("mnemosyne_write",json!({"project_path":a,"scope":"global","type":"codebase","importance":70,"content":"unauthorized"})).get("error").is_some());
+    assert!(mcp.call("mnemosyne_write",json!({"project_path":a,"scope":"global","type":"codebase","importance":70,"content":"unauthorized"}))["result"]["isError"].as_bool().unwrap_or(false));
     assert!(
         mcp.call(
             "mnemosyne_link",
             json!({"project_path":a,"id1":first,"id2":other,"rel":"related"})
-        )
-        .get("error")
-        .is_some()
+        )["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
     mcp.ok(
         "mnemosyne_link",
@@ -547,14 +548,14 @@ fn antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate()
         mcp.call(
             "mnemosyne_write",
             json!({"type":"codebase","importance":70,"content":"no implicit cwd project"})
-        )
-        .get("error")
-        .is_some()
+        )["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
     assert!(
-        mcp.call("mnemosyne_read_core", json!({"project_path":"../alpha"}))
-            .get("error")
-            .is_some()
+        mcp.call("mnemosyne_read_core", json!({"project_path":"../alpha"}))["result"]["isError"]
+            .as_bool()
+            .unwrap_or(false)
     );
     assert!(!sandbox.root().join("server/.mnemosyne").exists());
     mcp.close();

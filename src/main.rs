@@ -2,10 +2,7 @@ use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand};
 use mnemosyne::{api, schema::serialize_memory, store::*};
 use serde_json::{Value, json};
-use std::{
-    io::{self, Read},
-    path::PathBuf,
-};
+use std::{io, path::PathBuf};
 
 #[derive(Parser)]
 #[command(version, about = "Local-first, agent-agnostic memory kernel")]
@@ -25,6 +22,76 @@ struct InstallOptions {
 }
 #[derive(Subcommand)]
 enum Command {
+    Proposal {
+        #[arg(value_parser=["create","show","approve","reject","undo"])]
+        action: String,
+        #[arg(long, default_value = "")]
+        id: String,
+        #[arg(long, default_value = "")]
+        confirm_hash: String,
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    Reconcile {
+        #[arg(long)]
+        commit: bool,
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    Sleep {
+        #[arg(value_parser=["rules","export","import","cursor"])]
+        action: String,
+        #[arg(long, default_value_t = 0)]
+        cursor: usize,
+        #[arg(long)]
+        snapshot: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    View {
+        #[arg(value_parser=["generate","inspect"])]
+        action: String,
+        #[arg(long, default_value = "architecture")]
+        name: String,
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    Snapshot {
+        destination: PathBuf,
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    Restore {
+        source: PathBuf,
+        target: PathBuf,
+        #[arg(long)]
+        fork: bool,
+    },
+    StoreUpgrade {
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+        #[arg(long)]
+        commit: bool,
+    },
+    ReviseV2 {
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    WriteV2 {
+        #[arg(long,default_value="project",value_parser=["global","project"])]
+        scope: String,
+    },
+    ShowV2 {
+        id: String,
+        #[arg(long)]
+        store_id: Option<String>,
+    },
+    Checkpoint {
+        #[command(subcommand)]
+        command: CheckpointCommand,
+    },
     Config {
         #[arg(long,default_value="json",value_parser=["json"])]
         format: String,
@@ -42,6 +109,8 @@ enum Command {
         scope: Scope,
         #[arg(long)]
         no_archive: bool,
+        #[arg(long, default_value="text", value_parser=["text","json"])]
+        format: String,
     },
     Hook {
         #[arg(value_parser=["SessionStart","UserPromptSubmit","PreToolUse","Stop"])]
@@ -92,6 +161,8 @@ enum Command {
     },
     Search {
         query: String,
+        #[arg(long)]
+        as_of: Option<String>,
         #[command(flatten)]
         scope: Scope,
         #[arg(long = "type", default_value = "")]
@@ -105,8 +176,17 @@ enum Command {
         #[arg(long)]
         include_superseded: bool,
     },
+    History {
+        id: String,
+        #[arg(long)]
+        store_id: Option<String>,
+    },
     Show {
         id: String,
+        #[arg(long)]
+        revision: Option<u64>,
+        #[arg(long, requires = "revision")]
+        store_id: Option<String>,
     },
     Reindex {
         #[command(flatten)]
@@ -123,6 +203,8 @@ enum Command {
     Doctor {
         #[command(flatten)]
         scope: Scope,
+        #[arg(long, default_value="text", value_parser=["text","json"])]
+        format: String,
     },
     Link {
         id1: String,
@@ -144,6 +226,12 @@ enum Command {
         task: String,
         #[arg(long, default_value_t = 5)]
         limit: usize,
+        #[arg(long)]
+        budget: Option<usize>,
+        #[arg(long,default_value="text",value_parser=["text","json"])]
+        format: String,
+        #[arg(long)]
+        task_id: Option<String>,
     },
     #[command(alias = "codex-ingest")]
     Ingest {
@@ -165,6 +253,12 @@ enum Command {
         format: String,
         #[arg(long)]
         fail_safe: bool,
+        #[arg(long)]
+        budget: Option<usize>,
+        #[arg(long, default_value = "")]
+        context_epoch: String,
+        #[arg(long)]
+        task_id: Option<String>,
     },
     Distill {
         #[arg(long, required_unless_present = "stdin", conflicts_with = "stdin")]
@@ -184,6 +278,27 @@ enum Command {
     },
 }
 #[derive(Subcommand)]
+enum CheckpointCommand {
+    New,
+    Load {
+        id: String,
+    },
+    Update {
+        id: String,
+        #[arg(long)]
+        expected_revision: u64,
+    },
+    Close {
+        id: String,
+        #[arg(long)]
+        expected_revision: u64,
+    },
+    Observe {
+        #[arg(long, value_delimiter = ',')]
+        paths: Vec<String>,
+    },
+}
+#[derive(Subcommand)]
 enum McpCommand {
     Serve {
         #[arg(long)]
@@ -191,10 +306,9 @@ enum McpCommand {
     },
 }
 fn stdin_text() -> Result<String> {
-    let mut s = String::new();
-    io::stdin().read_to_string(&mut s)?;
-    Ok(s)
+    mnemosyne::input::read(io::stdin().lock())
 }
+
 fn main() {
     let cli = Cli::parse();
     if let Err(e) = run(cli.command) {
@@ -216,6 +330,174 @@ fn run(command: Command) -> Result<()> {
                 commit
             )?)?
         ),
+        Command::Proposal {
+            action,
+            id,
+            confirm_hash,
+            scope,
+        } => {
+            let store = stores_for_scope(&scope)?.remove(0);
+            let clock = mnemosyne::provenance::SystemClock;
+            let result = match action.as_str() {
+                "create" => mnemosyne::proposals::propose(
+                    &store,
+                    serde_json::from_str(&stdin_text()?)?,
+                    &clock,
+                )?,
+                "show" => mnemosyne::proposals::show(&store, &id)?,
+                _ => mnemosyne::proposals::review(&store, &id, &action, &confirm_hash, &clock)?,
+            };
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        Command::Reconcile { commit, scope } => {
+            let store = stores_for_scope(&scope)?.remove(0);
+            let request = serde_json::from_str(&stdin_text()?)?;
+            let result = if commit {
+                mnemosyne::reconcile::write(&store, request, &mnemosyne::provenance::SystemClock)?
+            } else {
+                mnemosyne::reconcile::classify(&store, &request)?
+            };
+            println!("{result}");
+        }
+        Command::Sleep {
+            action,
+            cursor,
+            snapshot,
+            limit,
+            scope,
+        } => {
+            let store = stores_for_scope(&scope)?.remove(0);
+            let clock = mnemosyne::provenance::SystemClock;
+            let result = match action.as_str() {
+                "rules" => {
+                    mnemosyne::sleep::rules(&store, cursor, snapshot.as_deref(), limit, &clock)?
+                }
+                "export" => serde_json::to_value(mnemosyne::sleep::export(
+                    &store,
+                    cursor,
+                    snapshot.as_deref(),
+                    limit,
+                )?)?,
+                "cursor" => mnemosyne::sleep::cursor(&store)?,
+                _ => {
+                    let value: Value = serde_json::from_str(&stdin_text()?)?;
+                    mnemosyne::sleep::finish(
+                        &store,
+                        &serde_json::from_value(value["batch"].clone())?,
+                        serde_json::from_value(value["proposals"].clone())?,
+                        &clock,
+                    )?
+                }
+            };
+            println!("{result}");
+        }
+        Command::View {
+            action,
+            name,
+            scope,
+        } => {
+            let store = stores_for_scope(&scope)?.remove(0);
+            let result = if action == "generate" {
+                mnemosyne::views::generate(
+                    &store,
+                    &serde_json::from_str(&stdin_text()?)?,
+                    &mnemosyne::provenance::SystemClock,
+                )?
+            } else {
+                mnemosyne::views::inspect(&store, &name)?
+            };
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        Command::Snapshot { destination, scope } => println!(
+            "{}",
+            serde_json::to_string(&mnemosyne::snapshot::create(
+                &stores_for_scope(&scope)?.remove(0),
+                &destination
+            )?)?
+        ),
+        Command::Restore {
+            source,
+            target,
+            fork,
+        } => {
+            let manifest = mnemosyne::snapshot::restore(&source, &target, fork)?;
+            let store = Store {
+                scope: "project".into(),
+                root: target,
+            };
+            let indexed = mnemosyne::search::reindex_store(&store, true)?;
+            println!("{}", json!({"manifest":manifest,"indexed":indexed}));
+        }
+        Command::StoreUpgrade { scope, commit } => {
+            let store = stores_for_scope(&scope)?.remove(0);
+            let result = if commit {
+                serde_json::to_value(mnemosyne::provenance::upgrade_store(&store)?)?
+            } else {
+                serde_json::to_value(mnemosyne::provenance::preview_upgrade(&store)?)?
+            };
+            println!("{}", result);
+        }
+        Command::WriteV2 { scope } => {
+            let request = serde_json::from_str(&stdin_text()?)?;
+            let result = mnemosyne::provenance::write_v2(
+                &stores_for_scope(&scope)?.remove(0),
+                &request,
+                &mnemosyne::provenance::SystemClock,
+            )?;
+            println!("{}", serde_json::to_string(&result)?);
+        }
+        Command::ReviseV2 { scope } => {
+            let request = serde_json::from_str(&stdin_text()?)?;
+            println!(
+                "{}",
+                api::revise_v2(
+                    &stores_for_scope(&scope)?.remove(0),
+                    &request,
+                    &mnemosyne::provenance::SystemClock
+                )?
+            );
+        }
+        Command::ShowV2 { id, store_id } => {
+            println!(
+                "{}",
+                api::show_v2(&stores_for_scope("all")?, &id, store_id.as_deref())?
+            );
+        }
+        Command::Checkpoint { command } => {
+            let store = project_store();
+            let clock = mnemosyne::provenance::SystemClock;
+            let result = match command {
+                CheckpointCommand::New => serde_json::to_value(mnemosyne::checkpoint::create(
+                    &store,
+                    serde_json::from_str(&stdin_text()?)?,
+                    &clock,
+                )?)?,
+                CheckpointCommand::Load { id } => mnemosyne::checkpoint::load(&store, &id, &clock)?,
+                CheckpointCommand::Update {
+                    id,
+                    expected_revision,
+                } => serde_json::to_value(mnemosyne::checkpoint::update(
+                    &store,
+                    &id,
+                    expected_revision,
+                    serde_json::from_str(&stdin_text()?)?,
+                    &clock,
+                )?)?,
+                CheckpointCommand::Close {
+                    id,
+                    expected_revision,
+                } => serde_json::to_value(mnemosyne::checkpoint::close(
+                    &store,
+                    &id,
+                    expected_revision,
+                    &clock,
+                )?)?,
+                CheckpointCommand::Observe { paths } => {
+                    serde_json::to_value(mnemosyne::checkpoint::observe(&store, &paths)?)?
+                }
+            };
+            println!("{}", result);
+        }
         Command::Config { format: _ } => {
             let c = load_config(None)?;
             let mut d = json!({});
@@ -233,10 +515,25 @@ fn run(command: Command) -> Result<()> {
                 json!({"distill":d,"memory":{"types":c["memory"]["types"]}})
             );
         }
-        Command::EmbedBackfill { scope, no_archive } => println!(
-            "Embedded {} memories",
-            mnemosyne::vectors::backfill(&stores_for_scope(&scope.scope)?, !no_archive)?
-        ),
+        Command::EmbedBackfill {
+            scope,
+            no_archive,
+            format,
+        } => {
+            let stores = stores_for_scope(&scope.scope)?;
+            if format == "json" {
+                let stats = mnemosyne::vectors::backfill_stats(&stores, !no_archive)?;
+                println!("{}", serde_json::to_string(&stats)?);
+                if stats.failed > 0 || stats.invalid > 0 {
+                    bail!("Embedding backfill contains failed or invalid results");
+                }
+            } else {
+                println!(
+                    "Embedded {} memories",
+                    mnemosyne::vectors::backfill(&stores, !no_archive)?
+                );
+            }
+        }
         Command::Hook { event } => {
             let result = (|| -> Result<Option<Value>> {
                 let text = stdin_text()?;
@@ -339,6 +636,7 @@ fn run(command: Command) -> Result<()> {
         }
         Command::Search {
             query,
+            as_of,
             scope,
             kind,
             limit,
@@ -346,6 +644,20 @@ fn run(command: Command) -> Result<()> {
             archive,
             include_superseded,
         } => {
+            if let Some(as_of) = as_of {
+                let result = mnemosyne::history::search(
+                    &stores_for_scope(&scope.scope)?,
+                    &query,
+                    &as_of,
+                    limit,
+                    &kind,
+                    archive,
+                    include_superseded,
+                )?;
+                // Historical output always includes coverage and date interpretation.
+                println!("{}", serde_json::to_string_pretty(&result)?);
+                return Ok(());
+            }
             let results = api::search_entries(
                 &stores_for_scope(&scope.scope)?,
                 &query,
@@ -372,7 +684,29 @@ fn run(command: Command) -> Result<()> {
                 }
             }
         }
-        Command::Show { id } => {
+        Command::History { id, store_id } => {
+            println!(
+                "{}",
+                mnemosyne::history::list(&stores_for_scope("all")?, &id, store_id.as_deref())?
+            );
+        }
+        Command::Show {
+            id,
+            revision,
+            store_id,
+        } => {
+            if let Some(revision) = revision {
+                println!(
+                    "{}",
+                    mnemosyne::history::show(
+                        &stores_for_scope("all")?,
+                        &id,
+                        store_id.as_deref(),
+                        revision
+                    )?
+                );
+                return Ok(());
+            }
             let (_, _, m) = find_memory(&id, &stores_for_scope("all")?, true)?
                 .ok_or_else(|| anyhow::anyhow!("Memory not found: {id}"))?;
             print!("{}", serialize_memory(&m));
@@ -393,32 +727,48 @@ fn run(command: Command) -> Result<()> {
                 dry_run
             )?)?
         ),
-        Command::Doctor { scope } => {
+        Command::Doctor { scope, format } => {
             let mut failed = false;
-            for s in stores_for_scope(&scope.scope)? {
-                match load_config(Some(&s)).and_then(|_| {
-                    let _guard = if s.root.exists() {
-                        Some(lock_store_read_only(&s)?)
+            let mut reports = Vec::new();
+            for store in stores_for_scope(&scope.scope)? {
+                let canonical = load_config(Some(&store)).and_then(|_| {
+                    let _guard = if store.root.exists() {
+                        Some(lock_store_read_only(&store)?)
                     } else {
                         None
                     };
                     anyhow::ensure!(
-                        !s.root.join(".relations-operation.json").exists(),
+                        !store.root.join(".relations-operation.json").exists(),
                         "Pending relation operation requires recovery before diagnostics"
                     );
-                    load_memories_unlocked(&s, true)
-                }) {
-                    Ok(memories) => println!(
-                        "{}: {} memories; store {}",
-                        s.scope,
-                        memories.len(),
-                        s.root.display()
-                    ),
+                    load_memories_unlocked(&store, true)
+                });
+                let mut report =
+                    json!({"scope": store.scope, "vectors": mnemosyne::vectors::diagnose(&store)});
+                match canonical {
+                    Ok(memories) => {
+                        report["canonical"] = json!({"status":"ready","memories":memories.len()});
+                        if format == "text" {
+                            println!(
+                                "{}: {} memories; store {}",
+                                store.scope,
+                                memories.len(),
+                                store.root.display()
+                            );
+                        }
+                    }
                     Err(e) => {
-                        eprintln!("{}: {e}", s.scope);
+                        report["canonical"] = json!({"status":"error","error":e.to_string()});
+                        if format == "text" {
+                            eprintln!("{}: {e}", store.scope);
+                        }
                         failed = true;
                     }
                 }
+                reports.push(report);
+            }
+            if format == "json" {
+                println!("{}", serde_json::to_string(&reports)?);
             }
             if failed {
                 bail!("Store diagnostics failed");
@@ -443,10 +793,27 @@ fn run(command: Command) -> Result<()> {
             "{}",
             mnemosyne::relations::graph(&stores_for_scope("all")?, &id, depth, &format)?
         ),
-        Command::Prep { task, limit } => println!(
-            "{}",
-            mnemosyne::context::prep(&stores_for_scope("all")?, &task, limit, "cli")?
-        ),
+        Command::Prep {
+            task,
+            limit,
+            budget,
+            format,
+            task_id,
+        } => {
+            let stores = stores_for_scope("all")?;
+            let extra = mnemosyne::checkpoint::active_context(
+                &stores,
+                task_id.as_deref(),
+                &mnemosyne::provenance::SystemClock,
+            )?;
+            let bundle =
+                mnemosyne::context::prep_bundle(&stores, &task, limit, "cli", budget, &extra)?;
+            if format == "json" {
+                println!("{}", serde_json::to_string(&bundle)?);
+            } else {
+                println!("{}", bundle.context);
+            }
+        }
         Command::Ingest {
             source,
             commit,
@@ -485,6 +852,9 @@ fn run(command: Command) -> Result<()> {
             channel,
             format,
             fail_safe,
+            budget,
+            context_epoch,
+            task_id,
         } => {
             let result = (|| -> Result<Value> {
                 let text = stdin_text()?;
@@ -493,7 +863,20 @@ fn run(command: Command) -> Result<()> {
                 } else {
                     serde_json::from_str(&text)?
                 };
-                mnemosyne::context::inject(&event, &payload, &session, &channel)
+                let extra = mnemosyne::checkpoint::active_context(
+                    &stores_for_scope("all")?,
+                    task_id.as_deref().or_else(|| payload["task_id"].as_str()),
+                    &mnemosyne::provenance::SystemClock,
+                )?;
+                mnemosyne::context::inject_with_options(
+                    &event,
+                    &payload,
+                    &session,
+                    &channel,
+                    budget,
+                    &context_epoch,
+                    &extra,
+                )
             })();
             match result {
                 Ok(v) => {

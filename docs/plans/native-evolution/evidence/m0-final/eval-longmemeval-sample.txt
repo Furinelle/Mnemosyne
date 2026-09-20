@@ -1,0 +1,3 @@
+pipeline: rust-full (lexical lane=SQLite FTS5 with CJK BM25 fallback; vectors=disabled; rerank=disabled) recall@5=1.000 MRR=1.000 p50=2.861ms p99=2.861ms queries=2
+
+EXIT_CODE=0

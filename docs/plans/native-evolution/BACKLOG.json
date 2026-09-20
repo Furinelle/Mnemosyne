@@ -1,0 +1,1242 @@
+{
+  "plan_version": "native-evolution-r1",
+  "created_on": "2026-09-19",
+  "repository": "Furinelle/Mnemosyne",
+  "base_commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+  "observed_package_version": "1.0.0",
+  "review_mode": "static_connector_review_plus_remote_ci_status",
+  "local_rust_tests": "R00–R15 locally implemented and accepted within recorded scope; default/all-feature suites each 144 tests; all 15 final gates exit 0. Three final Luna max synthetic consumer arms completed. Real host UI sessions, remote Linux CI and optional ONNX assets not_run.",
+  "default_first_batch": [
+    "R00",
+    "R01",
+    "R02",
+    "R03"
+  ],
+  "benchmark_starts_after": "R00",
+  "tasks": [
+    {
+      "id": "R00",
+      "title": "锁定 Rust 基线、契约和可重复验收",
+      "priority": "P0",
+      "milestone": "M0",
+      "depends_on": [],
+      "status": "completed",
+      "files": [
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        ".github/workflows/ci.yml",
+        "docs/interface.md",
+        "docs/adapters.md",
+        "docs/handoff-format.md",
+        "docs/rust-migration.md",
+        "tests/*.rs",
+        "tests/native_*_smoke.py"
+      ],
+      "goal": "以实际工作区和固定 Rust 提交为基线，不把旧 Python 路线机械翻译成 Rust。",
+      "implementation": [
+        "记录 HEAD、dirty diff、rustc/cargo 版本、host triple、Cargo features、测试/评测语料 SHA。HEAD 与本计划不同时先写差异表：已实现、仍缺、风险改变；不 reset 用户工作区。",
+        "保存当前 CLI --help、JSON 字段、八个 MCP 工具及旧 aliases 的契约快照。新功能应 additive；如实际承诺无法兼容，写迁移说明，不假称完全兼容。",
+        "修正文档仍出现的 Python import、portalocker、旧 index.sqlite、旧目录和退役 Hermes API。保留历史验收记录，给它们加适用提交，不能把旧记录改成新提交的通过证明。",
+        "隔离 HOME/MNEMOSYNE_HOME、测试项目、模型配置和写入目录；保留正确 CARGO_HOME/RUSTUP_HOME。对测试驱动子进程使用 env_clear/显式白名单，不在多线程 Rust 测试中修改共享进程环境。",
+        "记录固定提交 CI run 35441992545 的成功状态；复跑当前工作区门禁，不把远端 success 当本地改动的测试结果。创建 docs/plans/native-evolution/EXECUTION_LOG.md。",
+        "确认 cargo package --list 的白名单；不含真实记忆、模型、密钥、开发机缓存。先保留最低 MSRV 1.95 和 edition 2024；不以降级工具链作为本轮任务。"
+      ],
+      "acceptance": [
+        {
+          "id": "R00-A01",
+          "requirement": "所有原有原生测试、fmt、clippy 和现有三个检索门禁实际执行并记录退出码；受限环境明确 not_run。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        },
+        {
+          "id": "R00-A02",
+          "requirement": "以同一 JSON fixture 调 CLI/MCP 后可解释字段差异；八个工具及两个 CLI alias/一个 MCP alias 仍可用。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        },
+        {
+          "id": "R00-A03",
+          "requirement": "测试不新增、修改或读取测试范围外的真实记忆内容；原生运行测试清空 PATH 仍可工作。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        },
+        {
+          "id": "R00-A04",
+          "requirement": "新文档的默认缓存名是 rust-index.sqlite / vectors-rust.sqlite；不宣称 Python runtime/API 或 Hermes provider 仍受支持。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        },
+        {
+          "id": "R00-A05",
+          "requirement": "打包清单没有 .mnemosyne、credentials、models、target、私有报告；源包解包后能离线使用已缓存依赖构建，缺缓存时说明限制。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        },
+        {
+          "id": "R00-A06",
+          "requirement": "内置 50-query 检索门禁和 2-case LongMemEval 样本分别标识，未声称跑了完整公开基准。",
+          "status": "pass",
+          "evidence": "evidence/m0-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不改写内核架构、不自动升级依赖、不安装二进制、不更改真实宿主设置。"
+      ],
+      "rollback": "仅撤回本任务新增的契约/文档/测试；保留用户既有 diff，不执行破坏性 git 回滚。",
+      "references": [
+        "S01",
+        "S02",
+        "S13",
+        "S14",
+        "S15"
+      ]
+    },
+    {
+      "id": "R01",
+      "title": "补来源保留与生命周期语义回归",
+      "priority": "P0",
+      "milestone": "M0",
+      "depends_on": [
+        "R00"
+      ],
+      "status": "completed",
+      "files": [
+        "src/api.rs",
+        "src/schema.rs",
+        "src/ingest.rs",
+        "tests/cli.rs 或实际 CLI 集成测试文件"
+      ],
+      "goal": "在已有保守写入基础上，修补剩余小缺口；绝不恢复 Jaccard 自动 supersede。",
+      "implementation": [
+        "先复现 duplicate_entry 未比较 source：其余字段相同但 source 不同的写入可能只返回旧 ID。第一小补丁比较规范化后的有效 source（空值等同 agent）；不同来源至少保留两条，不丢新来源。R04 上线后可用 SUPPORT 合并证据，不把来源数量当独立证据数量。",
+        "保留 type/body/tags/expires/evidence 的现有精确重复语义和 allow_duplicate 逃生口；不要随意排序 tags 或归一化正文造成新的语义去重。",
+        "用显式 fixture 复现 maintain 对低 strength superseded 记录可能写为 deprecated。状态失效原因与热度分类应分开；维护不得移除 invalidated_by、复活已替代事实或将它列为 core candidate。",
+        "保持 expired 过滤和旧按次 decay 行为。R10 才引入新按天模式，本任务不偷偷改变维护节律。",
+        "把每一个行为改变沿 CLI/MCP/ingest/distill 最终共享的 write_entry 路径验证；不在适配器里各补一份去重。"
+      ],
+      "acceptance": [
+        {
+          "id": "R01-A01",
+          "requirement": "同 source 精确重放只有一个有效记录；仅 source 改变时第二来源不丢失。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R01-A02",
+          "requirement": "同标题的 port 8080 与 healthcheck /health 共存；改成 port 8081 仍保留新事实。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R01-A03",
+          "requirement": "长正文只变一个版本号/否定词不被判 duplicate；evidence 或 expires 更新仍能保存。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R01-A04",
+          "requirement": "使用低 archive 阈值保留在 working 的 superseded 记录，多次 maintain 后仍为 superseded 且默认搜索不可见。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R01-A05",
+          "requirement": "归档后的 superseded 记录在 --archive 且不含 include-superseded 时不会因为状态改写重新出现。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R01-A06",
+          "requirement": "高 strength、高 access_count 的 superseded 记录不成为 core candidate；旧 valid 记录维护行为没有意外变化。",
+          "status": "pass",
+          "evidence": "evidence/r01-regression.txt; evidence/m0-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不重建七决策系统、不修改真实库、不批量纠正历史误判。"
+      ],
+      "rollback": "此补丁不需要 store migration；撤回代码前保留新来源记录，不删除用户已写知识。",
+      "references": [
+        "S03",
+        "S04"
+      ]
+    },
+    {
+      "id": "R02",
+      "title": "向量缓存自愈与推理快照一致性",
+      "priority": "P1",
+      "milestone": "M0",
+      "depends_on": [
+        "R00"
+      ],
+      "status": "completed",
+      "files": [
+        "src/vectors.rs",
+        "src/models.rs",
+        "src/search.rs",
+        "src/main.rs",
+        "tests/native_http_models_smoke.py"
+      ],
+      "goal": "保留现有 fingerprint/hash/dimension/CAS；补坏行可恢复性和查询时配置一致性。",
+      "implementation": [
+        "复现 cached_vectors 会忽略坏向量，但 cached_hashes 只看 content_hash/fingerprint/dimension，导致 backfill 可能永远跳过同一坏行。让新鲜性同时要求可解码、维数正确、有限且非零。",
+        "使 backfill 的每批缓存提交有事务和结构化统计：computed/written/skipped_stale/invalid/repaired/failed；旧 CLI 摘要可保留，新增 --format json。",
+        "查询 embedding 与缓存匹配使用同一个不可变 ModelProfile。查询计算期间模型配置/本地资源改变时丢弃该次向量结果，保留 lexical lane；不能仅对 backfill 做 CAS。",
+        "保留模型调用在 store lock 外。用注入式 fake provider 复现竞争，不靠随机 sleep。缓存缺失、损坏、不可写时不能导致所有基本搜索不可用。",
+        "诊断明确区分 disabled / missing_assets / incompatible / corrupt / stale / ready。远端同名 alias 背后的未公布权重变化不可被本地哈希自动识别；支持用户显式 revision，不作绝对保证。",
+        "当前 fingerprint 逐次读取本地模型和词表；R14 先测量，只有有证据才缓存。缓存优化不得只凭 path/size 就假称等价于内容哈希。"
+      ],
+      "acceptance": [
+        {
+          "id": "R02-A01",
+          "requirement": "把一条原本新鲜缓存改为零向量、错误维数或畸形 JSON 后，下次 backfill 修复它，而不是永远跳过。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R02-A02",
+          "requirement": "正常同输入、同模型的重复 backfill 不调用 provider；只改变 access_count 不重算。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R02-A03",
+          "requirement": "推理期间正文、dimensions、model/revision 改变时旧结果不落为新鲜向量。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R02-A04",
+          "requirement": "查询推理期间 profile 改变时旧缓存与新查询向量不混用；词法结果仍返回且有降级诊断。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R02-A05",
+          "requirement": "断开 ONNX/HTTP 或损坏向量 SQLite 时，未启用模型的基本读写/MCP 不受影响。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R02-A06",
+          "requirement": "provider 返回乱序批次、重复 index、NaN、Inf、零向量、错误维数均有明确处理；真实模型验收与 mock 分开。",
+          "status": "pass",
+          "evidence": "evidence/r02-regression.txt; evidence/m0-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不再新建另一套向量索引、不默认下载模型、不接入额外云服务。"
+      ],
+      "rollback": "向量 SQLite 是派生数据，可在持锁、停用写入后重建；不能删 Markdown/证据/历史。配置迁移采用 additive。",
+      "references": [
+        "S06",
+        "S07",
+        "S08",
+        "E07"
+      ]
+    },
+    {
+      "id": "R03",
+      "title": "MCP 原生协议与有界输入验收",
+      "priority": "P0",
+      "milestone": "M0",
+      "depends_on": [
+        "R00"
+      ],
+      "status": "completed",
+      "files": [
+        "src/mcp.rs",
+        "src/mcp_tools.json",
+        "src/main.rs",
+        "src/adapters.rs",
+        "tests/native_only.rs",
+        "tests/native_transport_smoke.py"
+      ],
+      "goal": "把“能列出八个工具”推进为错误、通知、大小上限和项目作用域都符合声明协议。",
+      "implementation": [
+        "以官方 MCP/JSON-RPC 为准审阅 process_line：当前只特别忽略 notifications/initialized，initialize 固定返回 2024-11-05。固定旧版并非自动是缺陷；应明确支持集合、协商和连接生命周期，不盲改版本号。",
+        "明确区分协议错误（parse、非法 params、未知 method）与工具执行业务错误。按声明版本的工具结果契约返回 isError，不把“记忆不存在/权限拒绝”等都混为 -32603。",
+        "对无 id 通知、非法 id/jsonrpc、初始化顺序、未知通知做回归。不能因加入兼容路径而执行畸形写请求。",
+        "SSE 已有 1MiB 请求限制和有界会话/队列，保留；为 stdio line/main stdin 路径补一致的可配置大小上限。超限有明确错误/断连策略，不积累无界内存。",
+        "保留 project_path 从绝对项目解析、每请求隔离、global/project exposure。运行本地服务不等于对不可信本机进程/互联网提供强 ACL；不得把 project_path 当授权。SSE 默认仅本机；非本机监听需要显式安全策略，不能以 session_id 充当认证。",
+        "能力/错误/工具 schema 由单一 Rust 类型或注册表生成/验证，避免 schema 与 dispatch 各漂移一份。审批类能力默认不向普通 agent 自动暴露。"
+      ],
+      "acceptance": [
+        {
+          "id": "R03-A01",
+          "requirement": "正确初始化→工具列表→调用→断开能在 stdio 和已有 SSE 运行，CLI aliases 不受影响。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R03-A02",
+          "requirement": "无 id 通知不产生伪造 id:null 响应；非法请求不写 store；具体允许的通知记录在契约。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R03-A03",
+          "requirement": "工具业务失败以所声明协议的工具错误结果返回，parse/params 错误仍是 JSON-RPC 错误。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R03-A04",
+          "requirement": "超大/非法 UTF-8/负 limit/错误类型/未知字段均不导致进程 panic、越界写或无界缓冲。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R03-A05",
+          "requirement": "同一服务器在 cwd=/ 交替读写两个显式项目，不串库；关闭 global exposure 后每个相关工具都遵守。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        },
+        {
+          "id": "R03-A06",
+          "requirement": "没有模型库、Python、外网和 HOME 中旧包时，八个基础工具仍满足其非模型契约。",
+          "status": "pass",
+          "evidence": "evidence/r03-regression.txt; evidence/m0-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不以协议修正为由重写整个 server 或引入常驻服务框架；不自动装宿主插件。"
+      ],
+      "rollback": "保留协议契约 fixture；行为纠正可能影响非规范客户端，提供错误兼容说明，不恢复不安全写入。",
+      "references": [
+        "S09",
+        "S10",
+        "E12",
+        "E13"
+      ]
+    },
+    {
+      "id": "R04",
+      "title": "稳定身份、来源事件和写入结果 v2",
+      "priority": "P1",
+      "milestone": "M1",
+      "depends_on": [
+        "R01",
+        "R03"
+      ],
+      "status": "completed",
+      "files": [
+        "src/schema.rs",
+        "src/store.rs",
+        "src/api.rs",
+        "src/ingest.rs",
+        "src/main.rs",
+        "src/mcp_tools.json",
+        "新增 src/provenance.rs"
+      ],
+      "goal": "让事实身份与证据来源不再依赖“代理名+截断字符串”，仍保持原始 Markdown 可读。",
+      "implementation": [
+        "先写 ADR：StoreManifest(schema_version,store_id,min_writer_version)、MemoryRef(store_id,memory_id)、SourceEvent、WriteRequestV2/WriteOutcome。路径是本机定位而非唯一持久身份；store_id 不是身份认证。",
+        "保留旧裸 ID 入口；新入口允许限定 store，多个候选时 v2 显式返回歧义。不得静默把旧 first-match 语义全局改成另一行为；新旧差异通过契约版本公开。",
+        "新增 flat frontmatter：recorded_at、source_event_id、source_session_id、source_kind、verification_state、fact_key（可选）。复杂 evidence 集合用版本化 JSON sidecar 和稳定 ref，禁止凭现有受限 parser 随意输出嵌套 YAML。",
+        "knowledge Markdown + 证据/身份 JSON 是规范持久数据；它们不属于可删除索引。SQLite 只索引这些数据。为新 schema 设置写入兼容检查；旧原生 writer 未实现识别时，只能通过停旧 writer、升级入口和备份来避免混写，不声称自动阻止它。",
+        "幂等键限定 origin/session/event/finding：同一事件可含多条发现，不能只凭 source_event_id 丢掉后续 findings。同幂等键同 payload 返回既有结果；同键异 payload 明确冲突，不覆盖。",
+        "区分 source_kind（user_statement/tool_output/code_observation/agent_inference）与 verification_state（unverified/evidence_attached/verified）。verified 只能由明确的可信核验流程设置，不能因 agent 自填或被多次召回而升级。",
+        "默认不保留原始敏感 transcript；只存最小来源引用、内容哈希与可选脱敏摘要。SUPPORT 追加证据仍保留共同源事件关联，不宣称统计独立。",
+        "引入可注入 Clock；recorded_at 用 RFC3339 UTC，保留旧 created 日期但不将其推断为精确历史时间。"
+      ],
+      "acceptance": [
+        {
+          "id": "R04-A01",
+          "requirement": "两 agent 转述同一源事件，不增加独立证据；新独立事件支持相同事实时证据不丢。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A02",
+          "requirement": "同一源事件产生两条不同 findings，都能保存；并发重放每条仅提交一次。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A03",
+          "requirement": "同幂等键不同 payload 明确 IDENTITY_CONFLICT；重试不静默更换结果。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A04",
+          "requirement": "未知 flat frontmatter、中文、引号、逗号、反斜线 round-trip；legacy 文件不被一次读操作全量改写。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A05",
+          "requirement": "agent 自填 verified 不获可信验证等级；来源缺失输出 unknown，不伪造 user_asserted。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A06",
+          "requirement": "具有同裸 ID 的两个 store 可通过新 MemoryRef 正确定位；旧入口行为记录且可测试。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R04-A07",
+          "requirement": "新旧 JSON、MCP v1/v2 契约可区分；真实配置不变，schema 首次升级可预览和在副本上回滚。",
+          "status": "pass",
+          "evidence": "evidence/r04-regression.txt; evidence/m1-final/results.json; evidence/r05-regression.txt"
+        }
+      ],
+      "non_goals": [
+        "不强制把每条自然语言变为三元组、不实现团队认证、不加入 LLM 必选依赖。"
+      ],
+      "rollback": "先备份并验证恢复；sidecar/manifest 只 additive。回滚到旧 writer 使用迁移前副本，不让旧 writer 改写启用新语义的 store。",
+      "references": [
+        "S03",
+        "S04",
+        "S12",
+        "E01",
+        "E02",
+        "E10"
+      ]
+    },
+    {
+      "id": "R05",
+      "title": "ContextBundle 增量完善：路径、修订与压缩周期",
+      "priority": "P1",
+      "milestone": "M1",
+      "depends_on": [
+        "R04"
+      ],
+      "status": "completed",
+      "files": [
+        "src/context.rs",
+        "src/api.rs",
+        "src/search.rs",
+        "src/adapters.rs",
+        "src/main.rs",
+        "src/mcp.rs",
+        "assets/templates/"
+      ],
+      "goal": "复用 assemble 的已有整包 estimated budget，不重建上下文编译器。",
+      "implementation": [
+        "把现有字符串+selected 内部结果封装为有版本 ContextBundle：context、items、estimated_tokens、budget_mode、selected/omitted 原因。保留旧输出字段，新增 --budget 覆盖默认配置，不能因 budget 参数改全局配置。",
+        "现有 session key 已区分 host/channel/session，memory identity 已区分路径和 scope；新增 context_epoch 和语义内容哈希（R07 后替换/补充 semantic_rev），使同 ID 更正和宿主压缩后的必要信息可再次注入。",
+        "变更 session 状态版本，保留 TTL/锁/锁争用时不丢召回；使用结构化 key 防字符串碰撞。不把“候选被搜索到”算实际交付。",
+        "file_touch 先匹配显式 repo-relative related_paths，其次目录/模块，最后 basename + 词法/向量回退；不把代码仓全文作为记忆导入。",
+        "保留 relevance-first，不直接相乘 RRF×strength。必要的冲突/来源警告必须计入预算，不能裁掉警告却留貌似确定的断言。",
+        "本轮默认 estimated，不承诺特定模型 tokenizer 的严格上限。mandatory core 超预算仍 BUDGET_TOO_SMALL；以后精确 tokenizer 插件是可选扩展，不阻塞此任务。",
+        "加入限定数量的 show-many 和按需详情接口可选小补丁；裸全文 show/read 与注入摘要预算分开，不偷偷截断导出原文。"
+      ],
+      "acceptance": [
+        {
+          "id": "R05-A01",
+          "requirement": "core+标题+来源+警告+提示+检查点占位全部纳入预算；mandatory 超限沿 fail-safe 输出空 context+stderr。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R05-A02",
+          "requirement": "同一 revision 同 epoch 不重复注入；同 ID 内容更正或 context_epoch 改变可以再次注入。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R05-A03",
+          "requirement": "只改访问计数不触发重新注入；另一 host、另一 project、另一 channel 不共享错误抑制状态。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R05-A04",
+          "requirement": "backend/config.rs 与 frontend/config.rs 有区别；找不到完整路径时有可解释 basename fallback。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R05-A05",
+          "requirement": "缓存/会话锁争用时仍交付可用有界上下文；被裁掉的条目不记 injected/access。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R05-A06",
+          "requirement": "CLI、MCP 和 hook 在相同输入下候选与预算一致，通道差别仅在合法外壳/读取提示。",
+          "status": "pass",
+          "evidence": "evidence/r05-regression.txt; evidence/m1-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不重复实现原有预算、不强制第三方 tokenizer、不自动修改宿主 compaction 配置。"
+      ],
+      "rollback": "会话去重缓存可删重建；旧字段保留。新 epoch 未提供时兼容现有宿主，不要求所有 host 具备同一种钩子。",
+      "references": [
+        "S05",
+        "S10",
+        "E04",
+        "E05"
+      ]
+    },
+    {
+      "id": "R06",
+      "title": "原生 TaskCheckpoint：真正接续工作",
+      "priority": "P1",
+      "milestone": "M1",
+      "depends_on": [
+        "R04",
+        "R05"
+      ],
+      "status": "completed",
+      "files": [
+        "新增 src/checkpoint.rs",
+        "src/api.rs",
+        "src/context.rs",
+        "src/mcp_tools.json",
+        "src/adapters.rs",
+        "docs/handoff-format.md",
+        "tests/native_only.rs"
+      ],
+      "goal": "把一次任务的进度和测试证据，与可复用长期知识分开。",
+      "implementation": [
+        "新增 checkpoints/<uuid>.json，使用独立 schema、revision、单文件原子 CAS。最小字段：task_id/goal/state/completed_actions/artifacts/tests/unresolved/next_action/source_session/observed_commit/worktree_fingerprint/created_at/expires。不为了短期检查点先实现全库历史。",
+        "new/load/update/close 命令走共享 Rust API，update 带 expected_revision；MCP 扩展先做 versioned schema，默认不增加不必要的工具数量。长期 ingest 不自动将 checkpoint 变成高强度 memory。",
+        "每条测试证据记录执行命令、工作目录的项目相对引用、代码状态哈希、退出码、执行时间、报告摘要引用。reported 与 kernel/受信驱动观察到的 observed 区分；缺退出码不能写 passed。",
+        "接手时按 task/项目/环境选择少量检查点。代码变化后只说明证据对旧状态有效/需复验，不把旧 pass 抹去，也不升级为当前通过。",
+        "工具协议 fixtures 覆盖 Codex/Claude/Grok/Antigravity 的 writer→reader；不恢复已退役 Hermes provider。真实应用验收仅在用户另行授权真实配置时进行。",
+        "工作区可能有未提交修改，记录 scoped dirty fingerprint；Git commit 相同不等于工作区相同。不要全盘扫描私有文件。"
+      ],
+      "acceptance": [
+        {
+          "id": "R06-A01",
+          "requirement": "A 修改两文件、执行测试且 2 fail，B 接手必须看到未解决的 2 fail，不显示任务已验证完成。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R06-A02",
+          "requirement": "只有“准备跑测试”的文字不变成 executed/passed；reported evidence 不伪装成受信观测。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R06-A03",
+          "requirement": "同 commit 但 dirty 文件变化后，测试证据标记需复验。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R06-A04",
+          "requirement": "两个 agent 并发 update：一个成功，另一个 CAS conflict；不采用 last-writer-wins。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R06-A05",
+          "requirement": "关闭/到期 checkpoint 不再默认注入，但显式查看可保留记录；不会变成永久 pitfall。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        },
+        {
+          "id": "R06-A06",
+          "requirement": "四宿主 12 个有方向的跨宿主组合使用协议 fixtures 验证身份与交接；与真实模型会话统计分列。",
+          "status": "pass",
+          "evidence": "evidence/r06-regression.txt; evidence/m1-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不做任务调度器、不执行 checkpoint 中的任意命令、不把 plan 状态自动改为 done。"
+      ],
+      "rollback": "单文件 schema 可导出；禁用 checkpoint 注入即可回退基础工作流；保留检查点原文不删证据。",
+      "references": [
+        "S05",
+        "S10",
+        "S13",
+        "E03",
+        "E05"
+      ]
+    },
+    {
+      "id": "R07",
+      "title": "语义修订与可恢复写入的共同基础",
+      "priority": "P1",
+      "milestone": "M2",
+      "depends_on": [
+        "R04"
+      ],
+      "status": "completed",
+      "files": [
+        "src/relations.rs",
+        "src/store.rs",
+        "src/api.rs",
+        "src/schema.rs",
+        "新增 src/revisions.rs",
+        "新增 mutation 模块仅在有必要时拆分"
+      ],
+      "goal": "在已有关系恢复协议上增量扩展；恢复日志不是历史数据库。",
+      "implementation": [
+        "现有 .relations-operation.json / .relations-commits 已有校验和协调恢复，不重写一套并行提交协议。先为它们补公开内部 MutationPlan 接口，保留 v1/v2 journal 恢复。",
+        "为 body/type/tags/source/evidence/links/status/expires 等语义状态维护 semantic_rev；access_count/last_accessed/strength 变化不生成语义历史。语义 CAS 与磁盘字节 CAS 分开，防 metadata bump 导致假冲突或吞真实编辑。",
+        "新增 history/<memory_id>/<revision>.md 的不可变版本和有版本 manifest；仅成功提交记录系统时间。第一版支持单 store 原子计划，已有跨 store 关系继续原协议，不借机实现通用分布式事务。",
+        "保存操作意图→写持久历史镜像→记录提交决定→物化当前 Markdown→标记完成。新建文件必须有 absence precondition；路径白名单和 symlink 防护不得因支持 history/JSON 而放开为任意路径。",
+        "在模型/归纳计算前取得输入 snapshot，计算在锁外；提交时检查期望 rev 和来源哈希。所有知识修改入口必须走统一 mutation，包括 link、consolidate、维护中的状态变更。",
+        "外部手改：与上次已知镜像比较并在首次观察时记录 external_edit；无法知道真实编辑时刻或中间版本时明确 unknown gap，不用 mtime 冒充系统记录历史。",
+        "恢复遇到外部不同内容保留现场并报 RECOVERY_CONFLICT；旧 coordinator 未清空前不搬 store/改变 global root。commit decision 清理需证明所有参与者完成，不能按年龄盲删。"
+      ],
+      "acceptance": [
+        {
+          "id": "R07-A01",
+          "requirement": "新建、更正、supersede、关系变化可重建历史；只访问或调热度不产生新 semantic_rev。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A02",
+          "requirement": "在每个持久提交阶段注入失败，恢复后得到已提交一致状态或明确冲突，没有半数事实被隐藏。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A03",
+          "requirement": "保留既有跨 store 五个中断阶段测试；新单 store 多对象操作不破坏它们。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A04",
+          "requirement": "恢复期间用户手改任意目标时不覆盖；journal 与现场保留可诊断。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A05",
+          "requirement": "v1/v2 旧 pending journal 可恢复；新 journal 中越界/符号链接/重复目标/哈希不符被拒绝。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A06",
+          "requirement": "旧记忆首次纳入历史只记录当前快照与 coverage 起点，不能生成虚构的过去 body。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        },
+        {
+          "id": "R07-A07",
+          "requirement": "从规范 Markdown+manifest/证据重建 SQLite 后，当前状态与历史版本不丢失。",
+          "status": "pass",
+          "evidence": "evidence/r07-regression.txt; evidence/r07-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不做 CRDT/网络复制、不把 SQLite 改为唯一知识源、不宣称多文件普通 rename 已是原子事务。"
+      ],
+      "rollback": "在副本上先升级并验证恢复；旧 writer 不可处理新 journal 时禁止混写。回退使用备份或兼容导出，绝不删未决 journal 强行启动。",
+      "references": [
+        "S11",
+        "S12",
+        "E02",
+        "E09"
+      ]
+    },
+    {
+      "id": "R08",
+      "title": "system-time 历史查询与保守代码适用性",
+      "priority": "P2",
+      "milestone": "M2",
+      "depends_on": [
+        "R07"
+      ],
+      "status": "completed",
+      "files": [
+        "src/search.rs",
+        "src/api.rs",
+        "src/schema.rs",
+        "src/main.rs",
+        "src/mcp_tools.json",
+        "src/context.rs",
+        "src/eval.rs"
+      ],
+      "goal": "能回答“这个时刻库里记录了什么”，但不承诺世界真实时间或历史排序复现。",
+      "implementation": [
+        "新增 history/show --revision/search --as-of 的共享 API。历史窗口统一 [system_from,system_until)，timestamp 解析 RFC3339；仅日期输入固定解释为 UTC 00:00 并回显。所有时间由可注入 clock 产生。",
+        "旧 created 与未知 supersede 时间不强行回填；超出 coverage 返回 partial_history/unknown，而非空结果冒充不存在。",
+        "第一版历史检索仅使用版本化 lexical 数据；禁用现时 vector、现时图扩展、access bump 和当前视图回退。以后没有 revision-scoped 证据就不得重新开启这些 lanes。",
+        "结果包含历史版本的 status/expiry/provenance。旧 expires 仍是 inclusive 日期，历史到期状态依据查询明确偏移的日历日计算并回显；不能拿今天的 is_expired 筛掉过去有效条目。",
+        "新增 observed_commit 与 applies_to 是不同字段。默认只承认 repo-wide、explicit exact commit/tree、明确 related-path digest；不要推断一个祖先 commit 的事实永远适用于后代。branch 只展示，unknown applicability 明示。",
+        "使用当前索引词频排序历史内容可能受后来文档影响；第一版只保证内容版本正确，不承诺当时排名完全重现。严格历史重放作为独立评测模式使用冻结语料。"
+      ],
+      "acceptance": [
+        {
+          "id": "R08-A01",
+          "requirement": "在 T1 保存 PostgreSQL，T2 明确替代为 SQLite；T1≤T<T2 只看到当时版本。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        },
+        {
+          "id": "R08-A02",
+          "requirement": "当前已经过期的事实在过去有效时间仍可查；跨日期/偏移边界规则一致且输出解释。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        },
+        {
+          "id": "R08-A03",
+          "requirement": "没有历史覆盖时返回 partial/unknown；不将 recorded_at=今天的旧文件伪装成其 created 那天的完整快照。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        },
+        {
+          "id": "R08-A04",
+          "requirement": "加入未来文档、当前 supersedes 边、当前向量后，不会泄漏未来正文/关系进历史结果。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        },
+        {
+          "id": "R08-A05",
+          "requirement": "历史只读查询不改 usage、expiry、session 去重或 canonical memory。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        },
+        {
+          "id": "R08-A06",
+          "requirement": "切到旧 commit、相同 commit 的脏工作区、两分支同名文件：适用性不同或 unknown，不自动套用最新结论。",
+          "status": "pass",
+          "evidence": "evidence/r08-regression.txt; evidence/r08-final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不自动 LLM 推断现实生效时间、不默认实现 --as-of <commit> 与时间同义、不做通用 Git 分支知识合并。"
+      ],
+      "rollback": "关闭历史选项不影响当前搜索；历史索引可重建，历史 Markdown/manifest 不是缓存。",
+      "references": [
+        "S05",
+        "S08",
+        "S12",
+        "E02",
+        "E09"
+      ]
+    },
+    {
+      "id": "R09",
+      "title": "Reconciliation 与 Proposal Ledger",
+      "priority": "P1",
+      "milestone": "M2",
+      "depends_on": [
+        "R07",
+        "R04"
+      ],
+      "status": "completed",
+      "files": [
+        "新增 src/reconcile.rs",
+        "新增 src/proposals.rs",
+        "src/api.rs",
+        "src/ingest.rs",
+        "src/relations.rs",
+        "src/mcp_tools.json"
+      ],
+      "goal": "解释“支持、补充、不同上下文、冲突和替代”，并以可审核操作执行，而不是重新引入智能覆盖。",
+      "implementation": [
+        "定义枚举 CREATE/SKIP/SUPPORT/REFINE/CONTEXTUALIZE/CONTRADICT/SUPERSEDE 和带 evidence、reason、targets、expected_revisions 的 Decision；策略与执行分离，执行复用 R07。",
+        "默认自动处理确定性的 exact replay/CREATE/独立来源 SUPPORT；相似度只召回候选。模型生成的 refines/caused_by/contradicts/supersedes/摘要重写均为提案。",
+        "fact_key 需同时匹配主体、项目/环境、属性和单值/多值约束；同 key 不同值也可能是环境差异或低可信推测，不能直接 supersede。明确目标+授权+CAS 才可应用替代。",
+        "提案持久保存 generated/pending/approved/applied/rejected/stale 状态与变更摘要哈希。批准时重新读取所有目标 revision；不一致标 stale，不能静默重基。",
+        "默认 agent 可以提出提案，但不能自行批准有语义破坏性的提案。审批走明确的人类 CLI/受信管理入口；tool annotation 不是授权系统。",
+        "批准过程只执行结构化领域操作，不运行提案里的 shell。审批重试幂等；undo 以有前置条件的补偿修订实现，存在后续依赖时报告冲突。",
+        "有疑似矛盾的新事实仍可保守追加并显示未核实/冲突候选，不因无人审批而阻塞正常记忆写入。"
+      ],
+      "acceptance": [
+        {
+          "id": "R09-A01",
+          "requirement": "相同主题互补事实为 CREATE/REFINE 候选，不自动失效；多值属性不产生假冲突。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R09-A02",
+          "requirement": "同属性不同环境被识别为不同上下文；同范围单值冲突有证据说明但不自动选择赢家。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R09-A03",
+          "requirement": "不同来源同事实 SUPPORT 追加来源；同源转述不倍增证据。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R09-A04",
+          "requirement": "提案生成后目标被另一个 agent 修改，批准返回 stale 且无半应用。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R09-A05",
+          "requirement": "重复批准/applied 重放幂等；对不具审批授权的 MCP 调用拒绝，其他工具正常。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R09-A06",
+          "requirement": "语义修改全部经过 R07 恢复/历史链；undo 不覆盖后续外部修改或删除证据。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不强制 LLM judge、不按 agent 名称给真伪排名、不根据高 strength 自动信任。"
+      ],
+      "rollback": "关闭自动建议即可回到保守写入；提案文件保留。已应用动作使用补偿修订而非覆写旧历史。",
+      "references": [
+        "S03",
+        "S11",
+        "E08",
+        "E10",
+        "E11",
+        "E12"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "可重复维护与热度/有效性分离",
+      "priority": "P2",
+      "milestone": "M2",
+      "depends_on": [
+        "R07",
+        "R01"
+      ],
+      "status": "completed",
+      "files": [
+        "src/api.rs",
+        "src/schema.rs",
+        "src/store.rs",
+        "src/context.rs",
+        "src/main.rs"
+      ],
+      "goal": "多个 agent 共用 store 时，维护次数不再无意决定知识寿命。",
+      "implementation": [
+        "保留 per_run 兼容模式；新增显式 per_day 模式，启用时初始化 last_maintained_at，不根据旧 created 一次扣尽所有历史天数。",
+        "按固定 clock 计算 elapsed days 并记录已应用周期，多次同日维护幂等；时钟回退时不产生反向奖金或巨额惩罚。",
+        "区分 usage_strength、semantic validity、verification；保留旧字段投影，衰减不能自动改真假。明确 superseded/expired/deprecated/archive 的交互。",
+        "core candidate 只给候选，提升 core 仍需提案/明确确认；低频但关键记忆可 pinned，不因少召回自动丢失。",
+        "维护 dry-run 不改 canonical records；状态/归档变化经 R07；兼容原有 archive 位置和 explicit history 查询。"
+      ],
+      "acceptance": [
+        {
+          "id": "R10-A01",
+          "requirement": "同一天运行一次/十次维护结果相同（per_day），per_run 保留旧契约。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R10-A02",
+          "requirement": "启用 per_day 的旧库不因历史年龄被一次归档；时钟回退、跨日边界可重复测试。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R10-A03",
+          "requirement": "被频繁注入只提升热度，不提升 verification 或解除 superseded。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R10-A04",
+          "requirement": "pinned 关键低频知识不因热度归档，但明确 supersede/expiry 仍按公开策略处理。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R10-A05",
+          "requirement": "dry-run 不改文件/历史；实际状态变化只有一份对应 revision。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不复制复杂 Weibull/强化学习策略、不启用 cron、不自动 core promotion。"
+      ],
+      "rollback": "配置回到 per_run 不倒写历史计量；字段保留兼容，任何语义回退需补偿修订。",
+      "references": [
+        "S03",
+        "E10",
+        "E11"
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "有界 sleep 与宿主辅助提案",
+      "priority": "P2",
+      "milestone": "M3",
+      "depends_on": [
+        "R09",
+        "R06"
+      ],
+      "status": "completed",
+      "files": [
+        "新增 src/sleep.rs",
+        "src/ingest.rs",
+        "src/proposals.rs",
+        "src/main.rs",
+        "src/mcp_tools.json"
+      ],
+      "goal": "把 Gemini 的睡眠提炼转成显式、可审查、默认不修改事实的维护工作流。",
+      "implementation": [
+        "sleep 明确调用；输入只扫描 since_cursor 之后的有限变更/检查点，设置数量、字节、输出 token 和提案数量上限。已有启发式/host/外部模型模式复用而非另建 client。",
+        "规则模式能离线生成确定性重复/引用缺失等报告；语义模式输出 proposal。自动修复仅限满足证明性前置条件的派生索引或已有关系镜像修复，不自动猜 caused_by。",
+        "host 模式先 export 结构化 request，宿主返回 proposals 再 import；不从不可信记忆中取 shell 指令执行。可选外部模型遵守全局端点和显式授权。",
+        "生成报告记录输入 refs/revisions、输出和 cursor；失败或输出验证失败不推进 cursor，部分成功可安全重放。",
+        "禁止默认保留全量私人 transcript；报告只含必要的脱敏内容，不能把检测到的密钥再写进 audit log。",
+        "全程不自动安装定时器，不把每个 Stop 变成长时维护；请求到来时仍优先正常检索。"
+      ],
+      "acceptance": [
+        {
+          "id": "R11-A01",
+          "requirement": "关闭所有模型仍能执行规则 sleep/report；不发生网络请求。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R11-A02",
+          "requirement": "相同 input snapshot 重跑不重复生成等价提案；不同 revision 会生成新候选或 stale。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R11-A03",
+          "requirement": "模型失败、非法输出、半批提案失败时 cursor 不丢未处理输入。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R11-A04",
+          "requirement": "模型声称高置信度 caused_by/supersedes 仍待审，不直接改 Markdown。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R11-A05",
+          "requirement": "输入/输出/提案数超上限时明确 partial 与下一游标，不无限循环。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R11-A06",
+          "requirement": "报告含来源但不含凭据；未授权 sleep 不能改 core、执行命令或启用 cron。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不把 Dream Report 当事实、不引入后台 daemon、不要求每次写入跑模型。"
+      ],
+      "rollback": "关闭 sleep 保留基础能力；报告与待审提案可以归档，已应用变更仍按历史管理。",
+      "references": [
+        "E08",
+        "E10",
+        "S10"
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "可追溯的派生知识页",
+      "priority": "P2",
+      "milestone": "M3",
+      "depends_on": [
+        "R11",
+        "R08"
+      ],
+      "status": "completed",
+      "files": [
+        "新增 src/views.rs",
+        "src/context.rs",
+        "src/search.rs",
+        "src/proposals.rs",
+        "docs/interface.md"
+      ],
+      "goal": "借鉴 Hindsight/Letta 的归纳层，但不让旧摘要成为无法撤销的新事实。",
+      "implementation": [
+        "生成 views/architecture.md、pitfalls.md、testing.md 等可选视图，记录 derived_from 的 MemoryRef+revision、生成方式、覆盖范围与 known gaps。",
+        "源 revision 变动/supersede/失效时标 stale，并退出默认注入；重新生成需当前快照，不以旧视图替代原始证据。",
+        "不覆盖人工 core.md。视图与原始事实在检索和上下文中标类型，避免同一内容占两次预算或被算两份支持证据。",
+        "经验转规程仅输出候选，需成功证据、适用条件、失败边界和审批；不依据一次 agent 自述产生自动 skill。",
+        "派生文件可以重建；人工编辑视图必须转为独立知识或显式 unmanaged，不覆盖用户手改。"
+      ],
+      "acceptance": [
+        {
+          "id": "R12-A01",
+          "requirement": "每条关键结论可追溯到具体 source revision；不存在的引用使生成失败或明确 partial。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R12-A02",
+          "requirement": "源被替代后视图不再作为当前确定知识注入；旧视图仍可审计。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R12-A03",
+          "requirement": "原始事实与派生摘要不构成两个独立证据；相同上下文不双重占预算。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R12-A04",
+          "requirement": "人工 core 不被自动改；视图外部手改触发冲突而非静默覆盖。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R12-A05",
+          "requirement": "无模型情况下仍能按模板生成索引式视图，不伪称完成语义综合。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不做自动技能发布、不运行生成规程、不升级成 agent framework。"
+      ],
+      "rollback": "禁用 views 即恢复事实级召回；保留来源版本与人工内容，派生文件可在明确检查后重建。",
+      "references": [
+        "E03",
+        "E06"
+      ]
+    },
+    {
+      "id": "R13",
+      "title": "原生快照、迁移与安全恢复",
+      "priority": "P1",
+      "milestone": "M3",
+      "depends_on": [
+        "R07",
+        "R06",
+        "R09"
+      ],
+      "status": "completed",
+      "files": [
+        "新增 src/snapshot.rs",
+        "src/store.rs",
+        "src/relations.rs",
+        "src/main.rs",
+        "docs/rust-migration.md"
+      ],
+      "goal": "继承 Memvid 的便携与校验，不把 archive Markdown 换成私有二进制真源。",
+      "implementation": [
+        "快照包含 canonical Markdown、history、store manifest、证据/检查点/提案元数据和 schema/软件版本；config 采用安全白名单。默认排除原始 transcript、密钥、模型、可重建 SQLite/WAL 与宿主设置。",
+        "先持锁检查/恢复 pending 操作；未决跨 store coordinator 不齐全时拒绝“可迁移完整快照”。不得搬迁一个参与者后宣称仍能依赖旧 global root 恢复。",
+        "优先实现标准目录快照+SHA-256 manifest；可选 tar/zip 使用经过审查的依赖，不能 shell 拼接不可信路径。容器格式不改变知识真源。",
+        "恢复默认新空目录，先验证条目数量/大小上限、路径规范化、重复路径、symlink/hardlink、哈希与 schema，再发布目录；失败不留下貌似完整 store。",
+        "保留 store_id 的 restore 与创建新独立副本的 fork 分开；同时在线的相同身份副本必须可检测。首版不静默合并两个 store。",
+        "验证恢复后重建缓存；私有本机切换记录里的备份路径与脚本不作为公开实现依赖。"
+      ],
+      "acceptance": [
+        {
+          "id": "R13-A01",
+          "requirement": "备份→空目录恢复→重建 SQLite 后 facts/provenance/history/checkpoints/proposals 数量与哈希符合 manifest。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R13-A02",
+          "requirement": "路径 ../、绝对路径、符号/硬链接、重复条目、超大解压、损坏哈希均被拒绝。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R13-A03",
+          "requirement": "恢复失败不覆盖原 store；真实用户数据不作为默认测试输入。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R13-A04",
+          "requirement": "存在未完成跨 store 操作时拒绝不完整迁移，不盲删 coordinator decision。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R13-A05",
+          "requirement": "默认包中没有凭据/API selectors/敏感 transcript；脱敏策略及被排除项在 manifest 可见。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        },
+        {
+          "id": "R13-A06",
+          "requirement": "restore 保身份与 fork 新身份行为各自明确，旧裸 ID 引用不会静默指向另一独立库。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+        }
+      ],
+      "non_goals": [
+        "不做云同步、不把压缩包当在线索引、不自动恢复真实库。"
+      ],
+      "rollback": "恢复默认新目录；回退即保留旧目录不切换。新 schema writer 切换必须停旧 writer，并保留可验证的迁移前快照。",
+      "references": [
+        "S11",
+        "S12",
+        "S13",
+        "E07"
+      ]
+    },
+    {
+      "id": "R14",
+      "title": "实测驱动的性能与检索评测",
+      "priority": "P1",
+      "milestone": "横贯全程",
+      "depends_on": [
+        "R00"
+      ],
+      "status": "completed",
+      "files": [
+        "src/search.rs",
+        "src/models.rs",
+        "src/vectors.rs",
+        "src/eval.rs",
+        "新增 benches 或 tests/perf",
+        "assets/eval/",
+        ".github/workflows/ci.yml"
+      ],
+      "goal": "Rust 重构已完成，现在用证据优化，不能继续把“Rust 化”本身当性能项目。",
+      "implementation": [
+        "在 R00 后立即建立无模型 release 基线：进程启动、冷建索引、热查询、单文件变更、文件路径注入、pending recovery。合成 100/1k/10k 条，记录硬件、build profile、模型开关和数据哈希。",
+        "分解耗时为文件枚举/stat、SQLite 同步、候选读取/反序列化、图扩展、模型 hash/session 构造、context 渲染。审阅当前 sync_store 每次枚举文件和 fingerprint 读取模型的成本，但不先断言是主瓶颈。",
+        "保持 FTS/BM25/RRF/typed graph/reranker 已有功能；新增 lane ablation 与噪声/无关注入率，不再开发重复 graph-hopping。",
+        "语义正确性是硬门禁。若优化需要弱化内容哈希、跳过外部编辑检查或不恢复 pending，方案不合格。可能引入进程内模型 handle 缓存或更便宜同步策略，但须先说明一致性和失效。",
+        "评测分三类：确定性回归、完整公开语料的 retrieval、固定模型/预算的 end-to-end。报告 requested/effective pipeline，意外 fallback 不能继续冒名通过。",
+        "重复测量报告 p50/p95 与样本数。相对性能回退阈值在取得稳定基线后设定；暂不硬编码“Rust 一定<10ms”或随机 CI 机器绝对门限。"
+      ],
+      "acceptance": [
+        {
+          "id": "R14-A01",
+          "requirement": "发布可复跑命令、原始 CSV/JSON、数据哈希和环境，所有性能数值与明确提交绑定。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/eval-matrix.json; evidence/r14-perf-final.json"
+        },
+        {
+          "id": "R14-A02",
+          "requirement": "旧三个 recall 门禁不降低；benchmark fixture 不作为 training/tuning 后唯一测试集。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/eval-matrix.json; evidence/r14-perf-final.json"
+        },
+        {
+          "id": "R14-A03",
+          "requirement": "词法→向量→图→rerank 消融明确每一路实际启用状态，不混用 mock 和真实推理结论。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/eval-matrix.json; evidence/r14-perf-final.json"
+        },
+        {
+          "id": "R14-A04",
+          "requirement": "外部同大小正文修改、删除、rename、并发读写、缓存损坏、pending recovery 在优化前后行为一致。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/eval-matrix.json; evidence/r14-perf-final.json"
+        },
+        {
+          "id": "R14-A05",
+          "requirement": "跨 agent 端到端使用无记忆/本版/改进版相同任务与预算，记录错误事实使用率和接手续作结果。",
+          "status": "pass",
+          "evidence": "evidence/r14-agent-eval.json; evidence/r14-agent-before-checkpoint-fix.json; evidence/r09-r15-regression.txt (one synthetic producer handoff, three real isolated consumer sessions)"
+        },
+        {
+          "id": "R14-A06",
+          "requirement": "索引冷建变慢与热查询收益分别报告，不用某一项平均值笼统宣称全面提速。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/eval-matrix.json; evidence/r14-perf-final.json"
+        }
+      ],
+      "non_goals": [
+        "不再提 Rust probe 重写、不无证据引入 ANN/图数据库/常驻 worker、不使用未经授权真实会话评测。"
+      ],
+      "rollback": "所有优化单独可回退；固定评测语料与原始结果保留，回退不影响 canonical 数据格式。",
+      "references": [
+        "S06",
+        "S07",
+        "S08",
+        "S13",
+        "E05",
+        "E14"
+      ]
+    },
+    {
+      "id": "R15",
+      "title": "发布候选收口与执行交接",
+      "priority": "P1",
+      "milestone": "M4",
+      "depends_on": [
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R12",
+        "R13",
+        "R14"
+      ],
+      "status": "completed",
+      "files": [
+        ".github/workflows/ci.yml",
+        "Cargo.toml",
+        "Cargo.lock",
+        "README.md",
+        "README.zh.md",
+        "docs/rust-migration.md",
+        "docs/interface.md",
+        "assets/templates/",
+        "docs/plans/native-evolution/"
+      ],
+      "goal": "按明确能力边界验收下一代原生版本，不能以“功能代码已经写了”替代可用性。",
+      "implementation": [
+        "冻结 CLI/MCP 和持久 schema 契约；所有新能力有机器可读 status/warnings，旧 alias 按兼容承诺保留。pub Rust API 的新增字段可能破坏 struct literal；使用新请求类型/builder 或明确 crate semver 变更，不假称增加字段总是兼容。",
+        "Linux/macOS CI 验证 default/all-features 编译、测试、包内资源及原生工具；本地 ONNX 资产可选独立作业，缺失写 NOT_RUN，而非 pass。",
+        "主机验收按三个层次记录：纯协议 fixture、真实配置 runner、真实应用/模型会话。没有实际做哪层就不宣称通过；默认不更改已有聊天和宿主设置。",
+        "检查源码包和二进制包、checksum、依赖/许可证、MSRV、ORT 动态库要求。package version≠已发布 release；打 tag/push/publish 需另行用户授权。",
+        "更新 README/迁移指南/执行日志：已完成任务、未完成边界、迁移前置、恢复方法、实际测试结果。不宣称零 bug、任意模型支持或任意 Git 时间旅行。"
+      ],
+      "acceptance": [
+        {
+          "id": "R15-A01",
+          "requirement": "全部任务验收条目有 pass/fail/not_run/blocked；没有未运行却写 pass 的条目。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json; evidence/final/upgrade-restore.json"
+        },
+        {
+          "id": "R15-A02",
+          "requirement": "源码打包白名单继续有效；二进制不依赖 Python 内核，开发 smoke 脚本可以保留。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json; evidence/final/upgrade-restore.json"
+        },
+        {
+          "id": "R15-A03",
+          "requirement": "从旧 1.0.0 副本升级→复跑→快照恢复完整演练；所有 pending 操作有明确处置。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json; evidence/final/upgrade-restore.json"
+        },
+        {
+          "id": "R15-A04",
+          "requirement": "四当前宿主的协议合同通过，真实宿主/真实模型证据单列；不重新宣称 Hermes support。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json; evidence/final/upgrade-restore.json"
+        },
+        {
+          "id": "R15-A05",
+          "requirement": "版本与 schema 变更、回滚限制、尚未实现选项在中英文文档一致；未经授权没有发布或安装操作。",
+          "status": "pass",
+          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json; evidence/final/upgrade-restore.json"
+        }
+      ],
+      "non_goals": [
+        "不自动 push/tag/publish，不修改用户真实记忆，不删历史验收记录。"
+      ],
+      "rollback": "发布前保留旧二进制和迁移前已验证快照；入口切换单独授权；新数据不能直接交给旧 writer。",
+      "references": [
+        "S01",
+        "S02",
+        "S13",
+        "S14",
+        "S15"
+      ]
+    }
+  ],
+  "execution_head": "d05f02853f42771ae9ca04d78b79739d01f1a76c"
+}

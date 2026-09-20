@@ -1,0 +1,23 @@
+R08 local acceptance (2026-09-20)
+
+Commands:
+  cargo test --offline --test history
+  cargo test --offline --test applicability --test revision_contract
+  cargo test --offline --lib context::tests::applicability_changes_refresh_delivered_context
+  python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/r08-final
+The final shared gate logs/results are in r08-final/; completion is recorded in EXECUTION_LOG.md.
+
+R08-A01 PASS: history.rs uses injected T1/T2 clocks for PostgreSQL then SQLite on the same identity. It tests T1, immediately before T2, and T2, plus history listing and explicit revision show. Half-open boundaries select the correct body and source prefix. Historical dates are interpreted independently of current wall time.
+R08-A02 PASS: An already-expired-in-current-time fixture is retrievable on its historical valid day. Inclusive expiry, date-only UTC midnight, explicit offsets crossing calendar-day boundaries, and the echoed interpretation are asserted. Non-date expiry retains the legacy human-interpreted note contract.
+R08-A03 PASS: A legacy created=2000 record first observed in 2099 returns partial_history/unknown before coverage, never a fabricated 2000 snapshot. At adoption, the single known raw snapshot appears. No read path observes or migrates current Markdown.
+R08-A04 PASS: Later replacement content, current supersedes links, a future document and a deliberately invalid current vector file do not leak into past results. T1 source_event_count=1 and provenance prefix exclude the T2 SUPPORT event. Historical search never calls current search/vector/graph or access-update lanes.
+R08-A05 PASS: Recursive store-file bytes before and after search/list/show are identical, including canonical Markdown, manifests, usage/expiry and cache files. CLI/MCP historical outputs match; a pending journal (including a dangling symlink) blocks the read and remains untouched. Historical reads use an existing lock only and do not run recovery.
+R08-A06 PASS: Applicability fixtures test exact old/new commit, same-commit tracked/untracked dirt, exact tree, full-path digests across branches with same-basename files, malformed IDs, global scope, and unsafe paths. Missing/dirty/unsafe evidence returns unknown. Explicitly scoped context is reinjected with a budgeted warning when applicability changes without a memory edit.
+
+Read-only Git boundary: temporary fixtures prove ordinary status can execute configured fsmonitor or clean-filter scripts. Evaluation suppresses fsmonitor/untracked-cache features, clears inherited environment, checks effective included repository filter configuration before status, and refuses gitlinks rather than recursing. Sentinel scripts are not invoked and index bytes stay unchanged during evaluate. File reads are bounded by actual bytes, not only metadata.
+
+Initial test cleanup removed an unused import/helper and a redundant Ok(...?) before Clippy passed. Targeted tests were introduced alongside the new API, so this evidence does not claim all tests were red against the old implementation. The final review additionally covered included Git filter configuration and pending-journal symlinks.
+
+Models: Terra high owned applicability implementation/tests; Luna max owned the explicit history acceptance fixtures. The main agent owned historical API, CLI/MCP/context integration, review and final validation. No real host settings, memory stores, installed binaries, paid endpoints, model downloads, pushes or releases are part of this batch.
+
+Limits: only content versions and recorded coverage are promised. Ranking is lexical term overlap on selected snapshots, not original ranking replay; observed_commit/branch are not applicability proof; historical results assess applicability against the current worktree and label it as such. No real-world valid-time inference is made.

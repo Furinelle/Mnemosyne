@@ -1,0 +1,4 @@
+   Packaging mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Packaged 60 files, 623.6KiB (149.5KiB compressed)
+
+EXIT_CODE=0

@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "scope": "temporary project and loopback mock only",
+  "cache_recovery": "passed by tests/native_http_models_smoke.py before matrix",
+  "change_detection": [
+    "same_size_edit",
+    "rename",
+    "delete"
+  ],
+  "requested_effective_matrix": [
+    {
+      "requested": {
+        "lexical": true,
+        "vector": false,
+        "graph": false,
+        "rerank": false
+      },
+      "effective": {
+        "lexical": true,
+        "vector": false,
+        "graph": false,
+        "rerank": false
+      },
+      "diagnostic": "noise did not displace lexical target"
+    },
+    {
+      "requested": {
+        "lexical": true,
+        "vector": true,
+        "graph": false,
+        "rerank": false
+      },
+      "effective": {
+        "lexical": true,
+        "vector": true,
+        "graph": false,
+        "rerank": false
+      },
+      "diagnostic": "local HTTP embedding mock; vec score observed"
+    },
+    {
+      "requested": {
+        "lexical": true,
+        "vector": false,
+        "graph": true,
+        "rerank": false
+      },
+      "effective": {
+        "lexical": true,
+        "vector": false,
+        "graph": true,
+        "rerank": false
+      },
+      "diagnostic": "linked non-lexical record has link_boost"
+    },
+    {
+      "requested": {
+        "lexical": true,
+        "vector": false,
+        "graph": false,
+        "rerank": true
+      },
+      "effective": {
+        "lexical": true,
+        "vector": false,
+        "graph": false,
+        "rerank": false
+      },
+      "diagnostic": "missing local ONNX asset kept lexical ordering; no real rerank claim"
+    }
+  ],
+  "mock_http_calls": 2,
+  "limitations": [
+    "vector lane uses an in-process HTTP mock, not a real embedding provider",
+    "rerank is requested with missing local ONNX assets and verified only as lexical fallback",
+    "not a public-corpus retrieval result or cross-agent end-to-end evaluation"
+  ]
+}

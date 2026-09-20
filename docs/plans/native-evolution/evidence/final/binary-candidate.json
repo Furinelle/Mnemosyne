@@ -1,0 +1,8 @@
+{
+  "status": "built_not_published",
+  "platform": "macos-arm64",
+  "binary_sha256": "2429f2434d262f98cbe5b5126e337575fc6ecb133e648d1ac4bfa2260cb2cf3f",
+  "bundle_sha256": "f734310ad5289eee4c9ca5df9092a225568cdb3ebc391b54f052b2b09754026c",
+  "onnx_runtime": "optional external library/assets, not bundled",
+  "path": "target/release-candidate/mnemosyne-unreleased-macos-arm64.tar.gz"
+}

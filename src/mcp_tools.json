@@ -39,6 +39,10 @@
         "project_path": {
           "type": "string",
           "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        },
+        "as_of": {
+          "type": "string",
+          "description": "Read-only system time: RFC3339 with offset or YYYY-MM-DD (UTC midnight)."
         }
       },
       "required": [
@@ -48,7 +52,7 @@
   },
   {
     "name": "mnemosyne_write",
-    "description": "Write one durable memory.",
+    "description": "Write durable memory, checkpoint, or pending proposal. Version 2 operations are explicit; proposal approval is only available through the trusted human CLI with a reviewed summary hash.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false,
@@ -99,12 +103,62 @@
         "project_path": {
           "type": "string",
           "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        },
+        "version": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "memory",
+            "revise",
+            "checkpoint_new",
+            "checkpoint_update",
+            "checkpoint_close",
+            "proposal",
+            "reconcile",
+            "sleep_export",
+            "sleep_rules",
+            "sleep_import",
+            "view_generate"
+          ]
+        },
+        "request": {
+          "type": "object",
+          "description": "Version 2 structured operation request. Body rewrites and semantic relations generate pending proposals; never executes commands."
         }
       },
-      "required": [
-        "type",
-        "importance",
-        "content"
+      "oneOf": [
+        {
+          "required": [
+            "type",
+            "importance",
+            "content"
+          ],
+          "properties": {
+            "version": {
+              "enum": [
+                1
+              ]
+            }
+          }
+        },
+        {
+          "required": [
+            "version",
+            "operation",
+            "request"
+          ],
+          "properties": {
+            "version": {
+              "const": 2
+            }
+          }
+        }
       ]
     }
   },
@@ -148,6 +202,30 @@
         "project_path": {
           "type": "string",
           "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        },
+        "version": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "memory",
+            "checkpoint",
+            "history",
+            "proposal",
+            "view"
+          ]
+        },
+        "store_id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "required": [
@@ -157,7 +235,7 @@
   },
   {
     "name": "mnemosyne_link",
-    "description": "Link two memories with a typed relation.",
+    "description": "Add related links; semantic relations refines/caused_by/contradicts/supersedes create pending reviewed proposals in upgraded stores.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false,
@@ -271,6 +349,21 @@
         "project_path": {
           "type": "string",
           "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        },
+        "budget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
         }
       },
       "required": [

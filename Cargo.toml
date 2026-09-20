@@ -7,7 +7,7 @@ license = "MIT"
 description = "Local-first, agent-agnostic memory kernel"
 repository = "https://github.com/Furinelle/Mnemosyne"
 homepage = "https://github.com/Furinelle/Mnemosyne"
-include = ["/Cargo.toml", "/Cargo.lock", "/rust-toolchain.toml", "/src/**", "/assets/**", "/README.md", "/LICENSE", "/docs/rust-*.md", "/tests/*.rs", "/tests/native_*_smoke.py"]
+include = ["/Cargo.toml", "/Cargo.lock", "/rust-toolchain.toml", "/src/**", "/assets/**", "/README.md", "/README.zh.md", "/docs/interface.md", "/LICENSE", "/docs/rust-*.md", "/tests/*.rs", "/tests/native_*.py"]
 
 [dependencies]
 anyhow = "1"

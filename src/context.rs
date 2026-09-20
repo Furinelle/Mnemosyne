@@ -7,7 +7,9 @@ use crate::{
 use anyhow::{Result, bail, ensure};
 use chrono::{DateTime, Local, Utc};
 use fs2::FileExt;
+use serde::Serialize;
 use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
@@ -48,6 +50,26 @@ fn budget(config: &Value) -> Result<usize> {
         .as_u64()
         .and_then(|v| usize::try_from(v).ok())
         .ok_or_else(|| anyhow::anyhow!("injection.max_tokens must be a nonnegative integer"))
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ContextBundle {
+    pub version: u8,
+    pub context: String,
+    pub items: Vec<Value>,
+    pub estimated_tokens: usize,
+    pub budget_mode: &'static str,
+    pub selected: Vec<Value>,
+    pub omitted: Vec<Value>,
+}
+
+struct Assembly {
+    bundle: ContextBundle,
+    delivered: Vec<Value>,
+}
+
+fn item_reason(item: &Value, reason: &str) -> Value {
+    json!({"id":text(item,"id"),"scope":text(item,"scope"),"path":text(item,"path"),"kind":item["kind"].as_str().unwrap_or("memory"),"reason":reason,"match_reason":text(item,"match_reason")})
 }
 
 fn show_hint(config: &Value, channel: &str) -> String {
@@ -100,6 +122,55 @@ fn identity(item: &Value) -> String {
     json!([text(item, "scope"), path, text(item, "id")]).to_string()
 }
 
+fn semantic_identity(item: &Value) -> String {
+    let semantic = if let Some(revision) = item.get("semantic_rev").and_then(Value::as_str) {
+        json!([revision])
+    } else {
+        let path = Path::new(text(item, "path"));
+        // The canonical file catches same-id corrections even when the injection summary stays equal.
+        let memory = fs::read_to_string(path)
+            .ok()
+            .and_then(|contents| parse_memory(&contents).ok());
+        if let Some(memory) = memory {
+            json!([
+                memory.memory_type,
+                memory.source,
+                memory.created,
+                memory.tags,
+                memory.links,
+                memory.canonical_summary,
+                memory.injection_summary,
+                memory.status,
+                memory.expires,
+                memory.body,
+                memory.extra
+            ])
+        } else {
+            json!([
+                item["type"],
+                item["title"],
+                item["source"],
+                item["created"],
+                item["tags"],
+                item["links"],
+                item["summary"],
+                item["status"],
+                item["expires"],
+                item["evidence"],
+                item["invalidated_by"],
+                item["related_paths"],
+                item["warnings"]
+            ])
+        }
+    };
+    // Worktree applicability can change while the stored memory stays identical.
+    let digest = Sha256::digest(
+        serde_json::to_vec(&json!([semantic, item["applicability"]])).unwrap_or_default(),
+    );
+    json!([identity(item), format!("{digest:x}")]).to_string()
+}
+
+#[cfg(test)]
 fn assemble(
     base: &str,
     suffix: &str,
@@ -108,7 +179,23 @@ fn assemble(
     channel: &str,
     prefix: &str,
 ) -> Result<(String, Vec<Value>)> {
-    let max_tokens = budget(config)?;
+    let output = assemble_bundle(base, suffix, results, config, channel, prefix, None)?;
+    Ok((output.bundle.context, output.delivered))
+}
+
+fn assemble_bundle(
+    base: &str,
+    suffix: &str,
+    results: &[Value],
+    config: &Value,
+    channel: &str,
+    prefix: &str,
+    budget_override: Option<usize>,
+) -> Result<Assembly> {
+    let max_tokens = match budget_override {
+        Some(value) => value,
+        None => budget(config)?,
+    };
     let join = |entries: &[String]| {
         let mut parts = Vec::new();
         if !base.is_empty() {
@@ -152,6 +239,9 @@ fn assemble(
     });
     let mut entries = Vec::new();
     let mut selected = Vec::new();
+    let mut delivered = Vec::new();
+    let mut omitted = Vec::new();
+    let mut items = Vec::new();
     for item in candidates {
         let source = inline(text(item, "source"));
         let created = inline(text(item, "created"));
@@ -167,11 +257,52 @@ fn assemble(
         } else {
             format!(" [{}]", provenance.join("; "))
         };
+        let mut warnings = item["warnings"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(inline)
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        if !text(item, "invalidated_by").is_empty() {
+            warnings.push(format!(
+                "invalidated by {}",
+                inline(text(item, "invalidated_by"))
+            ));
+        }
+        if item["applicability"]["applies_to"].is_string()
+            && item["applicability"]["status"] != "applicable"
+        {
+            warnings.push(format!(
+                "code applicability: {} ({})",
+                item["applicability"]["status"]
+                    .as_str()
+                    .unwrap_or("unknown"),
+                item["applicability"]["reason"]
+                    .as_str()
+                    .unwrap_or("unknown")
+            ));
+        }
+        let warning = if warnings.is_empty() {
+            String::new()
+        } else {
+            format!(" [Warning: {}]", warnings.join("; "))
+        };
         let fixed = format!(
-            "- ({}/{}) {}{label}",
+            "- ({}/{}) {}{}{label}{warning}",
             inline(text(item, "scope")),
-            inline(text(item, "type")),
-            inline(text(item, "id"))
+            inline(if text(item, "kind") == "checkpoint" {
+                "checkpoint"
+            } else {
+                text(item, "type")
+            }),
+            inline(text(item, "id")),
+            if text(item, "title").is_empty() || text(item, "title") == text(item, "id") {
+                String::new()
+            } else {
+                format!(" — {}", inline(text(item, "title")))
+            }
         );
         let tags = item["tags"]
             .as_array()
@@ -184,17 +315,18 @@ fn assemble(
             })
             .unwrap_or_default();
         let summary = inline(text(item, "summary"));
-        let summary = if summary.chars().count() > summary_chars {
-            format!(
-                "{}...",
+        let summary =
+            if text(item, "kind") != "checkpoint" && summary.chars().count() > summary_chars {
+                format!(
+                    "{}...",
+                    summary
+                        .chars()
+                        .take(summary_chars.saturating_sub(3))
+                        .collect::<String>()
+                )
+            } else {
                 summary
-                    .chars()
-                    .take(summary_chars.saturating_sub(3))
-                    .collect::<String>()
-            )
-        } else {
-            summary
-        };
+            };
         let mut detail = format!(
             "{}: {summary}",
             if tags.is_empty() {
@@ -208,6 +340,7 @@ fn assemble(
         if approx_tokens(&join(&entries)) > max_tokens {
             entries.pop();
             if !entries.is_empty() {
+                omitted.push(item_reason(item, "budget"));
                 continue;
             }
             loop {
@@ -220,18 +353,52 @@ fn assemble(
                 }
             }
             if approx_tokens(&join(&[line.clone()])) > max_tokens {
+                omitted.push(item_reason(item, "budget"));
                 continue;
             }
             entries.push(line);
         }
-        selected.push(item.clone());
+        selected.push(item_reason(
+            item,
+            if text(item, "match_reason").is_empty() {
+                "ranked_relevance"
+            } else {
+                text(item, "match_reason")
+            },
+        ));
+        delivered.push(item.clone());
+        items.push(json!({"kind":item["kind"].as_str().unwrap_or("memory"),"id":text(item,"id"),"scope":text(item,"scope"),"path":text(item,"path"),"text":entries.last().cloned().unwrap_or_default()}));
     }
-    Ok((join(&entries), selected))
+    let context = join(&entries);
+    let estimated_tokens = approx_tokens(&context);
+    Ok(Assembly {
+        bundle: ContextBundle {
+            version: 1,
+            context,
+            items,
+            estimated_tokens,
+            budget_mode: "estimated",
+            selected,
+            omitted,
+        },
+        delivered,
+    })
 }
 
 const FINDINGS: &str = "### Reporting new findings\n\nWhen you finish, if you discovered something worth persisting, append a block in this exact format at the END of your reply:\n\n**新发现:**\n- type: pitfall|arch_decision|codebase|handoff\n- importance: 50-90\n- title: <=80 chars\n- tags: tag1, tag2\n- content: |\n    <multiline content here, 4-space indent>\n\nMultiple findings: repeat the block. Skip if there is nothing to record.";
 
 pub fn prep(stores: &[Store], task: &str, limit: usize, channel: &str) -> Result<String> {
+    Ok(prep_bundle(stores, task, limit, channel, None, &[])?.context)
+}
+
+pub fn prep_bundle(
+    stores: &[Store],
+    task: &str,
+    limit: usize,
+    channel: &str,
+    budget_override: Option<usize>,
+    extra_items: &[Value],
+) -> Result<ContextBundle> {
     let config = load_config(stores.last())?;
     let stores = exposed(stores, &config, channel);
     let core = core(&stores)?;
@@ -257,19 +424,27 @@ pub fn prep(stores: &[Store], task: &str, limit: usize, channel: &str) -> Result
     } else {
         search_entries(&stores, task, limit, "", false, false, false)?
     };
-    Ok(assemble(
+    let mut all = extra_items.to_vec();
+    for item in &mut all {
+        if item.get("score").is_none() {
+            item["score"] = json!(10.0);
+        }
+    }
+    all.extend(results);
+    Ok(assemble_bundle(
         &base,
         &format!("{tools}{FINDINGS}"),
-        &results,
+        &all,
         &config,
         channel,
         "### Relevant prior memories",
+        budget_override,
     )?
-    .0)
+    .bundle)
 }
 
-fn result(context: String, selected: &[Value]) -> Value {
-    json!({"approx_tokens":approx_tokens(&context),"context":context,"memory_ids":selected.iter().map(|v| text(v,"id")).collect::<Vec<_>>(),"budget_mode":"estimated"})
+fn result(bundle: ContextBundle, selected: &[Value]) -> Value {
+    json!({"approx_tokens":bundle.estimated_tokens,"context":bundle.context,"memory_ids":selected.iter().filter(|v| text(v,"kind") != "checkpoint").map(|v| text(v,"id")).collect::<Vec<_>>(),"budget_mode":"estimated","context_bundle":bundle})
 }
 
 struct SessionLock(File);
@@ -345,7 +520,7 @@ fn save_sessions(path: &Path, sessions: Map<String, Value>) -> Result<()> {
     let written = (|| -> Result<()> {
         let mut file = OpenOptions::new().create_new(true).write(true).open(&tmp)?;
         file.write_all(
-            serde_json::to_string(&json!({"version":2,"sessions":sessions}))?.as_bytes(),
+            serde_json::to_string(&json!({"version":3,"sessions":sessions}))?.as_bytes(),
         )?;
         file.sync_all()?;
         fs::rename(&tmp, path)?;
@@ -357,6 +532,7 @@ fn save_sessions(path: &Path, sessions: Map<String, Value>) -> Result<()> {
     written
 }
 
+#[cfg(test)]
 fn select_for_session(
     stores: &[Store],
     candidates: &[Value],
@@ -366,8 +542,26 @@ fn select_for_session(
     config: &Value,
     prefix: &str,
 ) -> Result<(String, Vec<Value>)> {
+    let output = select_for_session_bundle(
+        stores, candidates, session, host, channel, config, prefix, None, "",
+    )?;
+    Ok((output.bundle.context, output.delivered))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn select_for_session_bundle(
+    stores: &[Store],
+    candidates: &[Value],
+    session: &str,
+    host: &str,
+    channel: &str,
+    config: &Value,
+    prefix: &str,
+    budget_override: Option<usize>,
+    context_epoch: &str,
+) -> Result<Assembly> {
     if session.is_empty() || candidates.is_empty() || stores.is_empty() {
-        return assemble("", "", candidates, config, channel, prefix);
+        return assemble_bundle("", "", candidates, config, channel, prefix, budget_override);
     }
     let root = &stores.last().unwrap().root;
     // No search/model work occurs while the state lock is held.
@@ -379,13 +573,13 @@ fn select_for_session(
                 .is_some_and(|e| e.kind() == std::io::ErrorKind::WouldBlock) =>
         {
             // Session dedup is best effort; a busy state lock must not suppress recall.
-            return assemble("", "", candidates, config, channel, prefix);
+            return assemble_bundle("", "", candidates, config, channel, prefix, budget_override);
         }
         Err(error) => return Err(error),
     };
     let path = root.join(".session_injected.json");
     let mut sessions = load_sessions(&path)?;
-    let key = json!([host, channel, session]).to_string();
+    let key = json!([host, channel, session, context_epoch]).to_string();
     let mut seen: HashSet<String> = sessions
         .get(&key)
         .and_then(|s| s["ids"].as_array())
@@ -396,12 +590,21 @@ fn select_for_session(
         .collect();
     let fresh: Vec<_> = candidates
         .iter()
-        .filter(|v| !seen.contains(&identity(v)))
+        .filter(|v| !seen.contains(&semantic_identity(v)))
         .cloned()
         .collect();
-    let output = assemble("", "", &fresh, config, channel, prefix)?;
-    if !output.1.is_empty() {
-        seen.extend(output.1.iter().map(identity));
+    let mut output = assemble_bundle("", "", &fresh, config, channel, prefix, budget_override)?;
+    for item in candidates
+        .iter()
+        .filter(|v| seen.contains(&semantic_identity(v)))
+    {
+        output
+            .bundle
+            .omitted
+            .push(item_reason(item, "already_delivered"));
+    }
+    if !output.delivered.is_empty() {
+        seen.extend(output.delivered.iter().map(semantic_identity));
         let mut ids: Vec<_> = seen.into_iter().collect();
         ids.sort();
         sessions.insert(key, json!({"ts":Utc::now().to_rfc3339(),"ids":ids}));
@@ -412,6 +615,9 @@ fn select_for_session(
 
 fn bump_selected(stores: &[Store], selected: &[Value], config: &Value) {
     for item in selected {
+        if text(item, "kind") == "checkpoint" {
+            continue;
+        }
         let path = Path::new(text(item, "path"));
         let Some(store) = stores
             .iter()
@@ -445,7 +651,143 @@ fn bump_selected(stores: &[Store], selected: &[Value], config: &Value) {
     }
 }
 
+fn repo_relative(path: &str, store: &Store) -> Option<String> {
+    let path = Path::new(path);
+    let relative = if path.is_absolute() {
+        path.strip_prefix(store.root.parent()?).ok()?
+    } else {
+        path
+    };
+    let mut parts = Vec::new();
+    for part in relative.components() {
+        match part {
+            std::path::Component::Normal(value) => parts.push(value.to_str()?.to_owned()),
+            std::path::Component::CurDir => (),
+            _ => return None,
+        }
+    }
+    (!parts.is_empty()).then(|| parts.join("/"))
+}
+
+fn file_candidates(stores: &[Store], files: &[Value]) -> Result<(Vec<Value>, Vec<String>)> {
+    let mut candidates = Vec::new();
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    let mut seen_files = HashSet::new();
+    for file in files {
+        let file = file
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("file_touch.files must contain strings"))?;
+        let Some(name) = Path::new(file).file_name().and_then(|v| v.to_str()) else {
+            continue;
+        };
+        if name.is_empty() || !seen_files.insert(file.to_owned()) {
+            continue;
+        }
+        names.push(
+            stores
+                .iter()
+                .find(|s| s.scope == "project")
+                .and_then(|s| repo_relative(file, s))
+                .unwrap_or_else(|| file.to_owned()),
+        );
+        let mut path_matches = Vec::new();
+        let mut directory_matches = Vec::new();
+        for store in stores.iter().filter(|s| s.scope == "project") {
+            let Some(touched) = repo_relative(file, store) else {
+                continue;
+            };
+            for (path, memory) in load_memories(store, false)? {
+                if memory.status == "superseded" || is_expired(&memory.expires) {
+                    continue;
+                }
+                let Some(paths) = memory.extra.get("related_paths").and_then(Value::as_array)
+                else {
+                    continue;
+                };
+                let related = paths
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .filter_map(|s| repo_relative(s, store))
+                    .collect::<Vec<_>>();
+                let reason = if related.iter().any(|s| s == &touched) {
+                    "path_exact"
+                } else if related.iter().any(|s| {
+                    Path::new(s)
+                        .parent()
+                        .filter(|p| !p.as_os_str().is_empty())
+                        .is_some_and(|p| Some(p) == Path::new(&touched).parent())
+                }) {
+                    "path_directory"
+                } else {
+                    continue;
+                };
+                let applicability = crate::applicability::evaluate(store, &memory)?;
+                let candidate = json!({"applicability":applicability,"id":memory.id,"scope":store.scope,"type":memory.memory_type,"title":memory.title(),"source":memory.source,"created":memory.created,"score":if reason == "path_exact" {2.0} else {1.5},"strength":memory.strength,"tags":memory.tags,"summary":memory.injection_summary,"path":path,"match_reason":reason,"related_paths":paths,"warnings":memory.extra.get("warnings").cloned().unwrap_or(json!([]))});
+                if reason == "path_exact" {
+                    path_matches.push(candidate);
+                } else {
+                    directory_matches.push(candidate);
+                }
+            }
+        }
+        if path_matches.is_empty() {
+            path_matches = directory_matches;
+        }
+        if path_matches.is_empty() {
+            for store in stores.iter().filter(|s| s.scope == "project") {
+                let Some(relative) = repo_relative(file, store) else {
+                    continue;
+                };
+                let Some(parent) = Path::new(&relative)
+                    .parent()
+                    .and_then(Path::to_str)
+                    .filter(|s| !s.is_empty())
+                else {
+                    continue;
+                };
+                for mut item in search_entries(
+                    std::slice::from_ref(store),
+                    parent,
+                    2,
+                    "",
+                    false,
+                    false,
+                    false,
+                )? {
+                    item["match_reason"] = json!("directory_fallback");
+                    path_matches.push(item);
+                }
+            }
+        }
+        if path_matches.is_empty() {
+            for mut item in search_entries(stores, name, 2, "", false, false, false)? {
+                item["match_reason"] = json!("basename_fallback");
+                path_matches.push(item);
+            }
+        }
+        for item in path_matches {
+            if seen.insert(identity(&item)) {
+                candidates.push(item);
+            }
+        }
+    }
+    Ok((candidates, names))
+}
+
 pub fn inject(event: &str, payload: &Value, session: &str, channel: &str) -> Result<Value> {
+    inject_with_options(event, payload, session, channel, None, "", &[])
+}
+
+pub fn inject_with_options(
+    event: &str,
+    payload: &Value,
+    session: &str,
+    channel: &str,
+    budget_override: Option<usize>,
+    context_epoch: &str,
+    extra_items: &[Value],
+) -> Result<Value> {
     ensure!(
         matches!(
             event,
@@ -475,17 +817,26 @@ pub fn inject(event: &str, payload: &Value, session: &str, channel: &str) -> Res
         } else {
             format!("## Mnemosyne Memory\n\n{core}")
         };
-        return Ok(result(
-            assemble(&base, "", &[], &config, channel, "")?.0,
-            &[],
-        ));
+        let bundle = assemble_bundle(
+            &base,
+            "",
+            extra_items,
+            &config,
+            channel,
+            "",
+            budget_override,
+        )?
+        .bundle;
+        return Ok(result(bundle, extra_items));
     }
     let mut candidates = Vec::new();
     let mut prefix = String::new();
     if event == "turn_start" {
         let prompt = text(payload, "prompt").trim();
         if prompt.chars().count() < 10 {
-            return Ok(result(String::new(), &[]));
+            let bundle =
+                assemble_bundle("", "", extra_items, &config, channel, "", budget_override)?.bundle;
+            return Ok(result(bundle, extra_items));
         }
         if !stores.is_empty() {
             candidates = search_entries(&stores, prompt, 3, "", false, false, false)?;
@@ -496,27 +847,8 @@ pub fn inject(event: &str, payload: &Value, session: &str, channel: &str) -> Res
             Some(Value::Array(files)) => files.as_slice(),
             _ => bail!("file_touch.files must be an array of paths"),
         };
-        let mut names = Vec::new();
-        let mut seen = HashSet::new();
-        for file in files {
-            let file = file
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("file_touch.files must contain strings"))?;
-            let Some(name) = Path::new(file).file_name().and_then(|v| v.to_str()) else {
-                continue;
-            };
-            if name.is_empty() || names.iter().any(|v| v == name) {
-                continue;
-            }
-            names.push(name.to_owned());
-            if !stores.is_empty() {
-                for item in search_entries(&stores, name, 2, "", false, false, false)? {
-                    if seen.insert(identity(&item)) {
-                        candidates.push(item);
-                    }
-                }
-            }
-        }
+        let (found, names) = file_candidates(&stores, files)?;
+        candidates = found;
         prefix = format!(
             "## Memories relevant to {}",
             names
@@ -526,23 +858,32 @@ pub fn inject(event: &str, payload: &Value, session: &str, channel: &str) -> Res
                 .join(", ")
         );
     }
-    let (context, selected) = select_for_session(
+    let mut all = extra_items.to_vec();
+    for item in &mut all {
+        if item.get("score").is_none() {
+            item["score"] = json!(10.0);
+        }
+    }
+    all.extend(candidates);
+    let output = select_for_session_bundle(
         &stores,
-        &candidates,
+        &all,
         session,
         text(payload, "host"),
         channel,
         &config,
         &prefix,
+        budget_override,
+        context_epoch,
     )?;
     let update = payload
         .get("update_access")
         .and_then(Value::as_bool)
         .unwrap_or(event == "turn_start");
     if update {
-        bump_selected(&stores, &selected, &config);
+        bump_selected(&stores, &output.delivered, &config);
     }
-    Ok(result(context, &selected))
+    Ok(result(output.bundle, &output.delivered))
 }
 
 #[cfg(test)]
@@ -720,6 +1061,238 @@ mod tests {
             parse_memory(&fs::read_to_string(&paths[1])?)?.access_count,
             0
         );
+        Ok(())
+    }
+
+    #[test]
+    fn revision_epoch_and_heat_have_correct_session_identity() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let store = Store {
+            scope: "project".into(),
+            root: temp.path().join(".mnemosyne"),
+        };
+        ensure_store(&store)?;
+        let mut memory = crate::schema::Memory {
+            id: "same".into(),
+            memory_type: "pitfall".into(),
+            status: "active".into(),
+            body: "## Original\n\nBody".into(),
+            injection_summary: "Same summary".into(),
+            ..Default::default()
+        };
+        let path = working_path(&store, &memory)?;
+        write_memory(&path, &memory)?;
+        let candidate = item("same", &path);
+        let config = json!({"injection":{"max_tokens":2000}});
+        let select = |epoch: &str| {
+            select_for_session_bundle(
+                std::slice::from_ref(&store),
+                std::slice::from_ref(&candidate),
+                "s",
+                "host",
+                "cli",
+                &config,
+                "",
+                None,
+                epoch,
+            )
+            .map(|v| v.delivered.len())
+        };
+        assert_eq!(select("one")?, 1);
+        assert_eq!(select("one")?, 0);
+        memory.access_count = 3;
+        memory.strength = 80;
+        memory.last_accessed = "2026-09-20".into();
+        write_memory(&path, &memory)?;
+        assert_eq!(select("one")?, 0);
+        memory.body.push_str(" corrected");
+        write_memory(&path, &memory)?;
+        assert_eq!(select("one")?, 1);
+        assert_eq!(select("two")?, 1);
+        assert_eq!(select("two")?, 0);
+        assert_eq!(
+            select_for_session_bundle(
+                std::slice::from_ref(&store),
+                std::slice::from_ref(&candidate),
+                "s",
+                "other",
+                "cli",
+                &config,
+                "",
+                None,
+                "two"
+            )?
+            .delivered
+            .len(),
+            1
+        );
+        assert_eq!(
+            select_for_session_bundle(
+                std::slice::from_ref(&store),
+                std::slice::from_ref(&candidate),
+                "s",
+                "host",
+                "mcp",
+                &config,
+                "",
+                None,
+                "two"
+            )?
+            .delivered
+            .len(),
+            1
+        );
+        let other_store = Store {
+            scope: "project".into(),
+            root: temp.path().join("other/.mnemosyne"),
+        };
+        ensure_store(&other_store)?;
+        let other_path = working_path(&other_store, &memory)?;
+        write_memory(&other_path, &memory)?;
+        assert_eq!(
+            select_for_session_bundle(
+                std::slice::from_ref(&other_store),
+                &[item("same", &other_path)],
+                "s",
+                "host",
+                "cli",
+                &config,
+                "",
+                None,
+                "two"
+            )?
+            .delivered
+            .len(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn file_touch_prefers_repo_paths_before_basename() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let store = Store {
+            scope: "project".into(),
+            root: temp.path().join(".mnemosyne"),
+        };
+        ensure_store(&store)?;
+        for (id, related) in [
+            ("backend", "backend/config.rs"),
+            ("frontend", "frontend/config.rs"),
+        ] {
+            let mut memory = crate::schema::Memory {
+                id: id.into(),
+                memory_type: "codebase".into(),
+                status: "active".into(),
+                body: format!("## {id}\n\nconfig.rs"),
+                injection_summary: id.into(),
+                ..Default::default()
+            };
+            memory
+                .extra
+                .insert("related_paths".into(), json!([related]));
+            let path = working_path(&store, &memory)?;
+            write_memory(&path, &memory)?;
+        }
+        let (exact, _) =
+            file_candidates(std::slice::from_ref(&store), &[json!("backend/config.rs")])?;
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0]["id"], "backend");
+        assert_eq!(exact[0]["match_reason"], "path_exact");
+        let (both, labels) = file_candidates(
+            std::slice::from_ref(&store),
+            &[json!("backend/config.rs"), json!("frontend/config.rs")],
+        )?;
+        assert_eq!(both.len(), 2);
+        assert_eq!(labels, ["backend/config.rs", "frontend/config.rs"]);
+        let (dir, _) =
+            file_candidates(std::slice::from_ref(&store), &[json!("frontend/other.rs")])?;
+        assert_eq!(dir[0]["id"], "frontend");
+        assert_eq!(dir[0]["match_reason"], "path_directory");
+        let (fallback, _) = file_candidates(std::slice::from_ref(&store), &[json!("config.rs")])?;
+        assert!(!fallback.is_empty());
+        assert_eq!(fallback[0]["match_reason"], "basename_fallback");
+        Ok(())
+    }
+    #[test]
+    fn applicability_changes_refresh_delivered_context() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let store = Store {
+            scope: "project".into(),
+            root: temp.path().join(".mnemosyne"),
+        };
+        ensure_store(&store)?;
+        let path = store.working_dir().join("fact.md");
+        let memory = crate::schema::Memory {
+            id: "fact".into(),
+            memory_type: "codebase".into(),
+            body: "## Fact".into(),
+            ..Default::default()
+        };
+        write_memory(&path, &memory)?;
+        let mut candidate = item("fact", &path);
+        candidate["applicability"] =
+            json!({"applies_to":"commit","status":"applicable","reason":"exact_match"});
+        let config = json!({"injection":{"max_tokens":2000}});
+        let select = |candidate: &Value| {
+            select_for_session_bundle(
+                std::slice::from_ref(&store),
+                std::slice::from_ref(candidate),
+                "r08-session",
+                "host",
+                "cli",
+                &config,
+                "",
+                None,
+                "",
+            )
+        };
+        assert_eq!(select(&candidate)?.delivered.len(), 1);
+        assert!(select(&candidate)?.delivered.is_empty());
+        candidate["applicability"]["status"] = json!("unknown");
+        candidate["applicability"]["reason"] = json!("dirty_worktree");
+        let refreshed = select(&candidate)?;
+        assert_eq!(refreshed.delivered.len(), 1);
+        assert!(
+            refreshed
+                .bundle
+                .context
+                .contains("code applicability: unknown")
+        );
+        assert!(refreshed.bundle.estimated_tokens <= 2000);
+        Ok(())
+    }
+    #[test]
+    fn file_paths_never_deliver_expired_or_superseded_memories() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let store = Store {
+            scope: "project".into(),
+            root: temp.path().join(".mnemosyne"),
+        };
+        ensure_store(&store)?;
+        for (id, status, expires) in [
+            ("current", "active", ""),
+            ("replaced", "superseded", ""),
+            ("expired", "active", "2000-01-01"),
+        ] {
+            let mut memory = crate::schema::Memory {
+                id: id.into(),
+                memory_type: "codebase".into(),
+                body: format!("## {id}\n\nOnly for routing config"),
+                status: status.into(),
+                expires: expires.into(),
+                ..Default::default()
+            };
+            memory
+                .extra
+                .insert("related_paths".into(), json!(["src/config.rs"]));
+            write_memory(&store.working_dir().join(format!("{id}.md")), &memory)?;
+        }
+        for path in ["src/config.rs", "src/other.rs"] {
+            let (items, _) = file_candidates(std::slice::from_ref(&store), &[json!(path)])?;
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0]["id"], "current");
+        }
         Ok(())
     }
 }

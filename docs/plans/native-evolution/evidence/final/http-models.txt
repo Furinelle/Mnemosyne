@@ -1,0 +1,3 @@
+HTTP model protocol, cache repair, query profile CAS, invalid provider fallback, disabled model isolation: passed (local mock; no real model acceptance)
+
+EXIT_CODE=0

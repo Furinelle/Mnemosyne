@@ -9,6 +9,21 @@ background daemon, an LLM account or a separate database server.
 
 [中文文档](README.zh.md) · [Migration and compatibility](docs/rust-migration.md)
 
+## Native evolution candidate
+
+The working-tree candidate adds opt-in provenance, task checkpoints, semantic
+revision history, system-time queries, conservative Git applicability, reviewed
+proposals, daily maintenance, bounded offline sleep, derived source indexes and
+verified directory snapshots. See [the interface contract](docs/interface.md)
+and [execution evidence](docs/plans/native-evolution/EXECUTION_LOG.md).
+
+These changes are not a new published release or a live host cutover. Store
+upgrade explicitly enables writer protocol 3 (schema 2). Stop old writers before
+upgrading; rollback requires the complete pre-upgrade store, not a marker edit.
+The eight MCP names and native aliases remain. Public Rust struct additions may
+break downstream struct literals; CLI compatibility does not imply crate source
+compatibility. A breaking crate version must be selected before publication.
+
 ## Build and install
 
 ```sh

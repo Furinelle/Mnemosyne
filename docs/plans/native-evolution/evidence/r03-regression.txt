@@ -1,0 +1,110 @@
+R03 — MCP protocol and bounded input
+Date: 2026-09-19
+Scope: src/mcp.rs, src/input.rs, tests/mcp_boundaries.rs,
+       tests/native_transport_smoke.py. main stdin wiring and old fixture updates
+       are integrated by the root agent, not covered by this file's edit ownership.
+
+Official references consulted
+- https://www.jsonrpc.org/specification
+- https://modelcontextprotocol.io/specification/2024-11-05/basic/messages
+- https://modelcontextprotocol.io/specification/2024-11-05/basic/lifecycle
+- https://modelcontextprotocol.io/specification/2024-11-05/basic/transports
+- https://modelcontextprotocol.io/specification/2024-11-05/server/tools
+Also compared the 2025-06-18 lifecycle/tools/transports descriptions; no claim of
+supporting that newer version was added.
+
+Protocol/compatibility decisions
+- Supported MCP version set is exactly {2024-11-05}. initialize returns that
+  version for a supported request, and offers it as the supported fallback for
+  a different version. The client must disconnect if the fallback is unusable.
+- Standard path: initialize (version, object capabilities, clientInfo name and
+  version), notifications/initialized, then tools. Repeated initialization is
+  rejected. ping remains available during initialization. EOF closes stdio.
+- Legacy compatibility: direct tools/list and tools/call before ANY initialize
+  remain accepted. This is a deliberate legacy deviation from the standard
+  initialization-first path, not a claim that such clients are fully compliant.
+  Once initialize is accepted, tools are blocked with -32002 until initialized.
+- Every request must carry jsonrpc="2.0", string method and string/integer id.
+  Null, Boolean, fractional, array and object ids are rejected. Unknown envelope
+  fields and invalid/unknown tool parameters are rejected before tool execution.
+  The existing nonstandard fixtures without jsonrpc/full initialization need
+  correction; the malformed-write behavior is intentionally not restored.
+- Valid no-id messages never receive a response and cannot execute tools/call.
+  Only notifications/initialized changes server protocol state. Unknown
+  notifications, progress, cancelled and roots/list_changed are no-ops; this
+  synchronous server has no outgoing or cancellable work to update.
+- Batch arrays are not supported by this MCP endpoint and are rejected as
+  invalid requests; successful/error responses remain single JSON objects.
+- Parse/envelope/method/params failures are JSON-RPC errors. Missing memories,
+  disabled exposure and invalid project_path execution failures are tool results
+  with isError=true and text content, not JSON-RPC internal errors.
+- Eight tool registrations drive schema listing, validation and typed dispatch;
+  mnemosyne_codex_prep remains an alias of mnemosyne_prep_context. Integer limits
+  are published and enforced: limit 0..10000, depth 0..100.
+- Project selection and exposure remain per request. project_path is selection,
+  not authentication or a sandbox boundary against a same-user local process.
+
+Input/transport decisions
+- Shared default maximum: 1 MiB. MNEMOSYNE_MAX_INPUT_BYTES may override it with a
+  positive integer up to the hard maximum of 64 MiB. Invalid settings fail closed.
+- CLI whole-input and MCP stdio frames use bounded reads. An oversized stdio
+  frame (including no final newline) reports INPUT_TOO_LARGE on stderr and closes
+  the connection without trying to parse or execute its tail. Invalid UTF-8 in a
+  complete in-limit frame returns parse error -32700 and permits the next frame.
+- SSE retains 64 sessions / 32 queued messages and the default 1 MiB body limit,
+  with the same configurable bound. Oversize -> HTTP 413; bad UTF-8 -> HTTP 400.
+- SSE binds only to localhost or literal loopback IPs. Non-loopback configuration
+  is rejected until a separate authenticated deployment policy exists. Incoming
+  Host and supplied Origin are restricted to the local listener authorities,
+  including localhost:port and [::1]:port. Absent Origin supports native clients.
+  A session id routes responses; it is not treated as authentication.
+
+Regression FIRST, before implementation
+Command: cargo test --test mcp_boundaries -- --nocapture
+Exit: 101; 0 passed, 5 failed.
+Failure output summaries (synthetic isolated stores only):
+1. notifications_never_reply_or_execute_mutating_tools:
+   got 4 responses instead of 1; no-id tools/call executed a write.
+2. malformed_envelopes_cannot_write:
+   illegal id/jsonrpc requests returned created/duplicate, rather than -32600;
+   the first malformed request persisted a synthetic memory.
+3. protocol_errors_are_distinct_from_tool_execution_errors:
+   missing memory returned error.code=-32603, message="Memory not found".
+4. initialization_negotiates_the_declared_version_and_preserves_legacy_direct_calls:
+   tools/list before initialized succeeded; expected -32002.
+5. stdio_is_bounded_and_invalid_utf8_does_not_kill_the_next_request:
+   process terminated with "mnemosyne: stream did not contain valid UTF-8".
+No test accessed actual memory, host configuration or external model providers.
+
+Final owned-test verification
+Command: cargo test --locked --lib mcp::tests
+Exit 0; 1 passed, 0 failed.
+Command: cargo test --locked --lib input::tests
+Exit 0; 1 passed, 0 failed. Includes a std::io::repeat unbounded source to prove
+both bounded read functions stop without attempting to consume the stream.
+Command: cargo test --locked --test mcp_boundaries -- --nocapture
+Exit 0; 5 passed, 0 failed, 0 ignored.
+Command: cargo build --locked --bin mnemosyne
+Exit 0.
+Command: python3 tests/native_transport_smoke.py target/debug/mnemosyne
+Exit 0; output:
+SSE initialization, tools, notifications, isError, UTF-8/size and Origin/Host boundaries: passed
+Non-loopback SSE rejects unauthenticated exposure: passed
+Command: cargo clippy --locked --all-targets --all-features -- -D warnings
+Exit 0.
+
+Acceptance mapping
+R03-A01: Standard stdio/SSE initialization, list, tool call and disconnect covered;
+         legacy direct calls covered. CLI aliases are unchanged; full root suite
+         is the authority for existing alias/project fixture results.
+R03-A02: Notifications and malformed mutating envelopes covered by failing-then-
+         passing regressions; no store changes from those messages.
+R03-A03: isError vs parse/params/method errors covered in stdio and SSE.
+R03-A04: Invalid UTF-8, oversized/unterminated frames, invalid size config,
+         negative limits, wrong types and unknown fields covered.
+R03-A05: Existing project_path/exposure implementation retained; disabled global
+         tested here. Full alternating-project/all-tool coverage remains in
+         tests/native_only.rs and tests/rust_cli.rs, run by root integration.
+R03-A06: New protocol fixtures use env_clear, empty PATH, temporary HOME/global
+         stores and no model configuration. SSE harness drives only the native
+         binary with an isolated environment. No live-host claim is made.

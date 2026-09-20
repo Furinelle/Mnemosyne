@@ -1,0 +1,22 @@
+R04 local regression evidence (2026-09-20, no live stores touched)
+
+Command: cargo test --offline --test provenance_v2
+Result: 6 passed, 0 failed. Also: git diff --check passed.
+
+R04-A01 PASS: Same origin/session/event with a second finding for the same fact returns supported and evidence_count stays 1; an independent event raises it to 2. Ledger keeps all three records. A different retelling agent for the same event returns duplicate without increasing evidence.
+R04-A02 PASS: Eight concurrent replays of two finding keys yield one created and one supported result, then duplicates. Two distinct findings with different content and no fact_key produce distinct memories.
+R04-A03 PASS: Same origin/session/event/finding with changed content, verification state, or redacted summary returns IDENTITY_CONFLICT. A differing retelling-agent name is nonsemantic; the underlying source event is still one event.
+R04-A04 PASS: Unknown flat fields containing Chinese text, comma, escaped quote and backslash round-trip. Legacy read does not rewrite the file. Pending sidecar replay reconstructs missing Markdown.
+R04-A05 PASS: Agent-requested verified becomes unverified. Legacy record with no sidecar reports source_kind=unknown and verification_state=unknown. New v2 request rejects unknown fields and a type absent from that store's memory.types config.
+R04-A06 PASS: Two stores contain the same bare memory ID. V1 lookup returns the first store in caller order; MemoryRef lookup selects the matching store UUID.
+R04-A07 PASS: Preview is read-only; explicit upgrade adds store.json; new v1 writer rejects min_writer_version=2. CLI/MCP v1/v2 and upgraded/pre-upgrade copy restore pass in tests/m1_contract.rs; see r05-regression.txt.
+
+Crash recovery protocol: v2 sidecar is synced and atomically published before Markdown. Under the store lock, the next read or write repairs an unpublished Markdown projection, rejects conflicting existing Markdown, and refreshes derived MEMORY.md. The store lock serializes idempotency checks and SUPPORT updates. No transcript is captured by default; optional source_summary is caller-supplied and must be redacted before submission.
+
+Boundary regressions: SUPPORT refuses corrected, superseded, deprecated, expired, invalidated, and archived Markdown, leaving the source ledger unchanged. A sidecar with a filename that disagrees with memory.id is rejected. Sidecar reads have an 8 MiB cap, and writes enforce the same serialized-size ceiling.
+
+`recorded_at` and v2 SUPPORT expiry decisions use the injected clock. Upgrade preview scans without taking a mutating lock; a pending sidecar remains pending after preview and is repaired on the next store operation.
+
+Post-boundary checks: `cargo test --offline --test provenance_v2` 6/6; `cargo clippy --offline --lib --all-features -- -D warnings` and full `cargo clippy --offline --all-targets --all-features -- -D warnings` passed after the context test lint was corrected by its owner.
+
+No failing pre-change R04 test was recorded: the new v2 API did not exist before this implementation. The first full test run after adding the tests exposed a test setup error (copied the wrong memory when two existed); this was corrected, and all assertions then passed. It was not a product regression.

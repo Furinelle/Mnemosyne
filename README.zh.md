@@ -8,6 +8,18 @@
 
 [English](README.md) · [迁移与兼容说明](docs/rust-migration.md)
 
+## 原生演进候选版
+
+当前工作区新增显式来源、任务检查点、语义修订历史、按系统时间查询、保守 Git
+适用性、审批提案、按日维护、有界离线 sleep、派生来源索引及可校验目录快照。
+具体契约见 [接口文档](docs/interface.md)，实际验证见
+[执行记录](docs/plans/native-evolution/EXECUTION_LOG.md)。
+
+这些改动尚不代表新 release 或真实宿主切换。显式升级启用 schema 2 / writer 3；
+升级前停用旧 writer，回滚需恢复完整升级前数据，不能只改版本标记。
+八个 MCP 名称与原生 aliases 保留。Rust 公开结构体新增字段可能破坏下游字面量
+构造，CLI 兼容不等于 crate 源码兼容；发布前需要选择相应的破坏性版本号。
+
 ## 构建与安装
 
 ```sh

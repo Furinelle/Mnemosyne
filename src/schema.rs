@@ -277,10 +277,15 @@ fn format_scalar(value: &Value) -> String {
     let text = match value {
         Value::Null => return "null".to_owned(),
         Value::Bool(_) | Value::Number(_) => return value.to_string(),
-        Value::String(v) => v.replace('\n', " ").trim().to_owned(),
+        Value::String(v) => v.replace('\n', " "),
         Value::Object(_) | Value::Array(_) => return value.to_string(),
     };
-    if text.chars().any(|c| ":#[]{},".contains(c)) {
+    if text.is_empty()
+        || text != text.trim()
+        || matches!(text.as_str(), "true" | "false" | "null")
+        || text.parse::<i64>().is_ok()
+        || text.chars().any(|c| ":#[]{},\\\"'".contains(c))
+    {
         format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
     } else {
         text

@@ -394,12 +394,20 @@ pub fn search(
     }
 
     let lexical_ranked = sorted_candidates(&candidates);
+    let mut vector_diagnostic = None;
     let vector_ranked = if config_bool(config, &["embedding", "enabled"], false) {
         match crate::vectors::lane(stores, query, include_archive, config) {
             Ok(results) => results,
-            Err(_) => {
-                // Never print a backend error: it can contain a configured URL.
-                eprintln!("mnemosyne: vector query failed; falling back to lexical retrieval");
+            Err(error) => {
+                // Only emit our static diagnostic, never a backend URL or provider body.
+                let (status, reason) = error
+                    .downcast_ref::<crate::vectors::VectorDiagnostic>()
+                    .map(|d| (d.status, d.reason))
+                    .unwrap_or(("incompatible", "vector_query_failed"));
+                vector_diagnostic = Some(json!({"status":status, "reason":reason}));
+                eprintln!(
+                    "mnemosyne: vector query {status} ({reason}); falling back to lexical retrieval"
+                );
                 vec![]
             }
         }
@@ -443,6 +451,11 @@ pub fn search(
             .total_cmp(&left.score)
             .then_with(|| result_identity(right).cmp(&result_identity(left)))
     });
+    if let Some(diagnostic) = vector_diagnostic {
+        for result in &mut results {
+            result.score_breakdown["vector_diagnostic"] = diagnostic.clone();
+        }
+    }
     rerank(query, &mut results, config);
     results.truncate(limit);
     Ok(results)

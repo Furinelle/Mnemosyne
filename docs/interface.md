@@ -1,7 +1,7 @@
 # Language-Neutral Interface Specification
 
 Everything a third-party agent (in any language) needs to read and write a
-Mnemosyne store without importing the Python package.
+Mnemosyne store through the native Rust CLI or MCP. The retired Python import API is not supported.
 
 ## Store layout
 
@@ -12,17 +12,22 @@ Mnemosyne store without importing the Python package.
   config.toml            # per-store configuration
   working/<id>.md        # one file per active memory
   archive/YYYY-MM/       # archived memories (same file format)
-  index.sqlite           # derived FTS index — safe to delete, rebuilt by reindex
+  rust-index.sqlite      # derived lexical cache, rebuilt by reindex
+  vectors-rust.sqlite    # derived embedding cache, rebuilt by embed-backfill
+  history/<id>/<rev>.md   # committed immutable semantic images (writer 3)
+  history/<id>/manifest.json # versioned history coverage and image hashes
+  .relations-operation.json # pending recovery journal; not a cache or history
+  .relations-commits/    # global cross-store commit decisions
 ```
 
 ## Memory file format
 
 Markdown with YAML frontmatter. The frontmatter parser is **handwritten**
-(no PyYAML): only the subset below is supported — flat `key: value` pairs
+(Rust subset parser): only the subset below is supported — flat `key: value` pairs
 and inline lists (`[a, b]`, `[{id: x, rel: y}]`). Do not emit anchors,
 multi-line scalars, or nested mappings. Unknown *flat top-level* keys
 (e.g. `invalidated_by`, `evidence`) are preserved on read/write and exposed
-as the `extra` dict in the Python API — there is no `extra:` key on disk.
+as the `extra` map in the Rust memory representation — there is no `extra:` key on disk.
 
 ```markdown
 ---
@@ -52,9 +57,9 @@ Superseded memories keep their files; `status: superseded` plus a flat
 `invalidated_by: <memory-id>` key mark them.
 
 **Concurrency**: if you write files directly, take the store lock the same
-way the kernel does (portalocker on `<root>/.lock`) or route through the
-CLI/MCP — atomic rename + lock ordering is what keeps multi-agent stores
-consistent.
+way the kernel does (`fs2` advisory locks on `<root>/.lock`) and honor pending
+relation recovery. Prefer CLI/MCP: a lock alone is insufficient to implement
+the journal and cross-store commit protocol safely.
 
 ## `search --format json` output
 
@@ -81,14 +86,16 @@ Array of objects:
 | `why_matched` | str | human-readable match explanation |
 | `score_breakdown` | object | per-lane scores (bm25 / vector / rrf …) |
 
-These fields are shared by Python, CLI and MCP search. Normal retrieval
+These fields are shared by native CLI and MCP search. CLI search credits usage
+after ranking; MCP search is read-only. A later query can therefore rank using
+the updated strength, even when the knowledge fields are identical. Normal retrieval
 excludes expired and superseded memories before candidate limits.
 `--archive` / MCP `include_archive` also allows expired history;
 `--include-superseded` / MCP `include_superseded` allows replaced history.
 Expiry dates remain valid through that date. A non-date expiry note requires
 human interpretation. Retrieval does not delete or rewrite expired records.
 
-`write --evidence` (Python/MCP `evidence`) stores up to 200 characters in the
+`write --evidence` (MCP `evidence`) stores up to 200 characters in the
 existing flat frontmatter field. Use a secret-free file/line, report or source
 reference. Existing findings evidence remains compatible. Evidence is caller
 supplied, not automatically verified; a duplicate write keeps the existing
@@ -101,7 +108,7 @@ record. A stored date or high strength is never proof of current service state.
 
 ## config.toml
 
-Key tables (defaults in `mnemosyne/store.py::DEFAULT_CONFIG_TOML`):
+Key tables (defaults in `src/store.rs::default_config`):
 `[thresholds]` lifecycle tuning; `[memory] types` allowed types (drives
 write/ingest/distill validation); `[injection]` `max_tokens`,
 `summary_chars`, `show_command_template`; `[hooks] write_tools` host tool
@@ -119,3 +126,337 @@ endpoints or credentials.
 See [handoff-format.md](handoff-format.md) (v1): Markdown block
 (`**Findings:**` / `**新发现:**`) and the JSON variant accepted by
 `mnemosyne ingest --format auto|markdown|json`.
+
+## Native MCP and input boundaries (M0 increment)
+
+The server supports protocol `2024-11-05`. `initialize` negotiates that version;
+clients unable to use it must disconnect. After initialization starts, send
+`notifications/initialized` before tools. Legacy direct tool calls remain
+accepted before a handshake begins. Eight advertised tools and the
+`mnemosyne_codex_prep` alias remain supported. Unknown valid notifications are
+ignored; notifications never dispatch tool writes. Requests require a valid
+JSON-RPC 2.0 envelope and string/integer id.
+
+Parse, envelope, method and parameter failures return JSON-RPC errors. Tool
+execution failures (such as missing memory or disabled scope) return a tool
+result with `isError: true`. Consumers must check both channels. `project_path`
+selects a project; it is not authorization against untrusted local clients.
+
+CLI stdin, stdio frames and SSE bodies default to 1 MiB. The process environment
+`MNEMOSYNE_MAX_INPUT_BYTES` can explicitly override this from 1 byte to 64 MiB.
+Oversized stdio frames close the connection after an error; malformed UTF-8
+frames are rejected without dispatch. SSE is loopback-only with Host/Origin
+checks; a session id is not authentication and the server is not a public API.
+
+`embed-backfill --format json` reports computed/written/skipped_stale/invalid/
+repaired/failed counts. `doctor --format json` includes canonical-store health
+and vector status (disabled, missing_assets, incompatible, corrupt, stale,
+ready). Bad vector rows are not fresh: a later backfill recomputes them.
+A remote model alias with undisclosed weight changes requires an explicit
+configuration revision; local hashing cannot discover those remote changes.
+
+## Versioned identity and writes (M1 increment)
+
+`store-upgrade --scope project` previews the schema change without writing.
+`store-upgrade --scope project --commit` explicitly creates `store.json`
+(schema 2, UUID `store_id`, minimum writer protocol 3). Existing writer-2 stores
+report `upgrade_available`; explicit commit keeps the UUID and raises the writer
+requirement. Legacy Markdown is not
+bulk rewritten. Before an actual upgrade, stop older writers and preserve a
+complete store copy. This iteration only upgrades temporary test stores.
+Restoring that complete copy is the rollback procedure; deleting the manifest
+alone is not a rollback of new records or source events. Old 1.0 binaries cannot
+enforce a future minimum writer protocol. The new binary refuses legacy writes
+to an upgraded store, so existing auto-ingest callers need a v2 migration before
+upgrading their real stores.
+
+`write-v2 --scope project` reads a JSON request from stdin, with `type`, `title`,
+`content`, `importance`, and explicit `origin`, `source_session_id`,
+`source_event_id`, `finding_key`. Optional `fact_key` groups identical claims.
+Results contain `status`, `memory_ref: {store_id,memory_id}`, `source_event`,
+and `evidence_count`. Replays are idempotent; changed payloads using the same
+identity fail with `IDENTITY_CONFLICT`. Agent claims of `verified` are not trusted.
+`show-v2 ID --store-id UUID` reads by stable identity. Without a store UUID,
+ambiguous IDs fail; legacy `show` retains its first-match behavior.
+
+The eight MCP tool names remain unchanged. `mnemosyne_write` accepts either the
+legacy arguments or `{version:2,operation:"memory",request:{...},scope:"project"}`.
+`mnemosyne_show` accepts `{version:2,kind:"memory",id:"...",store_id:"..."}`.
+Mixed write/show contracts are rejected. Tool errors retain the M0 `isError`
+contract. `evidence/<memory-id>.json` is canonical provenance, not a disposable
+cache; preserve it with the manifest and Markdown during backup or restore.
+
+## Context bundles and task checkpoints
+
+`prep TASK --format json --budget N` returns a ContextBundle with `version`,
+`context`, `items`, `selected`, `omitted`, `estimated_tokens`, and `budget_mode`.
+The MCP equivalent is `mnemosyne_prep_context` with `version:2`, `task`, and `budget`.
+Legacy prep still returns text. `inject` additionally accepts `--context-epoch`
+and exposes `context_bundle` in JSON. Titles, core, source labels, warnings,
+read hints and checkpoint summaries consume the same estimated token budget.
+A mandatory section exceeding the budget fails closed. Deduplication tracks
+content revision and epoch, not changing access heat. Budgets are estimates,
+not model-tokenizer guarantees.
+
+Checkpoints live in project `checkpoints/<UUID>.json`, separately from durable
+memories. They require an explicitly upgraded project store. CLI operations:
+
+```sh
+mnemosyne checkpoint observe --paths src/a.rs,src/b.rs
+mnemosyne checkpoint new < checkpoint.json
+mnemosyne checkpoint load UUID
+mnemosyne checkpoint update UUID --expected-revision 1 < checkpoint.json
+mnemosyne checkpoint close UUID --expected-revision 2
+mnemosyne prep "resume work" --task-id TASK --format json
+```
+
+A new/update request contains `task_id`, `goal`, `completed_actions`, `artifacts`,
+`unresolved`, `tests`, `next_action`, `source_session`, `source_agent`, explicit
+project-relative `scoped_paths`, and RFC3339 `expires`. A test report contains
+`command`, relative `cwd`, `worktree_fingerprint`, optional `exit_code` and
+`executed_at`, and optional `summary_ref`. Checkpoints never execute these commands
+or turn reports into trusted observations. Missing execution evidence remains
+unknown. File changes under the same commit invalidate the old fingerprint.
+Only the listed files are inspected (maximum 64 files, 8 MiB each, 16 MiB total);
+symlinks and paths outside the project are rejected.
+
+MCP writes use `version:2` and operation `checkpoint_new`, `checkpoint_update`
+(request `{id,expected_revision,data}`), or `checkpoint_close`
+(request `{id,expected_revision}`). Read with `mnemosyne_show`, `version:2`,
+`kind:"checkpoint"`, and `id`. Update/close use revision compare-and-swap;
+expired checkpoints cannot be revived by update. Close preserves reports and
+unresolved items and does not assert successful completion.
+
+Only an explicit matching `task_id` selects active, unexpired checkpoint context;
+at most three are included, subject to the same bundle budget. Closed/expired
+records remain explicitly readable. Unreadable records produce a budgeted
+warning without suppressing other readable task context. Checkpoints never enter
+the long-term memory retrieval index or become permanent pitfalls automatically.
+
+
+## Semantic revisions and recovery (R07 increment)
+
+History is opt-in through the explicit writer-3 store upgrade above. Reads of
+unupgraded stores do not create history. Writer-2 stores remain readable, but
+memory writes, corrections, maintenance and relation mutations require the
+explicit upgrade. Both stores in a revision-aware cross-store relation must
+support writer 3; a mixed old/new writer transaction is rejected. Older native
+binaries must be stopped before upgrading: pre-manifest binaries cannot enforce
+future writer requirements, and writer-2 binaries cannot recover v3 journals.
+
+`show-v2` and MCP v2 memory show add a `revision` object containing
+`semantic_rev`, `semantic_hash`, and `raw_hash`. Semantic identity includes body,
+type, tags, source, evidence, relations, status, expiry, summaries and flat custom
+fields. Access count, last access date, strength and the revision counter itself
+are excluded. The history manifest is authoritative for the revision counter;
+first observation of legacy or externally edited Markdown does not rewrite it
+merely to add a frontmatter counter.
+
+To correct a memory, pass JSON to `revise-v2 --scope project`:
+
+```json
+{
+  "memory_ref": {"store_id": "STORE_UUID", "memory_id": "MEMORY_ID"},
+  "expected_rev": 1,
+  "expected_hash": "SEMANTIC_HASH_FROM_SHOW_V2",
+  "changes": {"body": "## Corrected fact\n\nNew content", "tags": ["reviewed"]}
+}
+```
+
+The MCP equivalent is `mnemosyne_write` with `version:2`, `operation:"revise"`,
+and this object in `request`. Changes may contain `body`, `type`, `tags`, `source`,
+`evidence`, or `expires`. Missing fields are preserved; unknown fields are rejected.
+Read the snapshot before computing a correction, then submit its revision/hash.
+Changed semantics produce `REVISION_CONFLICT`; intervening heat changes do not.
+The plan separately checks exact current disk images before committing, so semantic
+CAS does not grant permission to overwrite a later external edit. Corrections do
+not confer trusted verification or alter memory identity.
+
+Revision-aware source creation/SUPPORT, corrections, links, supersedes,
+consolidation and maintenance share the existing relation journal protocol.
+Source ledger count/hash and evidence count are recorded in flat fields and the
+sidecar is committed with Markdown/history. Exact source replays do not make new
+revisions. Archive moves record `archived_at` while preserving lifecycle status,
+including `superseded`; a pure heat update does not create a new history image.
+
+A v3 operation validates all target paths, before/after hashes and create-absence
+preconditions; persists intent; writes history images; persists its commit
+decision; materializes canonical files; then removes the journal. An interrupted
+uncommitted operation discards only its staged images, while a committed one rolls
+forward. Manifest entries expose only committed images. Recovery encountering an
+unexpected image reports `RECOVERY_CONFLICT` and retains the journal and files.
+Do not delete a pending journal to force startup. V1/v2 pending journal recovery
+continues to work. Cross-store transactions retain the trusted coordinator and
+its participant hashes; unresolved stores/global roots must not be moved.
+Coordinator decisions are not deleted based on age.
+
+For legacy adoption, history begins with the currently observed raw snapshot and
+`coverage_start`; no earlier body or edit time is invented. Later external edits
+are recorded as `external_edit`, with `unknown_gap:true` and the observation time.
+The real edit time and unobserved intermediate versions remain unknown. History
+and provenance are canonical files; deleting/rebuilding SQLite must preserve them.
+History validation currently scans canonical records and images under the store
+lock. Large history-heavy stores need the planned R14 measurement before a live
+cutover; the earlier M0 baseline does not measure this new path. R08 builds on this increment with the read-only queries described below.
+
+
+## System-time history and code applicability (R08)
+
+```sh
+mnemosyne history MEMORY_ID --store-id STORE_UUID
+mnemosyne show MEMORY_ID --revision 2 --store-id STORE_UUID
+mnemosyne search "database" --scope project --as-of 2026-09-20 --format json
+mnemosyne search "database" --as-of 2026-09-20T00:30:00+08:00 --archive
+```
+
+Historical commands return structured JSON, including the interpretation of time
+and coverage. Their current-search counterparts keep the existing output format.
+MCP retains eight tools: use `mnemosyne_search` with `as_of`, or
+`mnemosyne_show` with `version:2` and either `kind:"history"` to list entries,
+or `kind:"memory",revision:2` to read a snapshot. Store-qualified identities
+avoid ambiguous bare IDs. Unknown history is reported explicitly; it never falls
+back to current Markdown.
+
+Intervals are `[system_from,system_until)`. RFC3339 requires an explicit UTC offset;
+a date-only value means UTC midnight. Output echoes UTC `as_of`, the original
+input, `expiry_calendar_date`, and `expiry_offset`. An inclusive date-only expiry
+is expired only after that calendar day **in the query's offset**. Therefore two
+offset representations of one instant can intentionally use different expiry
+calendar days; the response exposes that choice. Current wall-clock expiry is
+never used to discard a historical snapshot. `--archive` permits archived or
+expired historical records; `--include-superseded` permits historically replaced
+ones. Future lifecycle flags and links are never overlaid on past content.
+
+Queries read committed immutable snapshots and validated source-event prefixes.
+Later SUPPORT events are not included in an older snapshot's provenance. Matching
+uses lexical term overlap on selected versions only: no current vector, graph,
+access bump, session update or current-view fallback. This establishes content
+version correctness, not exact reproduction of the ranking originally observed.
+Strict ranking replay would need a frozen corpus/evaluation mode.
+
+Coverage is `complete_for_known_records` or `partial_history`, with explicit
+unknown reasons. Before adoption, missing histories, observed edit gaps, and
+current content differing from the last observation are incomplete. A recorded
+creation establishes absence before that creation for that known ID. Coverage
+never proves unknown/deleted pre-adoption records did not exist. Non-monotonic
+system timestamps fail with an explicit history error. A pending recovery journal
+blocks a historical read; the read does not repair it, create lock files, adopt
+records or mutate caches. These commands expose library system time, not the real
+world's effective time.
+
+Code applicability is returned by current/historical results and v2 show as
+`applicable`, `not_applicable`, or `unknown`, with a reason. For historical results
+it describes the **current worktree**, not the worktree at the queried time.
+Explicit fields can be added through `revise-v2`'s `changes`:
+
+| Flat field | Meaning |
+|---|---|
+| `observed_commit`, `branch` | Informational observations; never applicability proof |
+| `applies_to: repo-wide` | Explicit scope anchored to the project repository |
+| `applies_to: commit`, `applies_commit` | Exact full commit ID, requiring a clean worktree |
+| `applies_to: tree`, `applies_tree` | Exact full tree ID, requiring a clean worktree |
+| `applies_to: paths`, `related_paths`, `related_path_hashes` | Matching ordered arrays of repository-relative files and SHA-256 hashes |
+
+No ancestor/branch inheritance is inferred. Dirty exact-commit/tree cases,
+missing evidence, unavailable Git, configured clean/process filters, gitlinks,
+unsafe paths and global-store repo ambiguity
+return unknown. Path checks distinguish full relative paths, reject symlinks and
+private metadata, and enforce 64 files / 8 MiB per file / 16 MiB total. Context
+bundles retain applicability metadata and budget warnings for explicitly scoped
+memories whose applicability is not confirmed. Applicability declarations remain
+caller assertions; matching scope is not trusted verification of the fact itself.
+
+## Reviewed evolution: proposals, maintenance, sleep, views and snapshots
+
+The following commands are additive. They use the opted-in schema 2 / writer 3
+store. Ordinary writes remain conservative and never infer a replacement from
+similarity or usage strength.
+
+`reconcile [--commit]` reads a JSON request with `fact` (subject, environment,
+attribute, multivalued), `value` and a provenance-v2 `write` request. Preview
+classifies explicit scope matches as SKIP/SUPPORT, contextual differences,
+complementary refinements or possible single-value contradictions. Commit calls
+the existing provenance writer: distinct facts append, exact source replay stays
+idempotent, and independent evidence supports an identical payload. The canonical
+fact key includes scope, value and content; a conflicting value cannot overwrite
+the old record. Classification is advisory and never approves a proposal.
+
+`proposal create` accepts a structured JSON request. `proposal show --id ID`
+returns the pending request and its summary hash. Human review uses
+`proposal approve --id ID --confirm-hash HASH` (or `reject` / `undo`). Approval
+rechecks target semantic revisions under one store lock and commits the changes
+and proposal state in the R07 journal. Changed targets make a pending proposal
+stale. Replays are idempotent; compensation rejects later edits. No proposal
+executes shell commands. The existing MCP `mnemosyne_write` adds version-2
+operations `proposal` and `reconcile`; it has no approval operation. The trusted
+CLI boundary assumes the host controls shell access: this is not OS-level user
+authentication and does not stop an agent already authorized to run arbitrary CLI
+commands. Do not grant the approval CLI as an autonomous agent tool.
+
+Maintenance keeps `[thresholds] decay_mode = 'per_run'` by default. Explicit
+`'per_day'` initializes each record's `last_maintained_at` without charging its
+historical age, then accounts for elapsed calendar days exactly once. Clock
+rollback cannot add heat or charge negative days. `pinned: true` prevents
+heat-driven archival; expiry and explicitly superseded lifecycle still apply.
+Heat and maintenance accounting do not increase verification or semantic revision.
+`maintain --dry-run` does not update canonical records or history.
+
+`sleep rules|export|import|cursor` is explicit, offline and bounded. Export returns
+input references/revisions and a snapshot-bound cursor; import accepts
+`{"batch": <export>, "proposals": [...]}`. Host output creates pending proposals,
+never approved changes. Failed output does not advance the cursor; replay uses
+content-addressed proposal IDs. Reports use metadata rather than private
+transcripts. There is no background scheduler or implicit external model call.
+
+`view generate` accepts `{ "name": "architecture", "references": [
+{"memory_ref":{"store_id":"UUID","memory_id":"ID"},"revision":1}],
+"allow_partial":false }`. `view inspect --name architecture` verifies the managed
+file and current source revisions. These optional offline pages are traceable
+indexes, not semantic summaries or independent evidence. They stay outside the
+default search/context lanes, preventing duplicate budget/evidence; stale pages
+remain available for audit. Manual edits prevent automatic replacement; `core.md`
+is never rewritten by views.
+
+`snapshot DESTINATION` creates a new standard directory containing `files/` and a
+SHA-256 manifest. It includes canonical Markdown, store identity, history,
+evidence, checkpoints and proposals; it excludes config/credentials, caches,
+models and raw transcripts. Detected credential material rejects the snapshot
+rather than silently altering history. `restore SOURCE TARGET [--fork]` verifies
+paths, bounded sizes, links, hashes and schema before publishing a new target;
+existing destinations are refused. CLI restoration rebuilds the derived search
+index. Restore preserves identity for replacement of an offline original; fork
+assigns a new identity and remaps structured references. Never run restored copies
+with the same identity concurrently. Pending cross-store decisions must be
+resolved before a portable snapshot is created.
+
+Semantic relation proposals use two ordered `targets`: source first, target
+second, both with `memory_ref`, `expected_rev` and `expected_hash`. `REFINE`,
+`CAUSED_BY`, `CONTRADICT` and `SUPERSEDE` add the typed relation and its inverse in
+one journal transaction. SUPERSEDE marks only the target superseded and records
+the replacement; cyclic replacements are refused. A single-target REFINE or
+CONTEXTUALIZE requires an explicit `body`. Arbitrary status-only edits are not a
+proposal operation. Approval time/hash are saved atomically with applied state;
+undo also checks dependent records before creating compensating history.
+Forked pending proposals become stale, and copied approval hashes are retained
+only as origin audit metadata, never treated as approval of a new store.
+
+MCP `mnemosyne_link` now returns a pending proposal for the four semantic relation
+kinds above; callers must inspect `state` instead of assuming a link was applied.
+MCP body `revise` similarly proposes a rewrite, while standalone CLI `revise-v2`
+remains an explicit trusted correction. These are intentional behavior changes
+in the candidate's safety contract. Related links and non-body corrections retain
+their existing behavior. MCP write also exposes `sleep_export`, `sleep_rules`,
+`sleep_import`, `view_generate`; show version 2 accepts kinds `proposal` and `view`.
+Snapshot, restore and proposal approval remain trusted administrative CLI commands.
+
+Sleep batches allow 1–100 inputs, at most 20 imported proposals and a 64 KiB
+report/output budget. The capped scan reads at most 10,000 records and 4 MiB total,
+with a 128 KiB per-record cap. Checkpoints contribute references and revisions only.
+Normal pagination returns `partial` and `next_cursor`; malformed or oversized
+input fails explicitly without advancing a cursor. A changed input snapshot
+requires restarting from cursor zero; deduplicated proposals make replay safe.
+
+Checkpoint summaries are kept whole rather than shortened by memory
+`summary_chars`, so the next action and verification limits cannot disappear
+behind a generic snippet cap. The existing total context budget still applies:
+a checkpoint that cannot fit is omitted as a whole and reported as omitted.

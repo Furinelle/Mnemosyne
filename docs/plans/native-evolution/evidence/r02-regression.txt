@@ -1,0 +1,81 @@
+R02 regression evidence — 2026-09-19
+
+Isolation:
+Every cargo invocation used a fresh mktemp HOME and MNEMOSYNE_HOME under it,
+with CARGO_HOME=/Users/furina/.cargo and RUSTUP_HOME=/Users/furina/.rustup retained.
+Cargo used --offline. HTTP smoke creates a temporary project/HOME/global store,
+and only contacts its in-process 127.0.0.1 fake provider. No downloads, paid API,
+real memory stores, host settings, commit, or push.
+
+Initial regression (before implementation):
+Command: cargo test --offline vectors::tests::access_only_change -- --nocapture
+Exit: 101
+Failed: vectors::tests::access_only_change_reuses_the_vector_and_invalid_vectors_are_ignored
+assertion `left == right` failed: corrupt cache must be repaired
+  left: 0
+ right: 1
+Cause: cached_hashes accepted content_hash/fingerprint/dimension metadata while
+cached_vectors rejected the zero vector, so backfill permanently skipped it.
+
+Final targeted checks:
+Command: cargo test --offline --lib vectors::tests -- --nocapture
+Exit: 0; 7 passed, 0 failed
+- query_discards_profile_and_local_asset_changes
+- body_change_and_model_dimension_change_fail_the_write_cas
+- inference_config_changes_are_stale_and_calls_are_unlocked
+- invalid_provider_results_never_commit_and_batch_failure_rolls_back
+- access_only_change_reuses_the_vector_and_invalid_vectors_are_ignored
+- corrupt_sqlite_and_missing_cache_preserve_lexical_results
+- corrupt_vectors_are_repaired_and_diagnostics_distinguish_states
+
+Command: cargo test --offline --lib models::tests -- --nocapture
+Exit: 0; 3 passed, 0 failed
+- http_vectors_reorder_and_reject_invalid_indices_and_values
+- explicit_revision_and_same_size_local_asset_changes_invalidate_profile
+- wordpiece_preserves_chinese_and_subwords
+
+Command: cargo build --offline
+Exit: 0
+Command: python3 tests/native_http_models_smoke.py target/debug/mnemosyne
+Exit: 0
+HTTP model protocol, cache repair, query profile CAS, invalid provider fallback,
+disabled model isolation: passed (local mock; no real model acceptance)
+
+Acceptance mapping:
+A01: Rust and CLI/HTTP corrupt-row loops cover zero vectors, wrong dimensions,
+     malformed JSON; Rust additionally covers null. Next backfill reports
+     computed=written=repaired=1. Read and freshness share valid_vector.
+A02: Rust access_count/last_accessed mutation uses a provider closure that errors
+     if invoked; repeated backfill returns zero. HTTP call counter is unchanged
+     on repeated backfill, with all six JSON counters zero.
+A03: Injected providers edit body, dimensions, model, revision before returning.
+     Body/config CAS rejects writes. Same-size local asset replacement changes
+     fingerprint. Providers acquire the store lock in their closure, proving
+     inference is outside that lock. Transaction trigger aborts the second row:
+     written=0, failed=2 and SQL count=0 (no partial batch persists).
+A04: HTTP handler synchronously changes dimensions/model/revision during query
+     inference; search returns lexical alpha with no vec and diagnostic
+     status=stale, reason=profile_changed_during_inference. Rust also changes
+     local ONNX bytes during fake query inference and discards the result.
+A05: Corrupt SQLite and a directory replacing the SQLite path both preserve
+     actual lexical CLI results with corrupt diagnostics. With embedding disabled,
+     CLI write/search and MCP mnemosyne_search work without any provider request.
+     Missing ONNX assets and missing caches are tested without inference/downloads.
+A06: Reverse-index HTTP batches reorder correctly; duplicate/out-of-range/negative/
+     noninteger indices are rejected. NaN/Inf/zero/wrong dimensions never commit.
+     JSON backfill gives invalid=2 for malformed responses, failed=2 for HTTP 503,
+     written=0 and nonzero exit. Query failures retain lexical results.
+
+Implementation/diagnostics:
+- backfill_stats returns computed/written/skipped_stale/invalid/repaired/failed.
+  computed counts vectors returned by compute; invalid provider responses rejected
+  before returning vectors are counted as invalid, not computed.
+- Query inference and cache selection use the same ModelProfile. Post-inference
+  settings and local asset hashes are rechecked; profile changes discard vectors.
+- diagnose is read-only, never infers/downloads; statuses are disabled,
+  missing_assets, incompatible, corrupt, stale, ready.
+- Explicit embedding revision participates in fingerprint. Remote providers can
+  silently change same-name alias weights; that cannot be discovered locally.
+- Real ONNX inference and real remote service quality are NOT validated. ONNX
+  asset-change tests use inert bytes with injected fake inference. Whole-database
+  corruption degrades search safely; automatic destructive DB rebuild is not added.

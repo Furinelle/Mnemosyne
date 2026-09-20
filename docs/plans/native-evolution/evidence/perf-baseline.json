@@ -1,0 +1,233 @@
+{
+  "commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+  "binary_sha256": "ceb586f881a691fa71c9579f67f6a1959e9dd54efdf8bdae0b0df33d32018ba2",
+  "build": "release; onnx feature compiled, models disabled",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "processor": "arm",
+  "samples": 5,
+  "clock": "perf_counter_ns",
+  "models": "disabled; no assets read",
+  "effective_pipeline": "lexical; no network",
+  "limitations": [
+    "process-level totals, not internal phase attribution",
+    "pending recovery measured by correctness tests only",
+    "no real-host/model E2E or lane ablation"
+  ],
+  "results": [
+    {
+      "records": 100,
+      "scenario": "startup",
+      "samples_ms": [
+        7.486083,
+        6.263875,
+        6.17075,
+        5.669708,
+        5.251667
+      ],
+      "p50_ms": 6.17075,
+      "p95_ms": 7.486083,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "cold_index",
+      "samples_ms": [
+        58.406583,
+        56.817917,
+        56.424458,
+        54.853417,
+        53.760709
+      ],
+      "p50_ms": 56.424458,
+      "p95_ms": 58.406583,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "warm_query",
+      "samples_ms": [
+        51.26475,
+        54.917958,
+        55.063625,
+        55.063083,
+        54.9965
+      ],
+      "p50_ms": 54.9965,
+      "p95_ms": 55.063625,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "single_edit",
+      "samples_ms": [
+        55.514042,
+        57.050833,
+        56.684458,
+        55.45825,
+        56.71325
+      ],
+      "p50_ms": 56.684458,
+      "p95_ms": 57.050833,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "file_hook",
+      "samples_ms": [
+        14.687792,
+        12.500041,
+        11.816708,
+        11.881167,
+        11.264084
+      ],
+      "p50_ms": 11.881167,
+      "p95_ms": 14.687792,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 1000,
+      "scenario": "startup",
+      "samples_ms": [
+        6.4145,
+        5.007958,
+        5.157666,
+        4.8405,
+        4.684167
+      ],
+      "p50_ms": 5.007958,
+      "p95_ms": 6.4145,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        95.19775,
+        95.994667,
+        92.849208,
+        92.877333,
+        93.633625
+      ],
+      "p50_ms": 93.633625,
+      "p95_ms": 95.994667,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        69.067458,
+        70.020166,
+        71.700584,
+        69.36525,
+        70.9485
+      ],
+      "p50_ms": 70.020166,
+      "p95_ms": 71.700584,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        72.6285,
+        69.87725,
+        72.401958,
+        66.930292,
+        69.833125
+      ],
+      "p50_ms": 69.87725,
+      "p95_ms": 72.6285,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        28.255708,
+        26.149875,
+        25.36575,
+        25.309459,
+        24.385
+      ],
+      "p50_ms": 25.36575,
+      "p95_ms": 28.255708,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 10000,
+      "scenario": "startup",
+      "samples_ms": [
+        5.773,
+        4.731375,
+        4.904333,
+        4.90375,
+        4.287042
+      ],
+      "p50_ms": 4.90375,
+      "p95_ms": 5.773,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        523.814959,
+        536.713916,
+        516.34425,
+        514.612791,
+        521.780125
+      ],
+      "p50_ms": 521.780125,
+      "p95_ms": 536.713916,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        245.471584,
+        241.754083,
+        252.74675,
+        242.764334,
+        244.346834
+      ],
+      "p50_ms": 244.346834,
+      "p95_ms": 252.74675,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        244.22175,
+        243.582042,
+        244.853208,
+        245.766583,
+        246.125708
+      ],
+      "p50_ms": 244.853208,
+      "p95_ms": 246.125708,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        195.715416,
+        190.292875,
+        189.73275,
+        192.698625,
+        188.085625
+      ],
+      "p50_ms": 190.292875,
+      "p95_ms": 195.715416,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    }
+  ],
+  "hardware": {
+    "machdep.cpu.brand_string": "Apple M5",
+    "hw.memsize": "25769803776"
+  }
+}

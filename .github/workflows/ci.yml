@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [master, 'codex/rust-migration']
+    branches: [master, 'codex/**']
   pull_request:
 jobs:
   native:
@@ -23,6 +23,7 @@ jobs:
           export HOME="$(mktemp -d)"
           export MNEMOSYNE_HOME="$HOME/global"
           cargo test --locked --all-targets
+          cargo test --locked --all-targets --all-features
           python3 tests/native_transport_smoke.py target/debug/mnemosyne
           python3 tests/native_http_models_smoke.py target/debug/mnemosyne
           cargo run --locked -- eval run --min-recall 0.95

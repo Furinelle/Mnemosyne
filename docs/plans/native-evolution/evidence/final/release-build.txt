@@ -1,0 +1,4 @@
+   Compiling mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `release` profile [optimized] target(s) in 9.38s
+
+EXIT_CODE=0

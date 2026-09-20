@@ -1,0 +1,299 @@
+{
+  "commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+  "binary_sha256": "2429f2434d262f98cbe5b5126e337575fc6ecb133e648d1ac4bfa2260cb2cf3f",
+  "build": "release; onnx feature compiled, models disabled",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "processor": "arm",
+  "samples": 3,
+  "clock": "perf_counter_ns",
+  "models": "disabled; no assets read",
+  "effective_pipeline": "lexical; no network",
+  "limitations": [
+    "process-level totals, not internal phase attribution",
+    "pending recovery measured by correctness tests only",
+    "no real-host/model E2E or lane ablation"
+  ],
+  "results": [
+    {
+      "records": 100,
+      "scenario": "startup",
+      "samples_ms": [
+        6.778917,
+        6.374375,
+        8.282875
+      ],
+      "p50_ms": 6.778917,
+      "p95_ms": 8.282875,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "cold_index",
+      "samples_ms": [
+        56.428667,
+        53.691708,
+        54.756291
+      ],
+      "p50_ms": 54.756291,
+      "p95_ms": 56.428667,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "warm_query",
+      "samples_ms": [
+        49.95725,
+        50.094417,
+        53.398834
+      ],
+      "p50_ms": 50.094417,
+      "p95_ms": 53.398834,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "single_edit",
+      "samples_ms": [
+        54.848,
+        55.571875,
+        55.716583
+      ],
+      "p50_ms": 55.571875,
+      "p95_ms": 55.716583,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "file_hook",
+      "samples_ms": [
+        14.967917,
+        13.726583,
+        13.529166
+      ],
+      "p50_ms": 13.726583,
+      "p95_ms": 14.967917,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 1000,
+      "scenario": "startup",
+      "samples_ms": [
+        5.5275,
+        4.8165,
+        4.405125
+      ],
+      "p50_ms": 4.8165,
+      "p95_ms": 5.5275,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        105.261333,
+        100.601709,
+        92.725916
+      ],
+      "p50_ms": 100.601709,
+      "p95_ms": 105.261333,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        69.877875,
+        74.209542,
+        84.717625
+      ],
+      "p50_ms": 74.209542,
+      "p95_ms": 84.717625,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        69.925084,
+        70.626208,
+        72.601334
+      ],
+      "p50_ms": 70.626208,
+      "p95_ms": 72.601334,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        45.6715,
+        39.67,
+        41.67825
+      ],
+      "p50_ms": 41.67825,
+      "p95_ms": 45.6715,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 10000,
+      "scenario": "startup",
+      "samples_ms": [
+        6.756959,
+        5.5835,
+        6.617584
+      ],
+      "p50_ms": 6.617584,
+      "p95_ms": 6.756959,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        593.268333,
+        532.570208,
+        537.455709
+      ],
+      "p50_ms": 537.455709,
+      "p95_ms": 593.268333,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        251.050875,
+        240.418166,
+        263.5845
+      ],
+      "p50_ms": 251.050875,
+      "p95_ms": 263.5845,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        254.082375,
+        257.401208,
+        245.486542
+      ],
+      "p50_ms": 254.082375,
+      "p95_ms": 257.401208,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        393.392583,
+        553.94175,
+        517.3245
+      ],
+      "p50_ms": 517.3245,
+      "p95_ms": 553.94175,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    }
+  ],
+  "measurement_binding": {
+    "commit_reference": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+    "binary_sha256": "2429f2434d262f98cbe5b5126e337575fc6ecb133e648d1ac4bfa2260cb2cf3f",
+    "workspace": "dirty workspace; final post-checkpoint-fix release binary"
+  },
+  "baseline_mean_comparison": {
+    "scope": "same-host process means, 5 baseline vs 3 final samples; no universal speed claim",
+    "rows": [
+      {
+        "records": 100,
+        "scenario": "startup",
+        "baseline_mean_ms": 6.1684166,
+        "final_mean_ms": 7.145389
+      },
+      {
+        "records": 100,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 56.0526168,
+        "final_mean_ms": 54.95888866666667
+      },
+      {
+        "records": 100,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 54.2611832,
+        "final_mean_ms": 51.150167
+      },
+      {
+        "records": 100,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 56.2841666,
+        "final_mean_ms": 55.37881933333333
+      },
+      {
+        "records": 100,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 12.4299584,
+        "final_mean_ms": 14.074555333333333
+      },
+      {
+        "records": 1000,
+        "scenario": "startup",
+        "baseline_mean_ms": 5.2209582,
+        "final_mean_ms": 4.9163749999999995
+      },
+      {
+        "records": 1000,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 94.1105166,
+        "final_mean_ms": 99.52965266666666
+      },
+      {
+        "records": 1000,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 70.2203916,
+        "final_mean_ms": 76.26834733333334
+      },
+      {
+        "records": 1000,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 70.334225,
+        "final_mean_ms": 71.05087533333334
+      },
+      {
+        "records": 1000,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 25.8931584,
+        "final_mean_ms": 42.33991666666667
+      },
+      {
+        "records": 10000,
+        "scenario": "startup",
+        "baseline_mean_ms": 4.9199,
+        "final_mean_ms": 6.319347666666666
+      },
+      {
+        "records": 10000,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 522.6532082,
+        "final_mean_ms": 554.4314166666667
+      },
+      {
+        "records": 10000,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 245.416717,
+        "final_mean_ms": 251.68451366666667
+      },
+      {
+        "records": 10000,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 244.9098582,
+        "final_mean_ms": 252.323375
+      },
+      {
+        "records": 10000,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 191.3050582,
+        "final_mean_ms": 488.219611
+      }
+    ]
+  }
+}

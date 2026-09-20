@@ -1,0 +1,103 @@
+R01: source-preserving exact replay and superseded lifecycle
+Baseline HEAD: d05f02853f42771ae9ca04d78b79739d01f1a76c
+Owned implementation: src/api.rs
+Tests: tests/source_lifecycle.rs
+All CLI/MCP/ingest/distill children use env_clear(), private HOME/MNEMOSYNE_HOME/XDG/TMPDIR,
+and an empty PATH. Fixtures are temporary local stores; no real memory or model calls.
+Cargo commands use temporary HOME/MNEMOSYNE_HOME/XDG directories and existing toolchain
+and crate caches through RUSTUP_HOME/CARGO_HOME, with --offline.
+
+Acceptance mapping:
+R01-A01 r01_a01_all_ingress_preserves_sources_and_same_source_replay
+  CLI, MCP, ingest, host distill: same-source replay deduplicates, another source survives.
+  MCP empty/agent/whitespace/case-normalized source is equivalent; allow_duplicate works.
+R01-A02 r01_a02_complementary_and_changed_ports_coexist
+  Same-title port 8080, healthcheck /health, and port 8081 remain active.
+R01-A03 r01_a03_small_text_changes_and_metadata_are_not_duplicates
+  Long-body version/negation edits, evidence/expiry updates, and tag-order changes survive.
+R01-A04 r01_a04_working_superseded_stays_invalid_after_repeated_maintenance
+  Working superseded remains superseded after two decay runs; invalidated_by preserved;
+  default search omits it and legacy per-run strength decay is unchanged.
+R01-A05 r01_a05_archiving_does_not_make_superseded_searchable
+  Archived superseded retains status/invalidation; --archive alone omits it;
+  explicit --include-superseded returns it.
+R01-A06 r01_a06_superseded_never_becomes_core_and_valid_behavior_is_unchanged
+  High-strength/access superseded is not a core candidate. Active high-strength records
+  remain candidates; cold valid records deprecate; expired records archive without decay.
+
+BEFORE IMPLEMENTATION
+Command: cargo test --offline --test source_lifecycle -- --nocapture
+Exit: 101
+Observed output (failure excerpts and full result summary):
+
+thread 'r01_a01_all_ingress_preserves_sources_and_same_source_replay' panicked:
+assertion `left == right` failed: cli: second source was lost
+  left: 1
+ right: 2
+
+thread 'r01_a05_archiving_does_not_make_superseded_searchable' panicked:
+assertion `left == right` failed
+  left: "deprecated"
+ right: "superseded"
+
+thread 'r01_a04_working_superseded_stays_invalid_after_repeated_maintenance' panicked:
+assertion `left == right` failed
+  left: "deprecated"
+ right: "superseded"
+
+thread 'r01_a06_superseded_never_becomes_core_and_valid_behavior_is_unchanged' panicked:
+assertion `left == right` failed: superseded fact was offered for core
+  left: 2
+ right: 1
+
+test r01_a02_complementary_and_changed_ports_coexist ... ok
+test r01_a03_small_text_changes_and_metadata_are_not_duplicates ... ok
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out
+R01_BASELINE_EXIT=101
+
+IMPLEMENTATION
+- Shared API effective_source trims/lowercases source (matching the existing CLI),
+  maps empty/whitespace source to agent, and is used for comparison and persistence.
+- Superseded memories retain their invalidation status during decay and cannot become
+  core candidates. Expiry, archive thresholds, and per-run decay are unchanged.
+- No schema migration, history rewrite, source-confidence boost, or adapter-side fix.
+
+INTERMEDIATE INTEGRATION NOTES
+Initial post-fix builds returned 101 while other owned tasks were in progress:
+missing src/input.rs; vectors.rs attempted FromSql for usize. Neither was changed here.
+After compilation recovered, the MCP fixture needed the JSON-RPC 2.0 envelope required
+by the concurrent MCP hardening change; the fixture now sends jsonrpc="2.0".
+The host-distill fixture uses role-jsonl's documented text field.
+These intermediate failures are not counted as successful validation.
+
+AFTER IMPLEMENTATION (actual captured command output follows)
+
+Command: cargo test --offline --test source_lifecycle -- --nocapture
+   Compiling mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running tests/source_lifecycle.rs (target/debug/deps/source_lifecycle-5d6387d2fb9275e0)
+
+running 6 tests
+test r01_a02_complementary_and_changed_ports_coexist ... ok
+test r01_a04_working_superseded_stays_invalid_after_repeated_maintenance ... ok
+test r01_a06_superseded_never_becomes_core_and_valid_behavior_is_unchanged ... ok
+test r01_a05_archiving_does_not_make_superseded_searchable ... ok
+test r01_a03_small_text_changes_and_metadata_are_not_duplicates ... ok
+test r01_a01_all_ingress_preserves_sources_and_same_source_replay ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+Exit: 0
+
+Command: cargo test --offline --lib api::tests
+   Compiling mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+     Running unittests src/lib.rs (target/debug/deps/mnemosyne-45c6e8529945faae)
+
+running 1 test
+test api::tests::complementary_facts_and_changed_values_survive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.07s
+
+Exit: 0

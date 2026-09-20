@@ -1,0 +1,281 @@
+[
+  {
+    "name": "mnemosyne_search",
+    "description": "Search durable memories.",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 5
+        },
+        "type": {
+          "type": "string",
+          "default": ""
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "global",
+            "project",
+            "all"
+          ],
+          "default": "all"
+        },
+        "include_archive": {
+          "type": "boolean",
+          "default": false
+        },
+        "include_superseded": {
+          "type": "boolean",
+          "default": false
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "mnemosyne_write",
+    "description": "Write one durable memory.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "importance": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "content": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "string",
+          "default": ""
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "global",
+            "project"
+          ],
+          "default": "project"
+        },
+        "source": {
+          "type": "string",
+          "default": "mcp"
+        },
+        "expires": {
+          "type": "string",
+          "default": "",
+          "description": "Inclusive ISO expiry date or a note."
+        },
+        "evidence": {
+          "type": "string",
+          "default": "",
+          "description": "Secret-free source reference (max 200 chars)."
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "type",
+        "importance",
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "mnemosyne_read_core",
+    "description": "Read core memory markdown.",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "global",
+            "project",
+            "all"
+          ],
+          "default": "all"
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      }
+    }
+  },
+  {
+    "name": "mnemosyne_show",
+    "description": "Show a memory by ID.",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "mnemosyne_link",
+    "description": "Link two memories with a typed relation.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id1": {
+          "type": "string"
+        },
+        "id2": {
+          "type": "string"
+        },
+        "rel": {
+          "type": "string",
+          "default": "related"
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "id1",
+        "id2"
+      ]
+    }
+  },
+  {
+    "name": "mnemosyne_graph",
+    "description": "Render linked memories as Mermaid, ASCII, or JSON.",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "depth": {
+          "type": "integer",
+          "default": 1
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "mermaid",
+            "ascii",
+            "json"
+          ],
+          "default": "mermaid"
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "mnemosyne_maintain",
+    "description": "Run memory lifecycle maintenance.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "global",
+            "project",
+            "all"
+          ],
+          "default": "all"
+        },
+        "dry_run": {
+          "type": "boolean",
+          "default": true
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      }
+    }
+  },
+  {
+    "name": "mnemosyne_prep_context",
+    "description": "Assemble a memory context block (core + relevant memories) for any agent task.",
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 5
+        },
+        "project_path": {
+          "type": "string",
+          "description": "Absolute project directory when the host MCP server has no project cwd. Omit for the server working directory."
+        }
+      },
+      "required": [
+        "task"
+      ]
+    }
+  }
+]

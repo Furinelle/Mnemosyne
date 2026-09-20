@@ -8,6 +8,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const DEFAULT_CONFIG_TOML: &str = r#"[thresholds]
+decay_mode = 'per_run'
 decay_per_run = 1
 bonus_access = 5
 bonus_write = 10
@@ -316,6 +317,16 @@ fn read_config(store: &Store) -> Result<Value> {
     Ok(serde_json::to_value(parsed)?)
 }
 
+pub(crate) fn memory_type_allowed(store: &Store, memory_type: &str) -> Result<bool> {
+    let configured = read_config(store)?;
+    let defaults = default_config();
+    let types = configured
+        .pointer("/memory/types")
+        .unwrap_or(&defaults["memory"]["types"]);
+    let types = types.as_array().context("memory.types must be an array")?;
+    Ok(types.iter().any(|kind| kind.as_str() == Some(memory_type)))
+}
+
 pub fn load_config(store: Option<&Store>) -> Result<Value> {
     let chosen = store
         .cloned()
@@ -458,6 +469,10 @@ fn lock_file_timeout(path: &Path, timeout: Duration) -> Result<StoreLock> {
         .truncate(false)
         .open(path)?;
     reject_symlink(path)?;
+    acquire_lock(file, timeout)
+}
+
+fn acquire_lock(file: File, timeout: Duration) -> Result<StoreLock> {
     let until = Instant::now() + timeout;
     loop {
         match file.try_lock_exclusive() {
@@ -474,6 +489,8 @@ pub fn lock_store(store: &Store) -> Result<StoreLock> {
     create_dir(&store.root)?;
     let lock = lock_file(&store.root.join(".lock"))?;
     crate::relations::recover_pending(store)?;
+    crate::provenance::recover_pending(store)?;
+    crate::revisions::observe_store(store, &crate::provenance::SystemClock)?;
     Ok(lock)
 }
 
@@ -481,12 +498,22 @@ pub fn try_lock_store(store: &Store) -> Result<StoreLock> {
     create_dir(&store.root)?;
     let lock = lock_file_timeout(&store.root.join(".lock"), Duration::ZERO)?;
     crate::relations::recover_pending(store)?;
+    crate::provenance::recover_pending(store)?;
+    crate::revisions::observe_store(store, &crate::provenance::SystemClock)?;
     Ok(lock)
 }
 
 pub fn lock_store_read_only(store: &Store) -> Result<StoreLock> {
     checked_directory(&store.root)?;
     lock_file(&store.root.join(".lock"))
+}
+
+/// Historical queries must not create lock files or run recovery/observation.
+pub fn lock_store_existing_read_only(store: &Store) -> Result<StoreLock> {
+    checked_directory(&store.root)?;
+    let path = store.root.join(".lock");
+    reject_symlink(&path)?;
+    acquire_lock(File::open(path)?, Duration::from_secs(30))
 }
 
 pub fn working_path(store: &Store, memory: &Memory) -> Result<PathBuf> {

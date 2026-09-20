@@ -1,0 +1,23 @@
+{
+  "head": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+  "initial_dirty": false,
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: aarch64-apple-darwin\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+  "features": {
+    "default": [],
+    "onnx": [
+      "dep:ort"
+    ]
+  },
+  "fixtures": {
+    "assets/eval/seed_memories.jsonl": "2034d80c71db2c119585f6447ee8c7b47680b4439f788d2ba41b583cc587211c",
+    "assets/eval/default_corpus.jsonl": "ec0be4c6fed11ac80d85343e9add912b528d9c89d58924c2b13d60f867edf22f",
+    "assets/eval/fixtures/longmemeval_sample.json": "82d28a8f87513b30343f0664465eab2b25f2f77ab46ee4104f919b69c02b1fa1"
+  },
+  "input_manifest": "verified 7 file hashes",
+  "historical_ci": {
+    "run": 35441992545,
+    "status": "success",
+    "evidence": "previous release turn; not current modifications"
+  }
+}

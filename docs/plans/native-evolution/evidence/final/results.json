@@ -1,0 +1,178 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "all-features-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--all-targets",
+      "--all-features"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "release-build",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--features",
+      "onnx"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "transport",
+    "command": [
+      "python3",
+      "tests/native_transport_smoke.py",
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "http-models",
+    "command": [
+      "python3",
+      "tests/native_http_models_smoke.py",
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "eval-matrix",
+    "command": [
+      "python3",
+      "tests/native_eval_matrix.py",
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne",
+      "--skip-model-smoke",
+      "--output",
+      "/Users/furina/Documents/Github/Mnemosyne/docs/plans/native-evolution/evidence/final/eval-matrix.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "upgrade-restore",
+    "command": [
+      "python3",
+      "tests/native_upgrade_smoke.py",
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne",
+      "--old-binary",
+      "/Users/furina/Documents/Github/Mnemosyne/target/baseline-v1/debug/mnemosyne",
+      "--output",
+      "/Users/furina/Documents/Github/Mnemosyne/docs/plans/native-evolution/evidence/final/upgrade-restore.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "eval-bm25",
+    "command": [
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne",
+      "eval",
+      "run",
+      "--min-recall",
+      "0.95"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "eval-full",
+    "command": [
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne",
+      "eval",
+      "run",
+      "--pipeline",
+      "full",
+      "--min-recall",
+      "0.95"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "eval-longmemeval-sample",
+    "command": [
+      "/Users/furina/Documents/Github/Mnemosyne/target/debug/mnemosyne",
+      "eval",
+      "run",
+      "--longmemeval",
+      "--pipeline",
+      "full",
+      "--min-recall",
+      "0.95"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "package-list",
+    "command": [
+      "cargo",
+      "package",
+      "--offline",
+      "--list",
+      "--allow-dirty"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "package",
+    "command": [
+      "cargo",
+      "package",
+      "--offline",
+      "--locked",
+      "--allow-dirty",
+      "--no-verify"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "package-offline-build",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked"
+    ],
+    "exit_code": 0
+  }
+]

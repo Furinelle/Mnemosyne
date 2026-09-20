@@ -212,13 +212,47 @@ fn stop_payload(event: &Value) -> Result<Option<Value>> {
 pub fn hook(event: &str, payload: &Value) -> Result<Option<Value>> {
     ensure!(payload.is_object(), "Hook payload must be an object");
     let session = payload["session_id"].as_str().unwrap_or("");
+    let budget = match payload.get("budget") {
+        None => None,
+        Some(value) => {
+            Some(usize::try_from(value.as_u64().ok_or_else(|| {
+                anyhow::anyhow!("budget must be a nonnegative integer")
+            })?)?)
+        }
+    };
+    let epoch = payload["context_epoch"].as_str().unwrap_or("");
+    let host = payload["host"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("claude-code");
+    let task_id = payload["task_id"].as_str().filter(|s| !s.is_empty());
+    let extra_items = if matches!(event, "SessionStart" | "UserPromptSubmit" | "PreToolUse")
+        && task_id.is_some()
+    {
+        crate::checkpoint::active_context(
+            &stores_for_scope("all")?,
+            task_id,
+            &crate::provenance::SystemClock,
+        )?
+    } else {
+        vec![]
+    };
     match event {
         "SessionStart" => {
-            if matches!(payload["source"].as_str(), Some("resume" | "compact")) {
+            if matches!(payload["source"].as_str(), Some("resume" | "compact")) && epoch.is_empty()
+            {
                 return Ok(None);
             }
             maybe_auto_init();
-            let output = context::inject("session_start", &json!({}), session, "cli")?;
+            let output = context::inject_with_options(
+                "session_start",
+                &json!({"host":host}),
+                session,
+                "cli",
+                budget,
+                epoch,
+                &extra_items,
+            )?;
             let result = hook_output(event, &output);
             if result.is_some() {
                 maybe_maintain();
@@ -226,11 +260,14 @@ pub fn hook(event: &str, payload: &Value) -> Result<Option<Value>> {
             Ok(result)
         }
         "UserPromptSubmit" => {
-            let output = context::inject(
+            let output = context::inject_with_options(
                 "turn_start",
-                &json!({"prompt":payload["prompt"].as_str().unwrap_or(""),"host":"claude-code"}),
+                &json!({"prompt":payload["prompt"].as_str().unwrap_or(""),"host":host}),
                 session,
                 "cli",
+                budget,
+                epoch,
+                &extra_items,
             )?;
             Ok(hook_output(event, &output))
         }
@@ -249,11 +286,14 @@ pub fn hook(event: &str, payload: &Value) -> Result<Option<Value>> {
             if !allowed {
                 return Ok(None);
             }
-            let output = context::inject(
+            let output = context::inject_with_options(
                 "file_touch",
-                &json!({"files":[path],"host":"claude-code"}),
+                &json!({"files":[path],"host":host}),
                 session,
                 "cli",
+                budget,
+                epoch,
+                &extra_items,
             )?;
             // No permissionDecision: context injection must never bypass tool approval.
             Ok(hook_output(event, &output))

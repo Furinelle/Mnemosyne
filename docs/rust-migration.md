@@ -144,3 +144,23 @@ retrieval scores from answer correctness.
 The subsequent evolution roadmap remains separate work: provenance, semantic
 revisions, checkpoints, system-time history, code applicability and approved
 maintenance proposals. Native migration does not imply these features exist.
+
+## Evolution candidate and rollback
+
+The unpublished evolution work opts stores into schema 2 / minimum writer 3.
+`store-upgrade` without `--commit` previews; `--commit` is a real migration and
+must only run after stopping every old writer and preserving a complete copy.
+Readers do not silently upgrade stores. New history/provenance/proposal state is
+part of the canonical rollback boundary. Restoring just `store.json`, or running
+the old 1.0 writer against upgraded state, is not a rollback strategy.
+
+For a new empty destination, `snapshot DEST` and `restore SNAPSHOT TARGET`
+validate directory manifests and reconstruct derived search caches. Restore
+preserves store identity for replacing an offline original; `--fork` creates an
+independent identity. Config and endpoints are deliberately excluded: review host
+configuration separately before any live cutover. All real host and optional model
+acceptance remains separately recorded from native protocol fixtures.
+
+The current crate still reports 1.0.0 as the baseline development version. It is
+not a published representation of this diff. Public Rust struct additions require
+a breaking crate release decision; existing CLI/MCP names remain compatible.

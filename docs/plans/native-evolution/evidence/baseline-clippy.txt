@@ -1,0 +1,4 @@
+    Checking mnemosyne v1.0.0 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.73s
+
+EXIT_CODE=0

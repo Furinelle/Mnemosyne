@@ -4,7 +4,7 @@ use crate::{
     store::*,
 };
 use anyhow::{Result, bail, ensure};
-use chrono::Local;
+use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -35,7 +35,7 @@ pub struct WriteResult {
 
 // MEMORY.md is a derived directory for file-only clients, not the knowledge source.
 // Caller holds the store lock, like the canonical write that precedes this update.
-fn update_markdown_index(store: &Store, added: Option<&Memory>) -> Result<()> {
+pub(crate) fn update_markdown_index(store: &Store, added: Option<&Memory>) -> Result<()> {
     use std::io::Write;
     let path = crate::store::cache_path(store, "MEMORY.md")?;
     let header = include_str!("../assets/templates/MEMORY.md");
@@ -96,16 +96,27 @@ fn request_body(request: &WriteRequest) -> (String, String) {
     );
     (title, body)
 }
+fn effective_source(source: &str) -> String {
+    let source = source.trim();
+    if source.is_empty() {
+        "agent".into()
+    } else {
+        source.to_lowercase()
+    }
+}
+
 fn duplicate_entry(
     store: &Store,
     request: &WriteRequest,
     body: &str,
 ) -> Result<Option<WriteResult>> {
     if !request.allow_duplicate {
+        let source = effective_source(&request.source);
         for (_, old) in load_memories_unlocked(store, false)? {
             if old.status != "superseded"
                 && !is_expired(&old.expires)
                 && old.memory_type == request.memory_type
+                && effective_source(&old.source) == source
                 && old.body == body
                 && old.expires == request.expires
                 && old.tags == request.tags
@@ -162,6 +173,7 @@ pub fn write_entry(store: &Store, request: &WriteRequest) -> Result<WriteResult>
     );
     ensure_store(store)?;
     let _guard = lock_store(store)?;
+    crate::provenance::ensure_v1_writer_compatible(store)?;
     let (title, body) = request_body(request);
     if let Some(duplicate) = duplicate_entry(store, request, &body)? {
         return Ok(duplicate);
@@ -185,11 +197,7 @@ pub fn write_entry(store: &Store, request: &WriteRequest) -> Result<WriteResult>
             &uuid::Uuid::new_v4().simple().to_string()[..8]
         ),
         memory_type: request.memory_type.clone(),
-        source: if request.source.is_empty() {
-            "agent".into()
-        } else {
-            request.source.clone()
-        },
+        source: effective_source(&request.source),
         strength: request.importance.clamp(0, 100),
         created: today.clone(),
         last_accessed: today,
@@ -271,30 +279,119 @@ pub fn search_entries(
                 }
             }
         }
-        output.push(json!({"id":m.id,"scope":result.store.scope,"type":m.memory_type,"source":m.source,"created":m.created,"status":m.status,"expires":m.expires,"expired":is_expired(&m.expires),"evidence":m.extra.get("evidence").cloned().unwrap_or(json!("")),"invalidated_by":m.extra.get("invalidated_by").cloned().unwrap_or(json!("")),"score":(result.score*10000.0).round()/10000.0,"strength":m.strength,"tags":m.tags,"links":m.links,"summary":m.injection_summary,"path":result.path,"why_matched":result.why_matched,"score_breakdown":result.score_breakdown}));
+        let applicability = crate::applicability::evaluate(&result.store, &m)?;
+        output.push(json!({"applicability":applicability,"id":m.id,"scope":result.store.scope,"type":m.memory_type,"title":m.title(),"source":m.source,"created":m.created,"status":m.status,"expires":m.expires,"expired":is_expired(&m.expires),"evidence":m.extra.get("evidence").cloned().unwrap_or(json!("")),"invalidated_by":m.extra.get("invalidated_by").cloned().unwrap_or(json!("")),"related_paths":m.extra.get("related_paths").cloned().unwrap_or(json!([])),"warnings":m.extra.get("warnings").cloned().unwrap_or(json!([])),"score":(result.score*10000.0).round()/10000.0,"strength":m.strength,"tags":m.tags,"links":m.links,"summary":m.injection_summary,"path":result.path,"why_matched":result.why_matched,"score_breakdown":result.score_breakdown}));
     }
     Ok(output)
 }
 
 pub fn maintain(stores: &[Store], dry_run: bool) -> Result<Value> {
+    maintain_at(stores, dry_run, &crate::provenance::SystemClock)
+}
+
+fn maintenance_day(clock: &impl crate::provenance::Clock) -> NaiveDate {
+    clock.now().date_naive()
+}
+
+fn expired_on(memory: &Memory, day: NaiveDate) -> bool {
+    NaiveDate::parse_from_str(memory.expires.trim(), "%Y-%m-%d").is_ok_and(|expiry| expiry < day)
+}
+
+fn decay_mode(thresholds: &Value) -> Result<bool> {
+    match thresholds["decay_mode"].as_str().unwrap_or("per_run") {
+        "per_run" => Ok(false),
+        "per_day" => Ok(true),
+        mode => bail!("thresholds.decay_mode must be per_run or per_day, got {mode}"),
+    }
+}
+
+/// `per_day` records its first observed maintenance day without charging old records.
+/// The caller supplies the clock so day boundaries and clock rollback stay testable.
+pub fn maintain_at(
+    stores: &[Store],
+    dry_run: bool,
+    clock: &impl crate::provenance::Clock,
+) -> Result<Value> {
     let mut counts =
         json!({"processed":0,"decayed":0,"deprecated":0,"archived":0,"core_candidates":[]});
     for store in stores.iter().filter(|s| s.root.exists()) {
-        let _guard = lock_store(store)?;
+        let _guard = if dry_run {
+            let path = store.root.join(".lock");
+            if path.exists() {
+                Some(crate::store::lock_store_existing_read_only(store)?)
+            } else {
+                None
+            }
+        } else {
+            Some(lock_store(store)?)
+        };
         let config = load_config(Some(store))?;
         let t = &config["thresholds"];
+        let per_day = decay_mode(t)?;
+        let decay = t["decay_per_run"].as_i64().unwrap_or(1).max(0);
+        let day = maintenance_day(clock);
+        let day_text = day.to_string();
+        let mut updated = false;
+        let manifest = crate::provenance::read_manifest(store)?;
+        if !dry_run && let Some(manifest) = &manifest {
+            ensure!(
+                manifest.min_writer_version == crate::provenance::WRITER_VERSION,
+                "UPGRADE_REQUIRED: maintenance requires store-upgrade --commit"
+            );
+        }
+        let versioned = manifest.is_some();
         for (path, mut m) in load_memories_unlocked(store, false)? {
+            let expected = if versioned && !dry_run {
+                let snapshot = crate::revisions::snapshot(store, &path)?;
+                ensure!(
+                    snapshot.semantic_hash == crate::revisions::semantic_digest(&m),
+                    "REVISION_CONFLICT: maintenance input changed"
+                );
+                Some(snapshot)
+            } else {
+                None
+            };
             counts["processed"] = json!(counts["processed"].as_u64().unwrap() + 1);
-            let expired = is_expired(&m.expires);
-            if !expired {
-                m.strength -= t["decay_per_run"].as_i64().unwrap_or(1);
+            let expired = expired_on(&m, day);
+            let mut changed = false;
+            if !expired && per_day {
+                let last = m
+                    .extra
+                    .get("last_maintained_at")
+                    .and_then(Value::as_str)
+                    .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok());
+                if let Some(last) = last {
+                    let elapsed = (day - last).num_days().max(0);
+                    if elapsed > 0 {
+                        m.strength = m.strength.saturating_sub(decay.saturating_mul(elapsed));
+                        m.extra.insert("last_maintained_at".into(), json!(day_text));
+                        changed = true;
+                    }
+                } else {
+                    m.extra.insert("last_maintained_at".into(), json!(day_text));
+                    changed = true;
+                }
+            } else if !expired {
+                m.strength = m.strength.saturating_sub(decay);
+                changed = true;
             }
-            if !expired && m.strength < t["deprecated_strength"].as_i64().unwrap_or(5) {
+            if !per_day
+                && !expired
+                && m.status != "superseded"
+                && m.strength < t["deprecated_strength"].as_i64().unwrap_or(5)
+            {
                 m.status = "deprecated".into();
+                changed = true;
             }
-            let action = if expired || m.strength < t["archive_strength"].as_i64().unwrap_or(30) {
+            let pinned = m.extra.get("pinned").and_then(Value::as_bool) == Some(true);
+            let action = if expired
+                || (m.status == "superseded"
+                    && m.strength < t["archive_strength"].as_i64().unwrap_or(30))
+                || (!pinned && m.strength < t["archive_strength"].as_i64().unwrap_or(30))
+            {
                 "archived"
-            } else if m.strength >= t["core_strength"].as_i64().unwrap_or(80)
+            } else if m.status == "active"
+                && m.strength >= t["core_strength"].as_i64().unwrap_or(80)
                 && m.access_count >= t["core_access_count"].as_i64().unwrap_or(3)
             {
                 "core_candidate"
@@ -312,20 +409,72 @@ pub fn maintain(stores: &[Store], dry_run: bool) -> Result<Value> {
                 counts[action] = json!(counts[action].as_u64().unwrap() + 1);
             }
             if !dry_run {
-                write_memory(&path, &m)?;
-                if action == "archived" {
-                    let month = Local::now().format("%Y-%m").to_string();
-                    let target = store.root.join("archive").join(month).join(
-                        path.file_name()
-                            .ok_or_else(|| anyhow::anyhow!("Invalid archive path"))?,
-                    );
-                    ensure!(!target.exists(), "Archive destination already exists");
-                    std::fs::create_dir_all(target.parent().unwrap())?;
-                    std::fs::rename(&path, target)?;
+                let archive_target = if action == "archived" {
+                    let month = day.format("%Y-%m").to_string();
+                    Some(
+                        store.root.join("archive").join(month).join(
+                            path.file_name()
+                                .ok_or_else(|| anyhow::anyhow!("Invalid archive path"))?,
+                        ),
+                    )
+                } else {
+                    None
+                };
+                if versioned && (changed || archive_target.is_some()) {
+                    if archive_target.is_some() {
+                        m.extra
+                            .insert("archived_at".into(), json!(clock.now().to_rfc3339()));
+                    }
+                    let mut plan = crate::revisions::plan_updates(
+                        store,
+                        &[crate::revisions::RevisionUpdate {
+                            path: path.clone(),
+                            memory: m,
+                            expected,
+                        }],
+                        "maintenance",
+                        clock,
+                    )?;
+                    if let Some(target) = archive_target {
+                        let relative = path.strip_prefix(&store.root)?.to_path_buf();
+                        let (before, after) = if let Some(index) = plan
+                            .changes
+                            .iter()
+                            .position(|change| change.path == relative)
+                        {
+                            let change = plan.changes.remove(index);
+                            (change.before, change.after)
+                        } else {
+                            let text = std::fs::read_to_string(&path)?;
+                            (Some(text.clone()), Some(text))
+                        };
+                        plan.changes.push(crate::relations::MutationChange {
+                            path: target.strip_prefix(&store.root)?.to_path_buf(),
+                            before: None,
+                            after,
+                        });
+                        plan.changes.push(crate::relations::MutationChange {
+                            path: relative,
+                            before,
+                            after: None,
+                        });
+                    }
+                    if !plan.changes.is_empty() {
+                        crate::relations::execute_mutation(store, plan)?;
+                        updated = true;
+                    }
+                } else if !versioned && (changed || archive_target.is_some()) {
+                    write_memory(&path, &m)?;
+                    if let Some(target) = archive_target {
+                        ensure!(!target.exists(), "Archive destination already exists");
+                        std::fs::create_dir_all(target.parent().unwrap())?;
+                        std::fs::rename(&path, target)?;
+                    }
+                    updated = true;
                 }
             }
         }
-        if !dry_run {
+        if !dry_run && updated {
             update_markdown_index(store, None)?;
         }
     }
@@ -437,4 +586,138 @@ mod tests {
         }
         Ok(())
     }
+}
+
+/// Corrections preserve identity and use semantic CAS; heat updates are not conflicts.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviseRequest {
+    pub memory_ref: crate::provenance::MemoryRef,
+    pub expected_rev: u64,
+    pub expected_hash: String,
+    pub changes: RevisionFields,
+}
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RevisionFields {
+    pub body: Option<String>,
+    #[serde(rename = "type")]
+    pub memory_type: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub source: Option<String>,
+    pub evidence: Option<String>,
+    pub expires: Option<String>,
+    pub observed_commit: Option<String>,
+    pub branch: Option<String>,
+    pub applies_to: Option<String>,
+    pub applies_commit: Option<String>,
+    pub applies_tree: Option<String>,
+    pub related_paths: Option<Vec<String>>,
+    pub related_path_hashes: Option<Vec<String>>,
+}
+
+pub fn revise_v2(
+    store: &Store,
+    request: &ReviseRequest,
+    clock: &impl crate::provenance::Clock,
+) -> Result<Value> {
+    let _lock = lock_store(store)?;
+    let manifest = crate::provenance::read_manifest(store)?
+        .ok_or_else(|| anyhow::anyhow!("Explicit upgrade required"))?;
+    ensure!(
+        manifest.min_writer_version == crate::provenance::WRITER_VERSION,
+        "UPGRADE_REQUIRED: corrections require store-upgrade --commit"
+    );
+    ensure!(
+        manifest.store_id == request.memory_ref.store_id,
+        "STORE_ID_MISMATCH"
+    );
+    let (path, mut memory) = load_memories_unlocked(store, true)?
+        .into_iter()
+        .find(|(_, m)| m.id == request.memory_ref.memory_id)
+        .ok_or_else(|| anyhow::anyhow!("Memory not found"))?;
+    let snapshot = crate::revisions::snapshot(store, &path)?;
+    ensure!(
+        snapshot.semantic_rev == request.expected_rev
+            && snapshot.semantic_hash == request.expected_hash,
+        "REVISION_CONFLICT: memory changed"
+    );
+    let changes = &request.changes;
+    if let Some(body) = &changes.body {
+        ensure!(!body.trim().is_empty(), "Empty body");
+        memory.body = body.clone();
+        let summary: String = body
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(220)
+            .collect();
+        memory.canonical_summary = summary.clone();
+        memory.injection_summary = summary;
+    }
+    if let Some(kind) = &changes.memory_type {
+        let config = load_config(Some(store))?;
+        ensure!(
+            config["memory"]["types"]
+                .as_array()
+                .is_some_and(|types| types.iter().any(|v| v.as_str() == Some(kind))),
+            "Invalid memory type"
+        );
+        memory.memory_type = kind.clone();
+    }
+    if let Some(tags) = &changes.tags {
+        memory.tags = tags.clone();
+    }
+    if let Some(source) = &changes.source {
+        memory.source = effective_source(source);
+    }
+    if let Some(evidence) = &changes.evidence {
+        ensure!(
+            evidence.chars().count() <= 200,
+            "Evidence exceeds 200 characters"
+        );
+        memory.extra.insert("evidence".into(), json!(evidence));
+    }
+    if let Some(expires) = &changes.expires {
+        memory.expires = expires.clone();
+    }
+    for (key, value) in [
+        ("observed_commit", &changes.observed_commit),
+        ("branch", &changes.branch),
+        ("applies_to", &changes.applies_to),
+        ("applies_commit", &changes.applies_commit),
+        ("applies_tree", &changes.applies_tree),
+    ] {
+        if let Some(value) = value {
+            memory.extra.insert(key.into(), json!(value));
+        }
+    }
+    for (key, value) in [
+        ("related_paths", &changes.related_paths),
+        ("related_path_hashes", &changes.related_path_hashes),
+    ] {
+        if let Some(value) = value {
+            memory.extra.insert(key.into(), json!(value));
+        }
+    }
+    crate::revisions::write_locked(store, &path, &memory, Some(snapshot), "correction", clock)?;
+    update_markdown_index(store, None)?;
+    Ok(
+        json!({"version":2,"memory_ref":request.memory_ref,"revision":crate::revisions::snapshot(store, &path)?}),
+    )
+}
+
+pub fn show_v2(stores: &[Store], id: &str, store_id: Option<&str>) -> Result<Value> {
+    let (store, path, _) = crate::provenance::resolve_id_v2(stores, id, store_id)?
+        .ok_or_else(|| anyhow::anyhow!("Memory not found"))?;
+    let _lock = lock_store(&store)?;
+    let provenance = crate::provenance::read_provenance_unlocked(&store, id)?;
+    let memory = crate::schema::parse_memory(&std::fs::read_to_string(&path)?)?;
+    let manifest = crate::provenance::read_manifest(&store)?
+        .ok_or_else(|| anyhow::anyhow!("Missing store manifest"))?;
+    let applicability = crate::applicability::evaluate(&store, &memory)?;
+    Ok(
+        json!({"version":2,"applicability":applicability,"memory_ref":{"store_id":manifest.store_id,"memory_id":id},"memory":memory,"provenance":provenance,"revision":crate::revisions::snapshot(&store,&path)?}),
+    )
 }

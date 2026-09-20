@@ -1,0 +1,27 @@
+R07 local acceptance (2026-09-20; temporary stores only)
+
+Commands:
+  cargo test --offline --lib relations::tests
+  cargo test --offline --test revisions --test revision_contract
+  python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/r07-final
+Final shared gate: 13 commands exit 0; default and all-feature suites each 101 passed.
+Includes release build with ONNX feature, no real model asset/inference/download.
+Raw logs, exact commands and source archive hash: r07-final/.
+
+R07-A01 PASS: tests/revisions.rs proves created image, correction, semantic CAS after heat changes, source SUPPORT and duplicate replay; tests/revision_contract.rs checks CLI/MCP corrections, relation/supersede, deprecation, archive markers and heat-only maintenance. Source event count/hash and immutable images preserve evidence states; snapshot/provenance read uses one store lock and concurrent show/support is tested.
+R07-A02 PASS: relations::tests::single_store_mutation_recovers_at_durable_stages injects at intent, staged history, durable decision and completed materialization. Before decision, staged images are rolled back without exposing a manifest; after decision, recovery rolls forward. committed_mutation_recovers_partial_current_materialization additionally starts with one target already materialized. cross_store_mutation_keeps_history_with_decision exercises the new participant/history stages. No published partial history remains after recovery.
+R07-A03 PASS: Original cross_store_interruption_recovers_at_every_durable_stage still executes its five legacy interruption points. Existing cross-store cycle/reverse-status tests and new both-store history tests pass.
+R07-A04 PASS: Recovery checks every target first. A user-edited current target remains byte-for-byte unchanged, recovery errors, and the journal remains. Corrupt immutable images/hashes are rejected. Source raw no-op guards prevent observing a stale external image without byte-CAS validation.
+R07-A05 PASS: Existing v1 partial journal and v2 cross-store recovery remain tested. New plans reject traversal, symlink directories, duplicate targets, invalid evidence paths/IDs and corrupted hashes. New creates require exact absence before intent; a preexisting identical history image is not claimed or deleted. Archive moves use absence CAS plus deletion in one plan. Mixed writer protocols are rejected for revision-aware cross-store changes.
+R07-A06 PASS: First adoption preserves current raw Markdown and records one adopted image plus coverage_start. No past image is invented. External semantic change yields external_edit/unknown_gap at observation time; heat alone adds nothing. Writer-2 preview/read does not opt into history; explicit writer-3 upgrade preserves store UUID and is separately tested.
+R07-A07 PASS: revision_contract removes temporary lexical/vector caches and runs reindex; current corrected state, all manifest entries and original image remain. Source provenance is canonical JSON committed with Markdown/history, not stored solely in SQLite.
+
+Integration findings corrected before final gate:
+- show_v2 previously read provenance and current Markdown under separate locks; now one final lock covers provenance, memory and revision.
+- archive without status change now records archived_at, preserving superseded/deprecated status rather than rewriting lifecycle semantics.
+- v3 cross-store transactions require writer-3 capability on both participants; a legacy store cannot receive an unsupported v3 journal.
+- initially prepared plans could treat a preexisting identical snapshot as a staged file; strict pre-intent absence validation now prevents ownership/deletion of that file.
+
+Initial test harness fixes: v2 fixture now supplies required source_kind/verification_state, and link uses the existing --rel option. One Clippy nonminimal boolean was simplified before the final gate. These were not hidden/skipped checks. New API tests were introduced alongside the feature, so no blanket claim of pre-change red tests is made.
+
+Boundaries: schema stays 2; writer protocol becomes 3 by explicit upgrade only. Package version stays 1.0.0. No install, real-store migration, real host/model session, Git push or release. R08 history query/applicability and later plan items are not claimed complete. Full-history validation currently scans under the lock; production-scale performance is not established by this batch.

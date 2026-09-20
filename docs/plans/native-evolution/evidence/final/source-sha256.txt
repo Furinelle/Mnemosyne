@@ -1,0 +1,1 @@
+37c4ad6d12b91f04b60aa79a688a34b27082516f7f221cfdea212d0d170c8f0d  mnemosyne-1.0.0.crate

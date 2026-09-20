@@ -1,0 +1,317 @@
+{
+  "commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+  "binary_sha256": "65bd61483431ab843c5afd552453738c59837c6a37a2aa9221f9644a3f8330fe",
+  "build": "release; onnx feature compiled, models disabled",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "processor": "arm",
+  "samples": 3,
+  "clock": "perf_counter_ns",
+  "models": "disabled; no assets read",
+  "effective_pipeline": "lexical; no network",
+  "limitations": [
+    "process-level totals, not internal phase attribution",
+    "pending recovery measured by correctness tests only",
+    "no real-host/model E2E or lane ablation"
+  ],
+  "results": [
+    {
+      "records": 100,
+      "scenario": "startup",
+      "samples_ms": [
+        6.299875,
+        4.963666,
+        5.130375
+      ],
+      "p50_ms": 5.130375,
+      "p95_ms": 6.299875,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "cold_index",
+      "samples_ms": [
+        60.000542,
+        52.743375,
+        55.270417
+      ],
+      "p50_ms": 55.270417,
+      "p95_ms": 60.000542,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "warm_query",
+      "samples_ms": [
+        58.629041,
+        56.053959,
+        60.994125
+      ],
+      "p50_ms": 58.629041,
+      "p95_ms": 60.994125,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "single_edit",
+      "samples_ms": [
+        55.594542,
+        55.693416,
+        55.821916
+      ],
+      "p50_ms": 55.693416,
+      "p95_ms": 55.821916,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "file_hook",
+      "samples_ms": [
+        16.972875,
+        12.549625,
+        13.165
+      ],
+      "p50_ms": 13.165,
+      "p95_ms": 16.972875,
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 1000,
+      "scenario": "startup",
+      "samples_ms": [
+        5.824041,
+        4.791167,
+        4.845792
+      ],
+      "p50_ms": 4.845792,
+      "p95_ms": 5.824041,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        102.649458,
+        96.594458,
+        104.898583
+      ],
+      "p50_ms": 102.649458,
+      "p95_ms": 104.898583,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        70.844958,
+        70.138542,
+        72.964041
+      ],
+      "p50_ms": 70.844958,
+      "p95_ms": 72.964041,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        74.928417,
+        71.53825,
+        69.869041
+      ],
+      "p50_ms": 71.53825,
+      "p95_ms": 74.928417,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        50.704,
+        43.512334,
+        36.783542
+      ],
+      "p50_ms": 43.512334,
+      "p95_ms": 50.704,
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 10000,
+      "scenario": "startup",
+      "samples_ms": [
+        5.5675,
+        4.303417,
+        4.387375
+      ],
+      "p50_ms": 4.387375,
+      "p95_ms": 5.5675,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        618.752375,
+        590.955792,
+        609.821542
+      ],
+      "p50_ms": 609.821542,
+      "p95_ms": 618.752375,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        255.971583,
+        251.885541,
+        248.973458
+      ],
+      "p50_ms": 251.885541,
+      "p95_ms": 255.971583,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        240.100416,
+        242.612875,
+        241.805584
+      ],
+      "p50_ms": 241.805584,
+      "p95_ms": 242.612875,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        417.207958,
+        392.639084,
+        399.929708
+      ],
+      "p50_ms": 399.929708,
+      "p95_ms": 417.207958,
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    }
+  ],
+  "measurement_binding": {
+    "commit_reference": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+    "binary_sha256": "65bd61483431ab843c5afd552453738c59837c6a37a2aa9221f9644a3f8330fe",
+    "workspace": "dirty workspace; final gate release binary"
+  },
+  "baseline_mean_comparison": {
+    "method": "same host-family raw mean only; no universal speed claim",
+    "baseline_commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
+    "baseline_samples": 5,
+    "final_samples": 3,
+    "rows": [
+      {
+        "records": 100,
+        "scenario": "startup",
+        "baseline_mean_ms": 6.1684166,
+        "final_mean_ms": 5.464638666666667,
+        "delta_ms": -0.7037779333333329
+      },
+      {
+        "records": 100,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 56.052616799999996,
+        "final_mean_ms": 56.00477800000001,
+        "delta_ms": -0.04783879999998675
+      },
+      {
+        "records": 100,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 54.261183200000005,
+        "final_mean_ms": 58.559041666666666,
+        "delta_ms": 4.297858466666661
+      },
+      {
+        "records": 100,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 56.284166600000006,
+        "final_mean_ms": 55.70329133333333,
+        "delta_ms": -0.5808752666666734
+      },
+      {
+        "records": 100,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 12.429958399999999,
+        "final_mean_ms": 14.229166666666666,
+        "delta_ms": 1.7992082666666676
+      },
+      {
+        "records": 1000,
+        "scenario": "startup",
+        "baseline_mean_ms": 5.2209582,
+        "final_mean_ms": 5.153666666666666,
+        "delta_ms": -0.06729153333333393
+      },
+      {
+        "records": 1000,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 94.1105166,
+        "final_mean_ms": 101.38083300000001,
+        "delta_ms": 7.270316400000013
+      },
+      {
+        "records": 1000,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 70.2203916,
+        "final_mean_ms": 71.315847,
+        "delta_ms": 1.0954554000000059
+      },
+      {
+        "records": 1000,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 70.334225,
+        "final_mean_ms": 72.11190266666667,
+        "delta_ms": 1.777677666666662
+      },
+      {
+        "records": 1000,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 25.893158399999997,
+        "final_mean_ms": 43.666625333333336,
+        "delta_ms": 17.77346693333334
+      },
+      {
+        "records": 10000,
+        "scenario": "startup",
+        "baseline_mean_ms": 4.9199,
+        "final_mean_ms": 4.752763999999999,
+        "delta_ms": -0.16713600000000106
+      },
+      {
+        "records": 10000,
+        "scenario": "cold_index",
+        "baseline_mean_ms": 522.6532082,
+        "final_mean_ms": 606.509903,
+        "delta_ms": 83.85669480000001
+      },
+      {
+        "records": 10000,
+        "scenario": "warm_query",
+        "baseline_mean_ms": 245.416717,
+        "final_mean_ms": 252.2768606666667,
+        "delta_ms": 6.860143666666687
+      },
+      {
+        "records": 10000,
+        "scenario": "single_edit",
+        "baseline_mean_ms": 244.90985819999997,
+        "final_mean_ms": 241.50629166666667,
+        "delta_ms": -3.4035665333333043
+      },
+      {
+        "records": 10000,
+        "scenario": "file_hook",
+        "baseline_mean_ms": 191.3050582,
+        "final_mean_ms": 403.25891666666666,
+        "delta_ms": 211.95385846666667
+      }
+    ]
+  }
+}

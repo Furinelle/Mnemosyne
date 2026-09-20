@@ -1,0 +1,13 @@
+R06 local regression evidence (2026-09-20)
+Command: cargo test --offline --test checkpoints
+Result before final shared gate: 5 passed, 0 failed.
+Final shared validation: m1-final/results.json and tests.txt/all-features-tests.txt.
+
+R06-A01 PASS: A modifies two temporary files and actually executes two failing shell test commands. B loads the checkpoint and sees two reported_fail results and both unresolved items. The record never says verified.
+R06-A02 PASS: A planned test with no execution receipt remains not_executed_or_unknown. Caller-supplied origin=observed is rejected. All accepted reports remain reported_only.
+R06-A03 PASS: A separate real temporary Git commit remains identical while a scoped dirty file changes; fingerprints differ. Load marks previous fingerprint evidence needs_revalidation. Scoped symlinks and traversal are rejected.
+R06-A04 PASS: Two concurrent update processes with expected_revision=1 produce exactly one success and one REVISION_CONFLICT. Close advances the revision and keeps unresolved items; closed update fails.
+R06-A05 PASS: Injected Clock verifies active, expired, and closed selection. Expired/closed records remain explicitly readable; expiry cannot be extended after it has elapsed. No working memory is created. A malformed unrelated checkpoint produces a warning while readable matching checkpoints remain available. Future minimum writer versions are rejected.
+R06-A06 PASS (protocol fixtures only): 12 directed pairs of codex/claude-code/grok/antigravity preserve writer identity, two unresolved failures, and reported_only. CLI and MCP share the same checkpoint implementation. This is not a live host/model conversation test.
+
+Isolation: temporary HOME, MNEMOSYNE_HOME, project files and stores. Subprocess environments are cleared; ordinary native CLI fixtures run with empty PATH. Git fixture permits only local system Git and no external endpoints. Checkpoint implementation never executes caller test commands. No real store, installed binary, host settings, paid model or network download is changed.

@@ -1,0 +1,10 @@
+R04-A07 / R05-A06 contract regression (2026-09-20)
+
+Command: cargo test --test m1_contract --quiet
+Result: 2 passed, 0 failed. The test clears inherited environment variables and uses temporary HOME, MNEMOSYNE_HOME, TMPDIR, and project paths. PATH is /usr/bin:/bin; no external service or real store is used.
+
+R04-A07 PASS: CLI legacy write/show, store-upgrade preview/commit, write-v2/show-v2, and MCP v1/v2 write/show are exercised together. The eight MCP tools remain listed. Preview leaves the entire temporary store byte-for-byte unchanged. Mixed write/show arguments are rejected, and the legacy writer rejects the upgraded schema. Restoring a copied upgraded store restores its manifest, evidence sidecars, and Markdown for v2 reads; restoring the pre-upgrade copy restores legacy read/write. The real configuration is untouched.
+
+R05-A06 PASS: After an explicit temporary upgrade, a v2 memory and a task checkpoint are created. CLI prep --format json and MCP prep version 2 return the same selected/omitted candidates under the same 2000 estimated-token budget. The host hook receives those memory and checkpoint IDs for the same prompt/task_id, and its context is also within that budget. Channel-specific prose/envelopes are not compared byte-for-byte.
+
+The first test run failed on a test expectation: preview reports `upgrade_available`, not `preview`. The next run failed because MCP wraps scalar v1 show output under `structuredContent.text`. Both assertions were corrected to match the existing contract; no implementation change was needed. No product regression was observed.

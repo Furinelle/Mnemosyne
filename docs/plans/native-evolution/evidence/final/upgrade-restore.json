@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "old_version": "mnemosyne 1.0.0",
+  "old_binary_sha256": "c72768ab99845ab40be2f1ba244c6654c9ea4f86046a86c6d7cfd3a87e44a3e6",
+  "new_binary_sha256": "e088773bb10c584e756e50dce0c789c0bf9d6441ee63325cea99ff815fd44c51",
+  "canonical_records": 2,
+  "restore_bytes_match": true,
+  "history_evidence_checkpoints_proposals_match": true,
+  "cache_rebuilt": true,
+  "live_stores_used": false,
+  "old_writer_after_upgrade": "not run: rollout requires stopping old writer"
+}
