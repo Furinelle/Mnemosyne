@@ -148,6 +148,16 @@ def main():
             reply = json.loads(run(['mcp', 'serve'], json.dumps(request) + '\n'))
             assert 'error' not in reply and not reply['result'].get('isError'), reply
             assert 'disabled' in json.dumps(reply) and len(calls) == before
+            project_config.write_text('[embedding]\nenabled=false\n[distill]\nenabled=true\nengine="llm"\n')
+            run(['store-upgrade', '--scope', 'project', '--commit'])
+            output = json.loads(run(['distill', '--stdin', '--format', 'role-jsonl', '--commit'],
+                               json.dumps({'role': 'assistant', 'text': 'Use a lock to serialize writes.'})))
+            assert output and output[0]['id']
+            ledger = root / '.mnemosyne/evidence' / (output[0]['id'] + '.json')
+            assert ledger.is_file(), 'upgraded LLM extraction did not use v2 provenance'
+            replay = json.loads(run(['distill', '--stdin', '--format', 'role-jsonl', '--commit'],
+                               json.dumps({'role': 'assistant', 'text': 'Use a lock to serialize writes.'})))
+            assert replay[0]['id'] == output[0]['id'] and replay[0]['verdict'] == 'duplicate'
             print('HTTP model protocol, cache repair, query profile CAS, invalid provider fallback, disabled model isolation: passed (local mock; no real model acceptance)')
     finally:
         server.shutdown()

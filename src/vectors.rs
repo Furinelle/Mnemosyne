@@ -185,6 +185,9 @@ where
     if !settings["enabled"].as_bool().unwrap_or(false) {
         return Ok(vec![]);
     }
+    if settings["backend"].as_str().unwrap_or("onnx") != "onnx" {
+        crate::timing::not_run("model_initialize");
+    }
     let profile = ModelProfile::new(settings)
         .map_err(|_| diagnostic("missing_assets", "model_or_vocabulary_unavailable"))?;
     // Keep the caller's selected profile and each store's configuration snapshots.

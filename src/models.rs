@@ -52,6 +52,7 @@ fn model_path(c: &Value) -> PathBuf {
     }
 }
 pub fn fingerprint(c: &Value) -> Result<String> {
+    let _timing = crate::timing::Scope::new("model_fingerprint");
     let mut hash = Sha256::new();
     let mut safe = c.clone();
     if let Some(o) = safe.as_object_mut() {
@@ -88,6 +89,7 @@ pub struct ModelProfile {
 
 impl ModelProfile {
     pub fn new(settings: &Value) -> Result<Self> {
+        let _timing = crate::timing::Scope::new("model_profile");
         Ok(Self {
             settings: settings.clone(),
             fingerprint: fingerprint(settings)?,
@@ -230,25 +232,29 @@ fn local_inference(_c: &Value, _texts: &[String], _query: Option<&str>) -> Resul
 #[cfg(feature = "onnx")]
 fn local_inference(c: &Value, texts: &[String], query: Option<&str>) -> Result<Vec<Vec<f64>>> {
     use ort::{session::Session, value::Tensor};
-    if std::env::var_os("ORT_DYLIB_PATH").is_none() {
-        let runtime = std::env::current_exe()?.with_file_name(if cfg!(target_os = "macos") {
-            "libonnxruntime.dylib"
-        } else if cfg!(target_os = "windows") {
-            "onnxruntime.dll"
-        } else {
-            "libonnxruntime.so"
-        });
-        if runtime.is_file() {
-            ort::init_from(runtime)?.commit();
+    let (vocab, mut session) = {
+        let _timing = crate::timing::Scope::new("model_initialize");
+        if std::env::var_os("ORT_DYLIB_PATH").is_none() {
+            let runtime = std::env::current_exe()?.with_file_name(if cfg!(target_os = "macos") {
+                "libonnxruntime.dylib"
+            } else if cfg!(target_os = "windows") {
+                "onnxruntime.dll"
+            } else {
+                "libonnxruntime.so"
+            });
+            if runtime.is_file() {
+                ort::init_from(runtime)?.commit();
+            }
         }
-    }
-    let path = model_path(c);
-    let vocab: HashMap<String, i64> = std::fs::read_to_string(path.with_file_name("vocab.txt"))?
-        .lines()
-        .enumerate()
-        .map(|(i, s)| (s.to_owned(), i as i64))
-        .collect();
-    let mut session = Session::builder()?.commit_from_file(path)?;
+        let path = model_path(c);
+        let vocab: HashMap<String, i64> =
+            std::fs::read_to_string(path.with_file_name("vocab.txt"))?
+                .lines()
+                .enumerate()
+                .map(|(i, s)| (s.to_owned(), i as i64))
+                .collect();
+        (vocab, Session::builder()?.commit_from_file(path)?)
+    };
     let length = if query.is_some() { 256 } else { 64 };
     let mut ids = Vec::new();
     let mut attention = Vec::new();

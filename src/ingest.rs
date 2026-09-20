@@ -1,5 +1,6 @@
 use crate::{
-    api::{WriteRequest, classify_entry, write_entry},
+    api::{WriteRequest, WriteResult, classify_entry, write_entry},
+    provenance::{self, WriteRequestV2},
     store::{Store, find_project_store, global_store, load_config},
 };
 use anyhow::{Result, bail};
@@ -219,7 +220,22 @@ fn parse_findings(text: &str, fmt: &str, types: &HashSet<String>) -> Result<Vec<
     }
 }
 
-fn process(findings: Vec<Finding>, source: &str, commit: bool) -> Result<Vec<Value>> {
+// Missing legacy event IDs use content-addressed identities, not a fabricated
+// independent observation on every replay. Explicit host IDs take precedence.
+fn identity_field(identity: &Value, field: &str, fallback: &str) -> String {
+    identity[field]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(fallback)
+        .to_owned()
+}
+
+fn process(
+    findings: Vec<Finding>,
+    source: &str,
+    commit: bool,
+    identity: &Value,
+) -> Result<Vec<Value>> {
     let store = destination();
     let mut actions = Vec::new();
     for finding in findings {
@@ -234,14 +250,70 @@ fn process(findings: Vec<Finding>, source: &str, commit: bool) -> Result<Vec<Val
             evidence: finding.evidence,
             ..Default::default()
         };
-        let written = if commit {
+        let written = if provenance::read_manifest(&store)?.is_some() {
+            let claim = format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(&(
+                    &request.memory_type,
+                    &request.title,
+                    &request.content,
+                    &request.tags,
+                ))?)
+            );
+            let event = format!(
+                "{:x}",
+                Sha256::digest(serde_json::to_vec(&(
+                    &claim,
+                    request.importance,
+                    &request.evidence,
+                ))?)
+            );
+            let request = WriteRequestV2 {
+                memory_type: request.memory_type,
+                title: request.title,
+                content: request.content,
+                importance: request.importance,
+                tags: request.tags,
+                source: source.into(),
+                origin: identity_field(identity, "origin", source),
+                source_session_id: identity_field(
+                    identity,
+                    "source_session_id",
+                    "legacy-unspecified",
+                ),
+                source_event_id: identity_field(identity, "source_event_id", &event),
+                finding_key: claim.clone(),
+                fact_key: format!("ingest:{claim}"),
+                source_kind: "agent_inference".into(),
+                verification_state: if request.evidence.is_empty() {
+                    "unverified"
+                } else {
+                    "evidence_attached"
+                }
+                .into(),
+                source_summary: request.evidence,
+                ..Default::default()
+            };
+            let written = if commit {
+                provenance::write_v2(&store, &request, &provenance::SystemClock)?
+            } else {
+                provenance::preview_v2(&store, &request, &provenance::SystemClock)?
+            };
+            WriteResult {
+                duplicate_of: (written.status != "created")
+                    .then(|| written.memory_ref.memory_id.clone()),
+                status: written.status,
+                id: written.memory_ref.memory_id,
+                path: None,
+            }
+        } else if commit {
             write_entry(&store, &request)?
         } else {
             classify_entry(&store, &request)?
         };
         let mut result = json!({"type":finding.kind,"importance":finding.importance,"title":finding.title,
             "tags":finding.tags,"content_preview":preview,
-            "verdict":if written.status == "duplicate" { "duplicate" } else { "new" },
+            "verdict":if written.status == "created" { "new" } else { written.status.as_str() },
             "target":written.duplicate_of});
         if commit {
             result["id"] = json!(written.id);
@@ -257,6 +329,7 @@ pub fn ingest(text: &str, source: &str, commit: bool, fmt: &str) -> Result<Vec<V
         parse_findings(text, fmt, &allowed(&config))?,
         source,
         commit,
+        &serde_json::from_str::<Value>(text).unwrap_or(Value::Null),
     )
 }
 
@@ -528,7 +601,13 @@ fn parse_llm_payload(content: &str, types: &HashSet<String>, max: usize) -> Resu
         .collect())
 }
 
-fn distill_turns(turns: &[Turn], source: &str, commit: bool, config: &Value) -> Result<Vec<Value>> {
+fn distill_turns(
+    turns: &[Turn],
+    source: &str,
+    commit: bool,
+    config: &Value,
+    identity: &Value,
+) -> Result<Vec<Value>> {
     let engine = config["distill"]["engine"].as_str().unwrap_or("heuristic");
     let types = allowed(config);
     let findings = match engine {
@@ -544,12 +623,18 @@ fn distill_turns(turns: &[Turn], source: &str, commit: bool, config: &Value) -> 
             .collect(),
         _ => bail!("unknown distill engine: {engine}"),
     };
-    process(findings, source, commit)
+    process(findings, source, commit, identity)
 }
 
 pub fn distill(text: &str, fmt: &str, source: &str, commit: bool) -> Result<Vec<Value>> {
     let config = load_config(Some(&destination()))?;
-    distill_turns(&parse_transcript(text, fmt)?, source, commit, &config)
+    distill_turns(
+        &parse_transcript(text, fmt)?,
+        source,
+        commit,
+        &config,
+        &Value::Null,
+    )
 }
 
 fn empty_event() -> Value {
@@ -631,7 +716,23 @@ pub fn session_end(payload: &Value) -> Result<Value> {
     if start == turns.len() {
         return Ok(empty_event());
     }
-    let actions = distill_turns(&turns[start..], source, true, &config)?;
+    let mut identity = payload.clone();
+    if identity["source_session_id"]
+        .as_str()
+        .is_none_or(str::is_empty)
+    {
+        identity["source_session_id"] = json!(
+            payload["session_id"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+                .or_else(
+                    || key.map(|path| format!("transcript:{:x}", Sha256::digest(path.as_bytes())))
+                )
+                .unwrap_or_else(|| "legacy-unspecified".into())
+        );
+    }
+    let actions = distill_turns(&turns[start..], source, true, &config, &identity)?;
     if let Some(key) = key {
         state["transcripts"][key] =
             json!({"turns":turns.len(),"hash":turn_hash(&turns),"version":3});
@@ -722,7 +823,8 @@ mod tests {
                 &turns,
                 "agent",
                 false,
-                &json!({"distill":{"engine":"llm","llm":{"backend":"unsupported"}},"memory":{"types":["pitfall"]}})
+                &json!({"distill":{"engine":"llm","llm":{"backend":"unsupported"}},"memory":{"types":["pitfall"]}}),
+                &Value::Null
             )
             .is_err()
         );

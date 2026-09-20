@@ -15,6 +15,9 @@ with tempfile.TemporaryDirectory(prefix='mnemosyne-upgrade-') as temp:
  run(old,['init','--no-agent-files']);run(old,['write','--type','codebase','--importance','70','--title','Upgrade fixture','--content','Quartz routing uses PostgreSQL'])
  before={str(f.relative_to(project/'.mnemosyne')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (project/'.mnemosyne/working').glob('*.md')}
  run(new,['store-upgrade','--commit']);result=json.loads(run(new,['search','Quartz','--format','json']).stdout);assert result
+ findings={'findings':[{'type':'pitfall','importance':70,'title':'Upgraded ingestion','content':'Automatic findings use the upgraded writer.'}]}
+ ingested=json.loads(run(new,['ingest','--format','json','--commit'],findings).stdout);assert ingested[0]['id']
+ replay=json.loads(run(new,['ingest','--format','json','--commit'],findings).stdout);assert replay[0]['id']==ingested[0]['id'] and replay[0]['verdict']=='duplicate'
  (project/'fixture.txt').write_text('temporary upgrade fixture')
  run(new,['checkpoint','new'],{'task_id':'upgrade','goal':'verify restoration','scoped_paths':['fixture.txt'],'expires':'2099-01-01T00:00:00Z'})
  written=json.loads(run(new,['write-v2'],{'type':'codebase','title':'Evidence fixture','content':'Independent test evidence','importance':70,'origin':'upgrade-test','source_session_id':'s','source_event_id':'e','finding_key':'f','source_kind':'tool_output','verification_state':'unverified'}).stdout)
@@ -27,9 +30,10 @@ with tempfile.TemporaryDirectory(prefix='mnemosyne-upgrade-') as temp:
   assert left and left==right,directory
  restored={str(f.relative_to(root/'restored')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (root/'restored/working').glob('*.md')}
  canonical={str(f.relative_to(project/'.mnemosyne')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (project/'.mnemosyne/working').glob('*.md')};assert canonical==restored
- assert len(before)==1 and len(restored)==2
+ assert len(before)==1 and len(restored)==3
  assert (root/'restored/rust-index.sqlite').exists()
+ assert ingested[0]['id'] in (root/'restored/MEMORY.md').read_text()
  manifest=json.loads((root/'restored/store.json').read_text());assert manifest['min_writer_version']==3
  # Old writers must not be used after upgrade: the rollout contract stops them.
- result={'status':'pass','old_version':version,'old_binary_sha256':hashlib.sha256(old.read_bytes()).hexdigest(),'new_binary_sha256':hashlib.sha256(new.read_bytes()).hexdigest(),'canonical_records':len(restored),'restore_bytes_match':True,'history_evidence_checkpoints_proposals_match':True,'cache_rebuilt':True,'live_stores_used':False,'old_writer_after_upgrade':'not run: rollout requires stopping old writer'}
+ result={'status':'pass','old_version':version,'old_binary_sha256':hashlib.sha256(old.read_bytes()).hexdigest(),'new_binary_sha256':hashlib.sha256(new.read_bytes()).hexdigest(),'canonical_records':len(restored),'restore_bytes_match':True,'history_evidence_checkpoints_proposals_match':True,'cache_rebuilt':True,'upgraded_ingest_replay':True,'markdown_index_rebuilt':True,'live_stores_used':False,'old_writer_after_upgrade':'not run: rollout requires stopping old writer'}
  a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))

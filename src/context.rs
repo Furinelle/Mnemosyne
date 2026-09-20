@@ -192,6 +192,7 @@ fn assemble_bundle(
     prefix: &str,
     budget_override: Option<usize>,
 ) -> Result<Assembly> {
+    let _timing = crate::timing::Scope::new("context_render");
     let max_tokens = match budget_override {
         Some(value) => value,
         None => budget(config)?,

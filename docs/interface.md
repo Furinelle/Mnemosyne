@@ -163,12 +163,23 @@ configuration revision; local hashing cannot discover those remote changes.
 report `upgrade_available`; explicit commit keeps the UUID and raises the writer
 requirement. Legacy Markdown is not
 bulk rewritten. Before an actual upgrade, stop older writers and preserve a
-complete store copy. This iteration only upgrades temporary test stores.
+complete store copy.
 Restoring that complete copy is the rollback procedure; deleting the manifest
 alone is not a rollback of new records or source events. Old 1.0 binaries cannot
-enforce a future minimum writer protocol. The new binary refuses legacy writes
-to an upgraded store, so existing auto-ingest callers need a v2 migration before
-upgrading their real stores.
+enforce a future minimum writer protocol. The new binary refuses explicit legacy
+writes to an upgraded store. Since
+2.0.1, native `ingest`, `distill` and `session_end` select the V2 writer for
+upgraded stores; no host setting change or weakened writer guard is needed.
+The JSON findings envelope may supply `origin`, `source_session_id` and
+`source_event_id`. Stop preserves the host session ID (or a transcript-path
+hash); legacy inputs without event IDs use content-addressed finding/event IDs
+so identical retries do not become new evidence. These fallbacks cannot prove
+independent real-world observations. Extracted findings remain unverified unless
+carrying an evidence summary, and even then are only `evidence_attached`.
+Preview and commit use the same V2 classification (`new`, `duplicate`, or
+`supported`). Preview does not recover pending mutations or observe history;
+it reports a pending-recovery error instead of modifying a store. The bounded
+source summary is also retained in the search result `evidence` field.
 
 `write-v2 --scope project` reads a JSON request from stdin, with `type`, `title`,
 `content`, `importance`, and explicit `origin`, `source_session_id`,
@@ -450,13 +461,37 @@ their existing behavior. MCP write also exposes `sleep_export`, `sleep_rules`,
 Snapshot, restore and proposal approval remain trusted administrative CLI commands.
 
 Sleep batches allow 1–100 inputs, at most 20 imported proposals and a 64 KiB
-report/output budget. The capped scan reads at most 10,000 records and 4 MiB total,
-with a 128 KiB per-record cap. Checkpoints contribute references and revisions only.
-Normal pagination returns `partial` and `next_cursor`; malformed or oversized
-input fails explicitly without advancing a cursor. A changed input snapshot
-requires restarting from cursor zero; deduplicated proposals make replay safe.
+report/output budget. The directory inventory is capped at 10,000 records and
+individual records at 128 KiB. Since 2.0.1, the 4 MiB canonical input budget applies
+to each page, not the whole store: a page stops at its item/byte limit and returns
+`partial` and `next_cursor`. Checkpoints contribute references and revisions only.
+The cursor snapshot binds paths, sizes, modification times and (on Unix) inode /
+change times. Page-local history adoption refreshes the returned snapshot; carry
+that snapshot into the next request. External source changes require restarting
+from cursor zero. Invalid records, inventories above the count cap, and oversized
+proposal/output requests still fail explicitly; they are not silently truncated.
+Export observes only the current page rather than reading all canonical bodies.
+It recovers pending relation journals, but does not scan unpublished provenance
+sidecars; normal writer recovery handles those before they become visible inputs.
+Deduplicated proposals make replay safe.
 
 Checkpoint summaries are kept whole rather than shortened by memory
 `summary_chars`, so the next action and verification limits cannot disappear
 behind a generic snippet cap. The existing total context budget still applies:
 a checkpoint that cannot fit is omitted as a whole and reported as omitted.
+
+### Source revision bindings and diagnostics (2.0.1)
+
+`show-v2` and historical provenance expose `source_revisions` in source-event
+order. An integer identifies the semantic revision supported by that event;
+`null` means that legacy binding is unknown. New evidence after a recorded
+correction, reviewed refinement or undo supports the current revision. Prior
+source events and immutable historical prefixes retain their original binding.
+Bindings are stored as compatible canonical metadata and checked by prefix hash;
+they are not inferred retroactively from the current body.
+
+Set `MNEMOSYNE_TRACE_TIMING=1` to emit JSON timing events on stderr only. Events
+contain phase names, status and milliseconds, never memory content. Timings are
+inclusive and may overlap; do not sum parent and child phases. Disabled model
+work is `not_run`, not a measured zero. Normal runs leave this instrumentation
+disabled, and CLI/MCP/hook stdout contracts are unchanged.

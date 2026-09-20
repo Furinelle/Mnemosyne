@@ -3,16 +3,17 @@ use crate::{
     checkpoint::Checkpoint,
     provenance::{Clock, MemoryRef, read_manifest},
     schema::{Memory, parse_memory},
-    store::{Store, lock_store},
+    store::{Store, lock_store_read_only},
 };
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::{self, File},
     path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 const MAX_INPUTS: usize = 10_000;
@@ -46,11 +47,6 @@ pub struct Batch {
     pub partial: bool,
     pub inputs: Vec<Input>,
     pub issues: Vec<Value>,
-}
-
-struct MemoryInput {
-    memory: Memory,
-    input: Input,
 }
 
 fn hash(value: &impl Serialize) -> Result<String> {
@@ -124,116 +120,154 @@ fn read_bounded(path: &Path, total: &mut u64) -> Result<Vec<u8>> {
     crate::input::read_bytes(File::open(path)?, MAX_RECORD_BYTES)
 }
 
-fn memory_inputs(store: &Store, store_id: &str, total: &mut u64) -> Result<Vec<MemoryInput>> {
-    let mut inputs = Vec::new();
-    for path in memory_files(store)? {
-        let memory = parse_memory(&String::from_utf8(read_bounded(&path, total)?)?)?;
-        let snapshot = crate::revisions::snapshot(store, &path)?;
-        inputs.push(MemoryInput {
-            input: Input {
-                kind: memory_kind(),
-                memory_ref: MemoryRef {
-                    store_id: store_id.into(),
-                    memory_id: memory.id.clone(),
-                },
-                revision: snapshot.semantic_rev,
-                semantic_hash: snapshot.semantic_hash,
-            },
-            memory,
-        });
-    }
-    Ok(inputs)
-}
-
-fn checkpoint_inputs(store: &Store, store_id: &str, total: &mut u64) -> Result<Vec<Input>> {
-    let directory = store.root.join("checkpoints");
-    let mut inputs = Vec::new();
-    for path in bounded_files_in(&directory, "json")? {
-        let checkpoint: Checkpoint = serde_json::from_slice(&read_bounded(&path, total)?)?;
+fn inventory_snapshot(
+    paths: &[PathBuf],
+    checkpoint_count: usize,
+    store_id: &str,
+) -> Result<String> {
+    let mut fingerprint = Sha256::new();
+    fingerprint.update(store_id.as_bytes());
+    for (index, path) in paths.iter().enumerate() {
+        let metadata = fs::symlink_metadata(path)?;
         ensure!(
-            checkpoint.schema_version == 1
-                && checkpoint.store_id == store_id
-                && path.file_stem().and_then(|value| value.to_str())
-                    == Some(checkpoint.id.as_str())
-                && uuid::Uuid::parse_str(&checkpoint.id)
-                    .is_ok_and(|value| value.to_string() == checkpoint.id),
-            "invalid checkpoint input"
+            metadata.is_file() && !metadata.file_type().is_symlink(),
+            "invalid sleep input file"
         );
-        inputs.push(Input {
-            kind: "checkpoint".into(),
-            memory_ref: MemoryRef {
-                store_id: store_id.into(),
-                memory_id: format!("checkpoint:{}", checkpoint.id),
-            },
-            revision: checkpoint.revision,
-            semantic_hash: hash(&json!({
-                "id": checkpoint.id,
-                "revision": checkpoint.revision,
-                "state": checkpoint.state,
-                "updated_at": checkpoint.updated_at,
-            }))?,
-        });
+        ensure!(
+            metadata.len() <= MAX_RECORD_BYTES as u64,
+            "Sleep input record too large"
+        );
+        let name = path.as_os_str().as_encoded_bytes();
+        fingerprint.update((name.len() as u64).to_le_bytes());
+        fingerprint.update(name);
+        fingerprint.update([u8::from(index >= checkpoint_count)]);
+        fingerprint.update(metadata.len().to_le_bytes());
+        let (before_epoch, modified) = match metadata.modified()?.duration_since(UNIX_EPOCH) {
+            Ok(duration) => (false, duration),
+            Err(error) => (true, error.duration()),
+        };
+        fingerprint.update([u8::from(before_epoch)]);
+        fingerprint.update(modified.as_secs().to_le_bytes());
+        fingerprint.update(modified.subsec_nanos().to_le_bytes());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            fingerprint.update(metadata.dev().to_le_bytes());
+            fingerprint.update(metadata.ino().to_le_bytes());
+            fingerprint.update(metadata.ctime().to_le_bytes());
+            fingerprint.update(metadata.ctime_nsec().to_le_bytes());
+        }
     }
-    Ok(inputs)
+    Ok(format!("{:x}", fingerprint.finalize()))
 }
 
-fn scan(store: &Store, store_id: &str) -> Result<(Vec<MemoryInput>, Vec<Input>)> {
-    let mut total = 0;
-    let memories = memory_inputs(store, store_id, &mut total)?;
-    let checkpoints = checkpoint_inputs(store, store_id, &mut total)?;
-    ensure!(
-        memories.len().saturating_add(checkpoints.len()) <= MAX_INPUTS,
-        "Sleep scan limit exceeded"
-    );
-    Ok((memories, checkpoints))
-}
-
-/// Cursor is only valid with the same complete metadata snapshot; changed input restarts safely.
+/// Cursor is bound to the bounded file inventory, including file change times.
 pub fn export(store: &Store, cursor: usize, expected: Option<&str>, limit: usize) -> Result<Batch> {
     ensure!((1..=100).contains(&limit), "Limit must be 1..100");
-    let _lock = lock_store(store)?;
+    // The regular lock observes every memory and evidence file; observe only this page below.
+    let _lock = lock_store_read_only(store)?;
+    crate::relations::recover_pending(store)?;
     let manifest = read_manifest(store)?.context("Upgrade required")?;
-    let (memories, checkpoints) = scan(store, &manifest.store_id)?;
-    let mut by_id = HashMap::new();
-    let mut all = Vec::new();
-    for input in memories {
-        by_id.insert(input.memory.id.clone(), input.memory);
-        all.push(input.input);
-    }
-    all.extend(checkpoints);
-    all.sort_by(|left, right| {
-        left.kind
-            .cmp(&right.kind)
-            .then_with(|| left.memory_ref.memory_id.cmp(&right.memory_ref.memory_id))
+    let mut paths = bounded_files_in(&store.root.join("checkpoints"), "json")?;
+    let mut memories = memory_files(store)?;
+    memories.sort_by(|left, right| {
+        left.file_stem()
+            .cmp(&right.file_stem())
+            .then_with(|| left.cmp(right))
     });
-    let snapshot = hash(&all)?;
+    ensure!(
+        paths.len() + memories.len() <= MAX_INPUTS,
+        "Sleep scan limit exceeded"
+    );
+    let checkpoint_count = paths.len();
+    paths.extend(memories);
+    let snapshot = inventory_snapshot(&paths, checkpoint_count, &manifest.store_id)?;
     ensure!(
         cursor == 0 || expected == Some(snapshot.as_str()),
         "STALE_CURSOR: restart at zero"
     );
-    ensure!(cursor <= all.len(), "Invalid cursor");
-    let end = cursor.saturating_add(limit).min(all.len());
-    let inputs = all[cursor..end].to_vec();
-    let ids: HashSet<_> = by_id.keys().map(String::as_str).collect();
+    ensure!(cursor <= paths.len(), "Invalid cursor");
+    let ids: HashSet<_> = paths[checkpoint_count..]
+        .iter()
+        .filter_map(|path| path.file_stem().and_then(|id| id.to_str()))
+        .collect();
+    let mut total = 0_u64;
+    let mut inputs = Vec::new();
     let mut issues = Vec::new();
-    for input in &inputs {
-        if input.kind != "memory" {
-            continue;
+    let mut observed = false;
+    for (index, path) in paths.iter().enumerate().skip(cursor).take(limit) {
+        let size = fs::symlink_metadata(path)?.len();
+        if total.saturating_add(size) > MAX_SCAN_BYTES {
+            break;
         }
-        let memory = &by_id[input.memory_ref.memory_id.as_str()];
-        for link in &memory.links {
-            if !ids.contains(link.id.as_str()) {
-                issues.push(json!({"kind":"unresolved_link","memory_ref":input.memory_ref}));
+        if index < checkpoint_count {
+            let checkpoint: Checkpoint = serde_json::from_slice(&read_bounded(path, &mut total)?)?;
+            ensure!(
+                checkpoint.schema_version == 1
+                    && checkpoint.store_id == manifest.store_id
+                    && path.file_stem().and_then(|value| value.to_str())
+                        == Some(checkpoint.id.as_str())
+                    && uuid::Uuid::parse_str(&checkpoint.id)
+                        .is_ok_and(|value| value.to_string() == checkpoint.id),
+                "invalid checkpoint input"
+            );
+            inputs.push(Input {
+                kind: "checkpoint".into(),
+                memory_ref: MemoryRef {
+                    store_id: manifest.store_id.clone(),
+                    memory_id: format!("checkpoint:{}", checkpoint.id),
+                },
+                revision: checkpoint.revision,
+                semantic_hash: hash(&json!({
+                    "id": checkpoint.id,
+                    "revision": checkpoint.revision,
+                    "state": checkpoint.state,
+                    "updated_at": checkpoint.updated_at,
+                }))?,
+            });
+        } else {
+            observed |=
+                crate::revisions::observe_memory(store, path, &crate::provenance::SystemClock)?;
+            let memory: Memory =
+                parse_memory(&String::from_utf8(read_bounded(path, &mut total)?)?)?;
+            ensure!(
+                path.file_stem().and_then(|id| id.to_str()) == Some(memory.id.as_str()),
+                "invalid memory input"
+            );
+            let revision = crate::revisions::snapshot(store, path)?;
+            let input = Input {
+                kind: memory_kind(),
+                memory_ref: MemoryRef {
+                    store_id: manifest.store_id.clone(),
+                    memory_id: memory.id,
+                },
+                revision: revision.semantic_rev,
+                semantic_hash: revision.semantic_hash,
+            };
+            for link in &memory.links {
+                if !ids.contains(link.id.as_str()) && issues.len() < MAX_ISSUES {
+                    issues.push(json!({"kind":"unresolved_link","memory_ref":input.memory_ref}));
+                }
             }
+            inputs.push(input);
         }
     }
-    issues.truncate(MAX_ISSUES);
+    ensure!(
+        !inputs.is_empty() || cursor == paths.len(),
+        "Sleep page cannot make progress"
+    );
+    let end = cursor + inputs.len();
+    let snapshot = if observed {
+        inventory_snapshot(&paths, checkpoint_count, &manifest.store_id)?
+    } else {
+        snapshot
+    };
     Ok(Batch {
         version: 1,
         snapshot,
         cursor,
         next_cursor: end,
-        partial: end < all.len(),
+        partial: end < paths.len(),
         inputs,
         issues,
     })
@@ -317,7 +351,7 @@ pub fn finish(
         serde_json::to_vec(&report)?.len() <= MAX_REPORT_BYTES,
         "Report budget exceeded"
     );
-    let _lock = lock_store(store)?;
+    let _lock = lock_store_read_only(store)?;
     let key = hash(batch)?;
     crate::provenance::atomic_json(&report_path(store, &key)?, &report)?;
     crate::provenance::atomic_json(

@@ -495,45 +495,58 @@ pub fn observe_store(store: &Store, clock: &impl Clock) -> Result<()> {
         return Ok(());
     }
     for (path, _) in load_memories_unlocked(store, true)? {
-        let Some((_, raw, memory)) = disk_memory(store, &path)? else {
-            continue;
-        };
-        let (manifest_raw, manifest) = read_history(store, &memory.id)?;
-        if manifest
-            .as_ref()
-            .and_then(|h| h.entries.last())
-            .is_some_and(|e| e.semantic_hash == semantic_digest(&memory))
-        {
-            continue;
-        }
-        let now = clock.now().to_rfc3339();
-        let mut manifest = manifest.unwrap_or_else(|| HistoryManifest {
-            version: 1,
-            memory_id: memory.id.clone(),
-            coverage_start: now.clone(),
-            entries: vec![],
-        });
-        let reason = if manifest.entries.is_empty() {
-            "adopted"
-        } else {
-            "external_edit"
-        };
-        let gap = !manifest.entries.is_empty();
-        let mut plan = MutationPlan {
-            changes: vec![MutationChange {
-                path: relative(store, &path, &memory.id)?,
-                before: Some(raw.clone()),
-                after: Some(raw.clone()),
-            }],
-        };
-        add_entry(store, &mut plan, &mut manifest, raw, reason, &now, gap)?;
-        let (_, path) = history_paths(&memory.id)?;
-        plan.changes.push(MutationChange {
-            path,
-            before: manifest_raw,
-            after: Some(manifest_image(&manifest)?),
-        });
-        execute_mutation(store, plan)?;
+        observe_memory_enabled(store, &path, clock)?;
     }
     Ok(())
+}
+
+/// Observe one memory under the store lock. Returns whether canonical metadata changed.
+pub fn observe_memory(store: &Store, path: &Path, clock: &impl Clock) -> Result<bool> {
+    if !history_enabled(store)? {
+        return Ok(false);
+    }
+    observe_memory_enabled(store, path, clock)
+}
+
+fn observe_memory_enabled(store: &Store, path: &Path, clock: &impl Clock) -> Result<bool> {
+    let Some((_, raw, memory)) = disk_memory(store, path)? else {
+        return Ok(false);
+    };
+    let (manifest_raw, manifest) = read_history(store, &memory.id)?;
+    if manifest
+        .as_ref()
+        .and_then(|h| h.entries.last())
+        .is_some_and(|e| e.semantic_hash == semantic_digest(&memory))
+    {
+        return Ok(false);
+    }
+    let now = clock.now().to_rfc3339();
+    let mut manifest = manifest.unwrap_or_else(|| HistoryManifest {
+        version: 1,
+        memory_id: memory.id.clone(),
+        coverage_start: now.clone(),
+        entries: vec![],
+    });
+    let reason = if manifest.entries.is_empty() {
+        "adopted"
+    } else {
+        "external_edit"
+    };
+    let gap = !manifest.entries.is_empty();
+    let mut plan = MutationPlan {
+        changes: vec![MutationChange {
+            path: relative(store, path, &memory.id)?,
+            before: Some(raw.clone()),
+            after: Some(raw.clone()),
+        }],
+    };
+    add_entry(store, &mut plan, &mut manifest, raw, reason, &now, gap)?;
+    let (_, path) = history_paths(&memory.id)?;
+    plan.changes.push(MutationChange {
+        path,
+        before: manifest_raw,
+        after: Some(manifest_image(&manifest)?),
+    });
+    execute_mutation(store, plan)?;
+    Ok(true)
 }

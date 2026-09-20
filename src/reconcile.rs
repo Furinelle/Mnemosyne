@@ -47,6 +47,12 @@ pub fn classify(store: &Store, r: &Request) -> Result<Value> {
         let same_body = content == r.write.content.trim();
         let decision = if fact.environment != r.fact.environment {
             "CONTEXTUALIZE"
+        } else if value != r.value {
+            if fact.multivalued || r.fact.multivalued {
+                "CREATE"
+            } else {
+                "CONTRADICT"
+            }
         } else if same_body {
             if crate::provenance::read_provenance_unlocked(store, &m.id)?
                 .source_events
@@ -62,12 +68,8 @@ pub fn classify(store: &Store, r: &Request) -> Result<Value> {
             } else {
                 "SUPPORT"
             }
-        } else if value == r.value {
-            "REFINE"
-        } else if fact.multivalued || r.fact.multivalued {
-            "CREATE"
         } else {
-            "CONTRADICT"
+            "REFINE"
         };
         candidates.push(json!({"decision":decision,"memory_id":m.id,"expected_revision":crate::revisions::snapshot(store,&path)?,"reason":"Explicit subject/environment/attribute/cardinality comparison; conflicting values remain unverified","evidence":m.canonical_summary}));
     }

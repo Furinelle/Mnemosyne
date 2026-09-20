@@ -4,7 +4,7 @@ use crate::{
     relations::{MutationChange, MutationPlan, execute_mutation},
     revisions::{self, RevisionUpdate, Snapshot},
     schema::{Link, Memory},
-    store::{Store, load_memories_unlocked, lock_store},
+    store::{Store, load_memories_unlocked, lock_store, lock_store_read_only},
 };
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
@@ -216,7 +216,9 @@ pub fn propose(store: &Store, request: Request, clock: &impl Clock) -> Result<Pr
         rel.is_some() || request.targets[0].body.is_some(),
         "Content proposal needs a body"
     );
-    let _lock = lock_store(store)?;
+    // A pending proposal does not read or change its target memories.
+    let _lock = lock_store_read_only(store)?;
+    crate::relations::recover_pending(store)?;
     let manifest = read_manifest(store)?.context("Upgrade required")?;
     ensure!(
         manifest.min_writer_version == crate::provenance::WRITER_VERSION,

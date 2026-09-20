@@ -560,3 +560,282 @@ fn antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate()
     assert!(!sandbox.root().join("server/.mnemosyne").exists());
     mcp.close();
 }
+
+#[test]
+fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("upgraded");
+    let findings = json!({"origin":"audit-fixture", "source_session_id":"session-a", "source_event_id":"event-a",
+        "findings":[{"type":"pitfall","title":"Upgrade ingest","content":"An upgraded store saves findings.","importance":70,"tags":[]},
+                    {"type":"pitfall","title":"Second fact","content":"A source event may contain two facts.","importance":70,"tags":[]}]}).to_string();
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    let first: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &findings,
+    ))
+    .unwrap();
+    assert_eq!(first.as_array().unwrap().len(), 2);
+    let replay: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &findings,
+    ))
+    .unwrap();
+    assert!(
+        replay
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["verdict"] == "duplicate")
+    );
+    let store = mnemosyne::store::Store {
+        scope: "project".into(),
+        root: project.join(".mnemosyne"),
+    };
+    let id = first[0]["id"].as_str().unwrap();
+    let view = mnemosyne::provenance::read_provenance(&store, id).unwrap();
+    assert_eq!(view.evidence_count, 1);
+    assert_eq!(view.source_events[0].source_event_id, "event-a");
+    assert_eq!(view.source_events[0].verification_state, "unverified");
+    let second = findings.replace("event-a", "event-b");
+    sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &second,
+    );
+    assert_eq!(
+        mnemosyne::provenance::read_provenance(&store, id)
+            .unwrap()
+            .evidence_count,
+        2
+    );
+    // The legacy API guard must remain in force after the integration fix.
+    assert!(
+        !sandbox
+            .run(
+                &project,
+                &["write", "--type", "pitfall", "--content", "old writer"],
+                ""
+            )
+            .status
+            .success()
+    );
+    fs::write(
+        project.join(".mnemosyne/config.toml"),
+        "[distill]\nenabled=true\nengine='host'\n",
+    )
+    .unwrap();
+    let block = "**Findings:**\n- type: pitfall\n- importance: 70\n- title: Upgraded Stop\n- content: |\n    Stop saves through the revision-aware writer.\n";
+    for host in ["codex", "claude", "grok", "antigravity"] {
+        let transcript = project.join(format!("{host}.jsonl"));
+        let row = match host {
+            "codex" => {
+                json!({"type":"response_item","payload":{"type":"message","role":"assistant","channel":"final","content":[{"type":"output_text","text":block}]}})
+            }
+            "grok" => json!({"type":"assistant","content":block}),
+            _ => json!({"type":"assistant","message":{"role":"assistant","content":block}}),
+        };
+        fs::write(&transcript, row.to_string()).unwrap();
+        let payload = json!({"transcript_path":transcript,"session_id":host});
+        let result = sandbox
+            .hook(&project, "Stop", payload.clone())
+            .expect("upgraded Stop must save, not silently fail");
+        assert!(
+            result["systemMessage"]
+                .as_str()
+                .unwrap()
+                .contains("auto-saved")
+        );
+        assert!(sandbox.hook(&project, "Stop", payload).is_none());
+    }
+    // Exercise the direct fail-safe session_end route used by event callers too.
+    let direct = json!({"source":"antigravity","session_id":"direct","text":block.replace("Upgraded Stop","Direct event")});
+    let output = sandbox.run(
+        &project,
+        &[
+            "inject",
+            "--event",
+            "session_end",
+            "--fail-safe",
+            "--format",
+            "json",
+        ],
+        &direct.to_string(),
+    );
+    assert!(output.status.success());
+    assert!(
+        output.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("auto-saved")
+    );
+}
+
+#[test]
+fn upgraded_heuristic_distill_commits_with_unverified_provenance() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("heuristic-upgrade");
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    fs::write(
+        project.join(".mnemosyne/config.toml"),
+        "[distill]\nenabled=true\nengine='heuristic'\n",
+    )
+    .unwrap();
+    let text = "[user] 不要用 print，改用 logging\n";
+    let rows: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["distill", "--stdin", "--format", "text", "--commit"],
+        text,
+    ))
+    .unwrap();
+    let id = rows[0]["id"].as_str().expect("heuristic finding saved");
+    let store = mnemosyne::store::Store {
+        scope: "project".into(),
+        root: project.join(".mnemosyne"),
+    };
+    let view = mnemosyne::provenance::read_provenance(&store, id).unwrap();
+    assert_eq!(view.source_events.len(), 1);
+    assert_ne!(view.verification_state, "verified");
+    let again: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["distill", "--stdin", "--format", "text", "--commit"],
+        text,
+    ))
+    .unwrap();
+    assert_eq!(again[0]["id"], id);
+    assert_eq!(again[0]["verdict"], "duplicate");
+}
+
+#[test]
+fn upgraded_ingest_preview_matches_v2_without_writing_and_keeps_evidence() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("v2-preview");
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    let input = |event: &str| {
+        json!({"origin":"fixture","source_session_id":"session","source_event_id":event,
+            "findings":[{"type":"pitfall","title":"Preview evidence","content":"Preview keeps this evidence searchable.","importance":70,"tags":[],"evidence":"logs/repro.txt:12"}]}).to_string()
+    };
+    let preview = |text: &str| -> Value {
+        serde_json::from_str(&sandbox.ok(&project, &["ingest", "--format", "json"], text)).unwrap()
+    };
+    assert_eq!(preview(&input("e1"))[0]["verdict"], "new");
+    assert!(!project.join(".mnemosyne/evidence").exists());
+    assert!(!project.join(".mnemosyne/history").exists());
+    let created: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &input("e1"),
+    ))
+    .unwrap();
+    let id = created[0]["id"].as_str().unwrap();
+    assert_eq!(preview(&input("e1"))[0]["verdict"], "duplicate");
+    let support = preview(&input("e2"));
+    assert_eq!(support[0]["verdict"], "supported");
+    assert_eq!(support[0]["target"], id);
+    let store = mnemosyne::store::Store {
+        scope: "project".into(),
+        root: project.join(".mnemosyne"),
+    };
+    assert_eq!(
+        mnemosyne::provenance::read_provenance(&store, id)
+            .unwrap()
+            .evidence_count,
+        1
+    );
+    let results = mnemosyne::api::search_entries(
+        std::slice::from_ref(&store),
+        "Preview keeps",
+        10,
+        "",
+        false,
+        false,
+        false,
+    )
+    .unwrap();
+    assert_eq!(results[0]["evidence"], "logs/repro.txt:12");
+    let committed: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &input("e2"),
+    ))
+    .unwrap();
+    assert_eq!(committed[0]["verdict"], "supported");
+    assert_eq!(committed[0]["id"], id);
+}
+
+#[test]
+fn preview_does_not_adopt_legacy_markdown_after_upgrade() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("preview-history");
+    sandbox.write(&project, "project", "Older fact awaiting adoption");
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    let history = project.join(".mnemosyne/history");
+    assert!(!history.exists());
+    let text = json!({"findings":[{"type":"codebase","title":"Preview","content":"Another fact","importance":70,"tags":[]}]}).to_string();
+    sandbox.ok(&project, &["ingest", "--format", "json"], &text);
+    assert!(!history.exists());
+}
+
+#[test]
+fn preview_supports_unadopted_v2_sidecar_without_creating_history() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("preview-old-v2");
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    let input = |event: &str| {
+        json!({"origin":"fixture","source_session_id":"session","source_event_id":event,
+            "findings":[{"type":"pitfall","title":"Adoption","content":"Existing V2 fact","importance":70,"tags":[]}]}).to_string()
+    };
+    sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &input("e1"),
+    );
+    let root = project.join(".mnemosyne");
+    fs::remove_dir_all(root.join("history")).unwrap();
+    let path = root.join("store.json");
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    manifest["min_writer_version"] = 2.into();
+    fs::write(&path, manifest.to_string()).unwrap();
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    let preview: Value =
+        serde_json::from_str(&sandbox.ok(&project, &["ingest", "--format", "json"], &input("e2")))
+            .unwrap();
+    assert_eq!(preview[0]["verdict"], "supported");
+    assert!(!root.join("history").exists());
+    let committed: Value = serde_json::from_str(&sandbox.ok(
+        &project,
+        &["ingest", "--format", "json", "--commit"],
+        &input("e2"),
+    ))
+    .unwrap();
+    assert_eq!(committed[0]["verdict"], "supported");
+}

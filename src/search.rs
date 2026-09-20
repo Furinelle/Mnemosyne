@@ -130,6 +130,7 @@ pub fn reindex_store(store: &Store, include_archive: bool) -> Result<usize> {
 }
 
 fn sync_store(store: &Store, include_archive: bool) -> Result<()> {
+    let _timing = crate::timing::Scope::new("sqlite_sync");
     let _lock = lock_store(store)?;
     crate::relations::recover_pending(store)?;
     let mut connection = Connection::open(cache_path(store)?)?;
@@ -280,6 +281,7 @@ fn read_memory_consistent(path: &Path) -> Result<ConsistentMemory> {
 }
 
 fn memory_paths(store: &Store, include_archive: bool) -> Result<Vec<PathBuf>> {
+    let _timing = crate::timing::Scope::new("file_enumeration");
     let mut paths = regular_markdown(&store.working_dir())?;
     if include_archive {
         let archive = store.archive_dir();
@@ -395,7 +397,14 @@ pub fn search(
 
     let lexical_ranked = sorted_candidates(&candidates);
     let mut vector_diagnostic = None;
-    let vector_ranked = if config_bool(config, &["embedding", "enabled"], false) {
+    let embedding_enabled = config_bool(config, &["embedding", "enabled"], false);
+    let rerank_enabled = config_bool(config, &["rerank", "enabled"], false);
+    if !embedding_enabled && !rerank_enabled {
+        crate::timing::not_run("model_profile");
+        crate::timing::not_run("model_fingerprint");
+        crate::timing::not_run("model_initialize");
+    }
+    let vector_ranked = if embedding_enabled {
         match crate::vectors::lane(stores, query, include_archive, config) {
             Ok(results) => results,
             Err(error) => {
@@ -438,6 +447,7 @@ pub fn search(
     }
 
     if config_bool(config, &["fusion", "link_expansion"], true) {
+        let _timing = crate::timing::Scope::new("graph_expansion");
         expand_links(&mut candidates, &all, include_archive, config);
     }
 
@@ -527,6 +537,7 @@ fn read_stores(
     for store in stores {
         if indexed {
             sync_store(store, include_archive)?;
+            let _timing = crate::timing::Scope::new("candidate_read");
             let connection = Connection::open(cache_path(store)?)?;
             let mut statement =
                 connection.prepare("SELECT path, memory_json, archived FROM memories")?;
@@ -547,6 +558,7 @@ fn read_stores(
                 });
             }
         } else {
+            let _timing = crate::timing::Scope::new("candidate_read");
             for (path, memory) in load_memories(store, include_archive)? {
                 let archived = path.starts_with(store.root.join("archive"));
                 entries.push(IndexedMemory {

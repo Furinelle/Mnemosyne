@@ -3,9 +3,9 @@
   "created_on": "2026-09-19",
   "repository": "Furinelle/Mnemosyne",
   "base_commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
-  "observed_package_version": "1.0.0",
+  "observed_package_version": "2.0.1",
   "review_mode": "static_connector_review_plus_remote_ci_status",
-  "local_rust_tests": "R00–R15 locally implemented and accepted within recorded scope; default/all-feature suites each 144 tests; all 15 final gates exit 0. Three final Luna max synthetic consumer arms completed. Real host UI sessions, remote Linux CI and optional ONNX assets not_run.",
+  "local_rust_tests": "v2.0.1 repair gates recorded in evidence/v2.0.1/results.json. R11 output continuation and R14 full cross-host model E2E remain partial. Historical scope is not blanket acceptance. Local real cached ONNX smoke passed; release CI is recorded separately.",
   "default_first_batch": [
     "R00",
     "R01",
@@ -867,7 +867,7 @@
         "R09",
         "R06"
       ],
-      "status": "completed",
+      "status": "partial",
       "files": [
         "新增 src/sleep.rs",
         "src/ingest.rs",
@@ -912,8 +912,8 @@
         {
           "id": "R11-A05",
           "requirement": "输入/输出/提案数超上限时明确 partial 与下一游标，不无限循环。",
-          "status": "pass",
-          "evidence": "evidence/r09-r15-regression.txt; evidence/final/results.json"
+          "status": "partial",
+          "evidence": "See corrected ACCEPTANCE.md and v2.0.1 execution log; original full requirement not met."
         },
         {
           "id": "R11-A06",
@@ -1082,7 +1082,7 @@
       "depends_on": [
         "R00"
       ],
-      "status": "completed",
+      "status": "partial",
       "files": [
         "src/search.rs",
         "src/models.rs",
@@ -1129,8 +1129,8 @@
         {
           "id": "R14-A05",
           "requirement": "跨 agent 端到端使用无记忆/本版/改进版相同任务与预算，记录错误事实使用率和接手续作结果。",
-          "status": "pass",
-          "evidence": "evidence/r14-agent-eval.json; evidence/r14-agent-before-checkpoint-fix.json; evidence/r09-r15-regression.txt (one synthetic producer handoff, three real isolated consumer sessions)"
+          "status": "partial",
+          "evidence": "See corrected ACCEPTANCE.md and v2.0.1 execution log; original full requirement not met."
         },
         {
           "id": "R14-A06",

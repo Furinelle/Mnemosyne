@@ -104,7 +104,7 @@ fn window(
     Ok((from, until))
 }
 fn source(store: &Store, memory: &Memory) -> Result<Value> {
-    let mut result = json!({"source_kind":memory.extra.get("source_kind").cloned().unwrap_or(json!("unknown")),"verification_state":memory.extra.get("verification_state").cloned().unwrap_or(json!("unknown")),"trusted_verification":false,"source_events":[],"coverage":"unknown"});
+    let mut result = json!({"source_kind":memory.extra.get("source_kind").cloned().unwrap_or(json!("unknown")),"verification_state":memory.extra.get("verification_state").cloned().unwrap_or(json!("unknown")),"trusted_verification":false,"source_events":[],"source_revisions":[],"coverage":"unknown"});
     if let (Some(count), Some(expected)) = (
         memory
             .extra
@@ -135,6 +135,40 @@ fn source(store: &Store, memory: &Memory) -> Result<Value> {
             "Historical source ledger hash mismatch"
         );
         result["source_events"] = serde_json::to_value(prefix)?;
+        // Old images have no revision binding. Their source identities remain verified,
+        // but the supported fact revision cannot be inferred from the sidecar alone.
+        let revisions = if let Some(expected) = memory
+            .extra
+            .get("source_revision_ledger_hash")
+            .and_then(Value::as_str)
+        {
+            let revisions: Vec<Option<u64>> =
+                serde_json::from_value(ledger["memory"]["extra"]["source_revisions"].clone())?;
+            ensure!(
+                revisions.len() <= events.len(),
+                "Invalid source revision ledger"
+            );
+            // An older writer may append source events without knowing about bindings.
+            // Match this image's committed binding prefix, then leave its later events unknown.
+            let mut bound = None;
+            for len in 0..=revisions.len().min(usize::try_from(count)?) {
+                if format!(
+                    "{:x}",
+                    Sha256::digest(serde_json::to_vec(&revisions[..len])?)
+                ) == expected
+                {
+                    bound = Some(len);
+                    break;
+                }
+            }
+            let bound = bound.context("Historical source revision ledger hash mismatch")?;
+            let mut known = revisions[..bound].to_vec();
+            known.resize(usize::try_from(count)?, None);
+            known
+        } else {
+            vec![None; usize::try_from(count)?]
+        };
+        result["source_revisions"] = serde_json::to_value(revisions)?;
         result["coverage"] = json!("versioned_prefix");
     }
     Ok(result)

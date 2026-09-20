@@ -19,5 +19,6 @@ pub mod search;
 pub mod sleep;
 pub mod snapshot;
 pub mod store;
+pub(crate) mod timing;
 pub mod vectors;
 pub mod views;

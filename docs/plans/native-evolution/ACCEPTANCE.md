@@ -1,6 +1,6 @@
 # 验收用例清单
 
-M0 本轮结果见逐项状态；R14 仅完成初始性能基线。其余条目仍为 NOT_RUN，不能视为已实现。
+各阶段历史证据保留；2026-09-20 v2.0.1 复核修正如下。测试通过不等于全部原始验收范围完成，PARTIAL 项仍待补齐。
 
 ## R00 锁定 Rust 基线、契约和可重复验收
 - [x] R00-A01 — 所有原有原生测试、fmt、clippy 和现有三个检索门禁实际执行并记录退出码；受限环境明确 not_run。
@@ -167,8 +167,8 @@ M0 本轮结果见逐项状态；R14 仅完成初始性能基线。其余条目�
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
 - [x] R11-A04 — 模型声称高置信度 caused_by/supersedes 仍待审，不直接改 Markdown。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
-- [x] R11-A05 — 输入/输出/提案数超上限时明确 partial 与下一游标，不无限循环。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+- [ ] R11-A05 — 输入/输出/提案数超上限时明确 partial 与下一游标，不无限循环。
+  状态：PARTIAL；v2.0.1 输入按 4 MiB/100 条分页，并覆盖 45×100 KB、导入后续页和 stale cursor 回归。单条 128 KiB、文件总数 10,000、输出 64 KiB/20 提案仍明确拒绝；输出超限不返回续传游标。证据：evidence/v2.0.1/tests.txt。
 - [x] R11-A06 — 报告含来源但不含凭据；未授权 sleep 不能改 core、执行命令或启用 cron。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
 
@@ -200,26 +200,26 @@ M0 本轮结果见逐项状态；R14 仅完成初始性能基线。其余条目�
 
 ## R14 实测驱动的性能与检索评测
 - [x] R14-A01 — 发布可复跑命令、原始 CSV/JSON、数据哈希和环境，所有性能数值与明确提交绑定。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+  状态：PASS（本次候选构建）；命令与源码提交/二进制哈希见 evidence/v2.0.1/perf.json 和 EXECUTION_LOG.md；100/1,000/10,000 条各场景五次，阶段为 inclusive，模型未启用时明确 not_run。
 - [x] R14-A02 — 旧三个 recall 门禁不降低；benchmark fixture 不作为 training/tuning 后唯一测试集。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
 - [x] R14-A03 — 词法→向量→图→rerank 消融明确每一路实际启用状态，不混用 mock 和真实推理结论。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
 - [x] R14-A04 — 外部同大小正文修改、删除、rename、并发读写、缓存损坏、pending recovery 在优化前后行为一致。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
-- [x] R14-A05 — 跨 agent 端到端使用无记忆/本版/改进版相同任务与预算，记录错误事实使用率和接手续作结果。
-  状态：PASS（有界合成任务）；命令：`python3 tests/native_agent_eval.py target/debug/mnemosyne --old-binary target/baseline-v1/debug/mnemosyne --codex "$(command -v codex)" --auth-file "$CODEX_HOME/auth.json" --output docs/plans/native-evolution/evidence/r14-agent-eval.json`；证据：`evidence/r14-agent-eval.json`。固定 Luna max，三个独立真实 CLI 消费者；生产者为 fixture，不代表真实四宿主会话或广泛任务成功率。
+- [ ] R14-A05 — 跨 agent 端到端使用无记忆/本版/改进版相同任务与预算，记录错误事实使用率和接手续作结果。
+  状态：PARTIAL（有界合成任务通过；完整跨宿主真实生产者/消费者未运行）；命令：`python3 tests/native_agent_eval.py target/debug/mnemosyne --old-binary target/baseline-v1/debug/mnemosyne --codex "$(command -v codex)" --auth-file "$CODEX_HOME/auth.json" --output docs/plans/native-evolution/evidence/r14-agent-eval.json`；证据：`evidence/r14-agent-eval.json`。固定 Luna max，三个独立真实 CLI 消费者；生产者为 fixture，不代表真实四宿主会话或广泛任务成功率。
 - [x] R14-A06 — 索引冷建变慢与热查询收益分别报告，不用某一项平均值笼统宣称全面提速。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+  状态：PASS；证据：evidence/v2.0.1/perf.json。冷建、热查、单条编辑和真实 PreToolUse 分列；旧 inject 与新 hook 场景不可直接作性能收益比。
 
 ## R15 发布候选收口与执行交接
 - [x] R15-A01 — 全部任务验收条目有 pass/fail/not_run/blocked；没有未运行却写 pass 的条目。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+  状态：PASS（明确范围）；证据：evidence/v2.0.1/results.json 与本轮 EXECUTION_LOG.md。升级后实际 ingest/distill/Stop 正向写入及重放使用隔离 fixture；四宿主真实模型端到端会话未运行，不以协议通过替代。
 - [x] R15-A02 — 源码打包白名单继续有效；二进制不依赖 Python 内核，开发 smoke 脚本可以保留。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
 - [x] R15-A03 — 从旧 1.0.0 副本升级→复跑→快照恢复完整演练；所有 pending 操作有明确处置。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+  状态：PASS（明确范围）；证据：evidence/v2.0.1/results.json 与本轮 EXECUTION_LOG.md。升级后实际 ingest/distill/Stop 正向写入及重放使用隔离 fixture；四宿主真实模型端到端会话未运行，不以协议通过替代。
 - [x] R15-A04 — 四当前宿主的协议合同通过，真实宿主/真实模型证据单列；不重新宣称 Hermes support。
-  状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。
+  状态：PASS（明确范围）；证据：evidence/v2.0.1/results.json 与本轮 EXECUTION_LOG.md。升级后实际 ingest/distill/Stop 正向写入及重放使用隔离 fixture；四宿主真实模型端到端会话未运行，不以协议通过替代。
 - [x] R15-A05 — 版本与 schema 变更、回滚限制、尚未实现选项在中英文文档一致；未经授权没有发布或安装操作。
   状态：PASS；命令：`python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/final --old-binary target/baseline-v1/debug/mnemosyne`；证据：`evidence/r09-r15-regression.txt`、`evidence/final/results.json`。

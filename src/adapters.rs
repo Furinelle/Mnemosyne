@@ -205,11 +205,12 @@ fn stop_payload(event: &Value) -> Result<Option<Value>> {
         _ => "claude-code",
     };
     Ok(Some(
-        json!({"transcript":{"path":path,"format":format},"source":source}),
+        json!({"transcript":{"path":path,"format":format},"source":source,"session_id":event["session_id"]}),
     ))
 }
 
 pub fn hook(event: &str, payload: &Value) -> Result<Option<Value>> {
+    let _timing = crate::timing::Scope::new("hook_total");
     ensure!(payload.is_object(), "Hook payload must be an object");
     let session = payload["session_id"].as_str().unwrap_or("");
     let budget = match payload.get("budget") {

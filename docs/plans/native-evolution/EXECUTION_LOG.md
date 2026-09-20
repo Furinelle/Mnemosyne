@@ -382,3 +382,42 @@ directory before publication using the existing index writer. The snapshot
 restore/fork regression checks both outputs contain the restored memory ID.
 Historical final-gate logs and binary hashes above describe the pre-fix build;
 GitHub CI validates the final committed source separately.
+
+
+## 2026-09-20 v2.0.1 audit correction and repairs
+
+The previous claim that all R00–R15 requirements were closed was too broad.
+The local Stop check exercised a fail-safe/no-op path, not a positive write to
+an upgraded store. v2.0.0 ingest/distill still called the refused v1 writer.
+That release's hook checks therefore did not establish working automatic save.
+
+v2.0.1 routes upgraded ingest, heuristic/host/HTTP-model distill, and real
+session-end findings through the existing v2 writer. Stable event identity
+makes replay idempotent; sources remain unverified or evidence-attached.
+Explicit v1 write remains refused. Tests use isolated stores and synthetic
+Codex/Claude/Grok/Antigravity-shaped payloads, not four real model sessions.
+The upgrade/restore smoke now includes positive ingest and replay.
+
+Structured reconciliation checks environment and value before textual equality.
+Revision support validates known history and retains each source's supported
+semantic revision in a hash-checked ledger. Unknown legacy bindings remain
+null; the public source-event and writer protocol stay compatible with v2.0.0.
+Sleep inventories metadata and reads only the bounded page; importing pending
+proposals does not observe later pages or invalidate continuation itself.
+
+R11-A05 remains PARTIAL: oversized input batches continue, but single-record,
+file-count, report-size and proposal-count safety caps still reject explicitly.
+R14-A05 remains PARTIAL: the historical synthetic producer and three Luna max
+consumer arms are not full cross-host/model end-to-end evidence.
+
+Timing is opt-in stderr JSON with inclusive, overlapping durations. Five samples
+per 100/1,000/10,000-record scenario include real PreToolUse hooks. Models are
+disabled in the process benchmark and initialization is not_run. This hook
+scenario differs from the old inject baseline, so no direct speedup is claimed.
+Real cached ONNX embedding/reranking is checked separately in a temporary store.
+No user memory or transcript content enters the fixtures or timing records.
+
+An actual retained v2.0.0 release executable was interleaved with the v2.0.1
+candidate against one temporary store. New → old → new source additions retained
+bindings [1, null, 2]; the old source remains explicitly unknown. This supplements
+the legacy-writer simulation regression (evidence/v2.0.1/writer3-compat.json).

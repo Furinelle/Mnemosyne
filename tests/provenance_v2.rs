@@ -1,10 +1,13 @@
 use chrono::{DateTime, Utc};
 use mnemosyne::{
-    api,
-    provenance::{self, Clock, MemoryRef, WriteRequestV2},
+    api, history,
+    proposals::{self, Request, Target},
+    provenance::{self, Clock, MemoryRef, SourceEvent, SystemClock, WriteRequestV2},
     schema::{Memory, parse_memory, serialize_memory},
+    snapshot,
     store::{self, Store},
 };
+use sha2::{Digest, Sha256};
 use std::{fs, sync::Arc};
 
 struct FixedClock;
@@ -291,8 +294,12 @@ fn support_rechecks_live_markdown_and_inactive_state() -> anyhow::Result<()> {
             }
             store::write_memory(&path, &memory)?;
         }
+        let mut new_source = request("e2", "f1");
+        if case == "corrected" {
+            new_source.content.push_str("\nCorrection");
+        }
         assert!(
-            provenance::write_v2(&store, &request("e2", "f1"), &FixedClock).is_err(),
+            provenance::write_v2(&store, &new_source, &FixedClock).is_err(),
             "{case}"
         );
         assert_eq!(
@@ -301,6 +308,387 @@ fn support_rechecks_live_markdown_and_inactive_state() -> anyhow::Result<()> {
             "{case}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn corrected_fact_accepts_new_support_without_rewriting_old_sources() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let store = store(dir.path());
+    let manifest = provenance::upgrade_store(&store)?;
+    let original = request("e1", "f1");
+    let first = provenance::write_v2(&store, &original, &FixedClock)?;
+    let old_event = serde_json::to_value(&first.source_event)?;
+    let path = store
+        .working_dir()
+        .join(format!("{}.md", first.memory_ref.memory_id));
+    let before = mnemosyne::revisions::snapshot(&store, &path)?;
+    api::revise_v2(
+        &store,
+        &api::ReviseRequest {
+            memory_ref: first.memory_ref.clone(),
+            expected_rev: before.semantic_rev,
+            expected_hash: before.semantic_hash,
+            changes: api::RevisionFields {
+                body: Some("## 标题\n\n修订后的事实".into()),
+                ..Default::default()
+            },
+        },
+        &FixedClock,
+    )?;
+    let mut supported = request("e2", "f1");
+    supported.content = "修订后的事实".into();
+    let mut stale = supported.clone();
+    stale.content = original.content.clone();
+    assert!(
+        provenance::write_v2(&store, &stale, &FixedClock)
+            .unwrap_err()
+            .to_string()
+            .contains("IDENTITY_CONFLICT")
+    );
+    let added = provenance::write_v2(&store, &supported, &FixedClock)?;
+    assert_eq!(added.status, "supported");
+    assert_eq!(added.memory_ref, first.memory_ref);
+    assert_eq!(added.evidence_count, 2);
+    assert_eq!(
+        provenance::write_v2(&store, &original, &FixedClock)?.status,
+        "duplicate"
+    );
+    assert_eq!(
+        provenance::write_v2(&store, &supported, &FixedClock)?.status,
+        "duplicate"
+    );
+    let current = api::show_v2(
+        std::slice::from_ref(&store),
+        &first.memory_ref.memory_id,
+        None,
+    )?;
+    assert_eq!(current["revision"]["semantic_rev"], 3);
+    assert_eq!(current["memory"]["body"], "## 标题\n\n修订后的事实");
+    assert_eq!(current["provenance"]["source_events"][0], old_event);
+    assert_eq!(
+        current["provenance"]["source_revisions"],
+        serde_json::json!([1, 2])
+    );
+    let historical = |rev| {
+        history::show(
+            std::slice::from_ref(&store),
+            &first.memory_ref.memory_id,
+            Some(&manifest.store_id),
+            rev,
+        )
+    };
+    let created = historical(1)?;
+    let revised = historical(2)?;
+    let after_support = historical(3)?;
+    assert_eq!(
+        created["memory"]["body"],
+        "## 标题\n\n中文, \"quote\" \\path"
+    );
+    assert_eq!(
+        created["provenance"]["source_events"],
+        serde_json::json!([old_event])
+    );
+    assert_eq!(
+        revised["provenance"]["source_events"],
+        created["provenance"]["source_events"]
+    );
+    assert_eq!(
+        created["provenance"]["source_revisions"],
+        serde_json::json!([1])
+    );
+    assert_eq!(
+        revised["provenance"]["source_revisions"],
+        serde_json::json!([1])
+    );
+    assert_eq!(revised["memory"]["body"], "## 标题\n\n修订后的事实");
+    assert_eq!(
+        after_support["provenance"]["source_events"],
+        current["provenance"]["source_events"]
+    );
+    assert_eq!(
+        after_support["provenance"]["source_revisions"],
+        serde_json::json!([1, 2])
+    );
+    let package = dir.path().join("snapshot");
+    snapshot::create(&store, &package)?;
+    let restored_root = dir.path().join("restored");
+    snapshot::restore(&package, &restored_root, false)?;
+    let restored = Store {
+        scope: "project".into(),
+        root: restored_root,
+    };
+    let restored_current = api::show_v2(
+        std::slice::from_ref(&restored),
+        &first.memory_ref.memory_id,
+        None,
+    )?;
+    assert_eq!(restored_current["provenance"], current["provenance"]);
+    assert_eq!(
+        history::show(
+            std::slice::from_ref(&restored),
+            &first.memory_ref.memory_id,
+            Some(&manifest.store_id),
+            1,
+        )?["provenance"],
+        created["provenance"]
+    );
+    let evidence = store
+        .root
+        .join("evidence")
+        .join(format!("{}.json", first.memory_ref.memory_id));
+    let mut altered: serde_json::Value = serde_json::from_slice(&fs::read(&evidence)?)?;
+    altered["memory"]["extra"]["source_revisions"][0] = 2.into();
+    altered["memory"]["extra"]["source_revision_ledger_hash"] = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(
+            &altered["memory"]["extra"]["source_revisions"]
+        )?),
+    )
+    .into();
+    fs::write(&evidence, serde_json::to_vec(&altered)?)?;
+    assert!(
+        historical(1)
+            .unwrap_err()
+            .to_string()
+            .contains("Historical source revision ledger hash mismatch")
+    );
+    Ok(())
+}
+
+#[test]
+fn reviewed_refine_and_undo_can_support_the_resulting_fact() -> anyhow::Result<()> {
+    for undo in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let store = store(dir.path());
+        let manifest = provenance::upgrade_store(&store)?;
+        let first = provenance::write_v2(&store, &request("e1", "f1"), &FixedClock)?;
+        let path = store
+            .working_dir()
+            .join(format!("{}.md", first.memory_ref.memory_id));
+        let before = mnemosyne::revisions::snapshot(&store, &path)?;
+        let proposal = proposals::propose(
+            &store,
+            Request {
+                decision: "REFINE".into(),
+                reason: "reviewed correction".into(),
+                evidence: vec![],
+                targets: vec![Target {
+                    memory_ref: first.memory_ref.clone(),
+                    expected_rev: before.semantic_rev,
+                    expected_hash: before.semantic_hash,
+                    body: Some("## 标题\n\n经审核的修订".into()),
+                    status: None,
+                }],
+            },
+            &FixedClock,
+        )?;
+        proposals::review(
+            &store,
+            &proposal.id,
+            "approve",
+            &proposal.summary_hash,
+            &FixedClock,
+        )?;
+        if undo {
+            proposals::review(
+                &store,
+                &proposal.id,
+                "undo",
+                &proposal.summary_hash,
+                &FixedClock,
+            )?;
+        }
+        let mut new_source = request("e2", "f1");
+        new_source.content = if undo {
+            request("e1", "f1").content
+        } else {
+            "经审核的修订".into()
+        };
+        let supported = provenance::write_v2(&store, &new_source, &FixedClock)?;
+        assert_eq!(supported.status, "supported");
+        let current = api::show_v2(
+            std::slice::from_ref(&store),
+            &first.memory_ref.memory_id,
+            None,
+        )?;
+        let target_revision = if undo { 3 } else { 2 };
+        assert_eq!(
+            current["provenance"]["source_revisions"],
+            serde_json::json!([1, target_revision])
+        );
+        let original = history::show(
+            std::slice::from_ref(&store),
+            &first.memory_ref.memory_id,
+            Some(&manifest.store_id),
+            1,
+        )?;
+        assert_eq!(
+            original["provenance"]["source_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            original["provenance"]["source_revisions"],
+            serde_json::json!([1])
+        );
+        let refined = history::show(
+            std::slice::from_ref(&store),
+            &first.memory_ref.memory_id,
+            Some(&manifest.store_id),
+            2,
+        )?;
+        assert_eq!(refined["memory"]["body"], "## 标题\n\n经审核的修订");
+        assert_eq!(
+            refined["provenance"]["source_events"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        let latest = history::show(
+            std::slice::from_ref(&store),
+            &first.memory_ref.memory_id,
+            Some(&manifest.store_id),
+            target_revision + 1,
+        )?;
+        assert_eq!(
+            latest["provenance"]["source_revisions"],
+            current["provenance"]["source_revisions"]
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn pre_binding_ledger_keeps_unknown_old_revision_and_binds_new_source() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let store = store(dir.path());
+    let manifest = provenance::upgrade_store(&store)?;
+    let old = SourceEvent {
+        origin: "legacy".into(),
+        source_session_id: "session".into(),
+        source_event_id: "e1".into(),
+        finding_key: "f1".into(),
+        source_kind: "tool_output".into(),
+        verification_state: "unverified".into(),
+        content_hash: "old-hash".into(),
+        redacted_summary: None,
+    };
+    let mut memory = parse_memory(
+        "---\nid: codebase-legacy\ntype: codebase\nstatus: active\n---\n## 标题\n\n旧事实\n",
+    )?;
+    memory.extra.insert("fact_key".into(), "fact".into());
+    memory.extra.insert("source_event_count".into(), 1.into());
+    memory.extra.insert(
+        "source_event_ledger_hash".into(),
+        format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&vec![old.clone()])?)
+        )
+        .into(),
+    );
+    fs::write(
+        store.working_dir().join("codebase-legacy.md"),
+        serialize_memory(&memory),
+    )?;
+    fs::create_dir_all(store.root.join("evidence"))?;
+    fs::write(
+        store.root.join("evidence/codebase-legacy.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "schema_version": 2,
+            "memory": memory,
+            "markdown_published": true,
+            "fact_key": "fact",
+            "events": [old],
+        }))?,
+    )?;
+    drop(store::lock_store(&store)?); // Adopt this pre-binding image into recorded history.
+    let historical = |rev| {
+        history::show(
+            std::slice::from_ref(&store),
+            "codebase-legacy",
+            Some(&manifest.store_id),
+            rev,
+        )
+    };
+    assert_eq!(
+        historical(1)?["provenance"]["source_revisions"],
+        serde_json::json!([null])
+    );
+    let mut new_source = request("e2", "f1");
+    new_source.content = "旧事实".into();
+    let supported = provenance::write_v2(&store, &new_source, &SystemClock)?;
+    assert_eq!(supported.status, "supported");
+    let current = api::show_v2(std::slice::from_ref(&store), "codebase-legacy", None)?;
+    assert_eq!(
+        current["provenance"]["source_revisions"],
+        serde_json::json!([null, 1])
+    );
+    assert_eq!(
+        historical(1)?["provenance"]["source_revisions"],
+        serde_json::json!([null])
+    );
+    assert_eq!(
+        historical(2)?["provenance"]["source_revisions"],
+        serde_json::json!([null, 1])
+    );
+    // Simulate the v2.0.0 writer: it preserves unknown Memory.extra keys while
+    // appending an event, but cannot extend the new binding vector.
+    let path = store.working_dir().join("codebase-legacy.md");
+    let evidence = store.root.join("evidence/codebase-legacy.json");
+    let _lock = store::lock_store(&store)?;
+    let mut ledger: serde_json::Value = serde_json::from_slice(&fs::read(&evidence)?)?;
+    let mut events: Vec<SourceEvent> = serde_json::from_value(ledger["events"].clone())?;
+    events.push(SourceEvent {
+        origin: "legacy".into(),
+        source_session_id: "session".into(),
+        source_event_id: "e3".into(),
+        finding_key: "f1".into(),
+        source_kind: "tool_output".into(),
+        verification_state: "unverified".into(),
+        content_hash: "old-hash-3".into(),
+        redacted_summary: None,
+    });
+    let mut memory = parse_memory(&fs::read_to_string(&path)?)?;
+    memory.extra.insert("source_event_count".into(), 3.into());
+    memory.extra.insert("evidence_count".into(), 3.into());
+    memory.extra.insert(
+        "source_event_ledger_hash".into(),
+        format!("{:x}", Sha256::digest(serde_json::to_vec(&events)?)).into(),
+    );
+    mnemosyne::revisions::write_locked(
+        &store,
+        &path,
+        &memory,
+        Some(mnemosyne::revisions::snapshot(&store, &path)?),
+        "source_evidence",
+        &SystemClock,
+    )?;
+    ledger["events"] = serde_json::to_value(&events)?;
+    ledger["memory"] = serde_json::to_value(&memory)?;
+    fs::write(&evidence, serde_json::to_vec(&ledger)?)?;
+    drop(_lock);
+    assert_eq!(
+        historical(3)?["provenance"]["source_revisions"],
+        serde_json::json!([null, 1, null])
+    );
+    let mut latest = request("e4", "f1");
+    latest.content = "旧事实".into();
+    assert_eq!(
+        provenance::write_v2(&store, &latest, &SystemClock)?.status,
+        "supported"
+    );
+    assert_eq!(
+        historical(4)?["provenance"]["source_revisions"],
+        serde_json::json!([null, 1, null, 3])
+    );
+    assert_eq!(
+        historical(2)?["provenance"]["source_revisions"],
+        serde_json::json!([null, 1])
+    );
     Ok(())
 }
 

@@ -257,6 +257,7 @@ fn all_evidence(store: &Store) -> Result<Vec<(PathBuf, EvidenceFile)>> {
                 "IDENTITY_CONFLICT: evidence filename differs from memory ID"
             );
             ensure!(!file.events.is_empty(), "Invalid empty evidence ledger");
+            source_revisions(&file)?;
             out.push((path, file));
         }
     }
@@ -293,6 +294,13 @@ fn commit_evidence(
             Sha256::digest(serde_json::to_vec(&file.events)?)
         )),
     );
+    if let Some(revisions) = file.memory.extra.get("source_revisions") {
+        let digest = format!("{:x}", Sha256::digest(serde_json::to_vec(revisions)?));
+        file.memory.extra.insert(
+            "source_revision_ledger_hash".into(),
+            serde_json::json!(digest),
+        );
+    }
     file.markdown_published = true;
     let after = format!("{}\n", serde_json::to_string_pretty(file)?);
     ensure!(after.len() <= MAX_EVIDENCE_BYTES, "EVIDENCE_TOO_LARGE");
@@ -373,6 +381,60 @@ fn evidence_count(events: &[SourceEvent]) -> usize {
         .collect::<HashSet<_>>()
         .len()
 }
+fn source_revisions(file: &EvidenceFile) -> Result<Vec<Option<u64>>> {
+    let expected = file
+        .memory
+        .extra
+        .get("source_revision_ledger_hash")
+        .and_then(serde_json::Value::as_str);
+    let Some(value) = file.memory.extra.get("source_revisions") else {
+        ensure!(expected.is_none(), "Source revision ledger is missing");
+        return Ok(vec![None; file.events.len()]);
+    };
+    let mut revisions: Vec<Option<u64>> = serde_json::from_value(value.clone())?;
+    ensure!(
+        revisions.len() <= file.events.len(),
+        "Invalid source revision ledger"
+    );
+    ensure!(
+        format!("{:x}", Sha256::digest(serde_json::to_vec(&revisions)?))
+            == expected.context("Missing source revision ledger hash")?,
+        "Source revision ledger hash mismatch"
+    );
+    revisions.resize(file.events.len(), None);
+    Ok(revisions)
+}
+fn recorded_support_target(store: &Store, file: &EvidenceFile, current: &Memory) -> Result<bool> {
+    let (_, history) = crate::revisions::read_history(store, &current.id)?;
+    let Some(history) = history else {
+        return Ok(false);
+    };
+    let original = crate::revisions::semantic_digest(&file.memory);
+    let Some(start) = history
+        .entries
+        .iter()
+        .rposition(|entry| entry.semantic_hash == original)
+    else {
+        return Ok(false);
+    };
+    let mut body = file.memory.body.clone();
+    for entry in &history.entries[start + 1..] {
+        if entry.unknown_gap {
+            return Ok(false);
+        }
+        let revised = crate::revisions::history_image(store, &current.id, entry)?;
+        if revised.body != body
+            && !matches!(
+                entry.reason.as_str(),
+                "correction" | "proposal_apply" | "proposal_undo"
+            )
+        {
+            return Ok(false);
+        }
+        body = revised.body;
+    }
+    Ok(body == current.body)
+}
 fn outcome(
     status: &str,
     manifest: &StoreManifest,
@@ -394,6 +456,23 @@ pub fn write_v2(
     store: &Store,
     request: &WriteRequestV2,
     clock: &impl Clock,
+) -> Result<WriteOutcome> {
+    write_or_preview_v2(store, request, clock, true)
+}
+
+pub fn preview_v2(
+    store: &Store,
+    request: &WriteRequestV2,
+    clock: &impl Clock,
+) -> Result<WriteOutcome> {
+    write_or_preview_v2(store, request, clock, false)
+}
+
+fn write_or_preview_v2(
+    store: &Store,
+    request: &WriteRequestV2,
+    clock: &impl Clock,
+    commit: bool,
 ) -> Result<WriteOutcome> {
     ensure!(!request.content.trim().is_empty(), "No content provided");
     ensure!(
@@ -429,7 +508,11 @@ pub fn write_v2(
         ),
         "Invalid verification state"
     );
-    let _guard = lock_store(store)?;
+    let _guard = if commit {
+        Some(lock_store(store)?)
+    } else {
+        crate::api::preview_lock(store)?
+    };
     let manifest = require_v2(store)?;
     let now = clock.now();
     ensure!(
@@ -514,7 +597,6 @@ pub fn write_v2(
                         && current.extra.get("fact_key").and_then(|v| v.as_str())
                             == Some(request.fact_key.as_str())
                         && current.memory_type == request.memory_type
-                        && current.body == file.memory.body
                         && current
                             .body
                             .split_once("\n\n")
@@ -532,7 +614,30 @@ pub fn write_v2(
                     expected.semantic_hash == crate::revisions::semantic_digest(&current),
                     "REVISION_CONFLICT: fact changed"
                 );
+                ensure!(
+                    recorded_support_target(store, file, &current)?
+                        || (!commit
+                            && expected.semantic_rev == 0
+                            && crate::revisions::semantic_digest(&file.memory)
+                                == expected.semantic_hash),
+                    "IDENTITY_CONFLICT: fact Markdown changed outside recorded revisions"
+                );
+                if !commit {
+                    return Ok(outcome("supported", &manifest, file, event));
+                }
+                let mut revisions = source_revisions(file)?;
+                revisions.push(Some(expected.semantic_rev));
                 file.memory = current;
+                if file.memory.extra.get("evidence").is_none()
+                    && let Some(summary) = &event.redacted_summary
+                {
+                    file.memory
+                        .extra
+                        .insert("evidence".into(), serde_json::json!(summary));
+                }
+                file.memory
+                    .extra
+                    .insert("source_revisions".into(), serde_json::json!(revisions));
                 file.events.push(event.clone());
                 commit_evidence(store, path, Some(before), file, Some(expected), clock)?;
                 return Ok(outcome("supported", &manifest, file, event));
@@ -597,6 +702,11 @@ pub fn write_v2(
             .extra
             .insert("fact_key".into(), request.fact_key.clone().into());
     }
+    if let Some(summary) = &event.redacted_summary {
+        memory
+            .extra
+            .insert("evidence".into(), serde_json::json!(summary));
+    }
     let mut file = EvidenceFile {
         schema_version: SCHEMA,
         memory,
@@ -604,10 +714,16 @@ pub fn write_v2(
         fact_key: request.fact_key.clone(),
         events: vec![event.clone()],
     };
+    file.memory
+        .extra
+        .insert("source_revisions".into(), serde_json::json!([1]));
     let path = evidence_path(store, &file.memory.id)?;
     ensure!(!path.exists(), "IDENTITY_CONFLICT: memory ID collision");
     let markdown = working_path(store, &file.memory)?;
     ensure!(!markdown.exists(), "IDENTITY_CONFLICT: memory ID collision");
+    if !commit {
+        return Ok(outcome("created", &manifest, &file, event));
+    }
     commit_evidence(store, &path, None, &mut file, None, clock)?;
     Ok(outcome("created", &manifest, &file, event))
 }
@@ -700,4 +816,17 @@ pub(crate) fn read_provenance_unlocked(store: &Store, memory_id: &str) -> Result
         evidence_count: evidence_count(&file.events),
         source_events: file.events,
     })
+}
+
+/// Source support revisions in event order. Older ledgers have unknown bindings.
+/// Caller holds the store lock, as for `read_provenance_unlocked`.
+pub(crate) fn read_source_revisions_unlocked(
+    store: &Store,
+    memory_id: &str,
+) -> Result<Vec<Option<u64>>> {
+    let files = all_evidence(store)?;
+    let Some((_, file)) = files.into_iter().find(|(_, f)| f.memory.id == memory_id) else {
+        return Ok(vec![]);
+    };
+    source_revisions(&file)
 }

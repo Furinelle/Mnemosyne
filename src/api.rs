@@ -145,11 +145,7 @@ fn duplicate_entry(
 }
 pub fn classify_entry(store: &Store, request: &WriteRequest) -> Result<WriteResult> {
     ensure!(!request.content.trim().is_empty(), "No content provided.");
-    let _guard = if store.root.exists() {
-        Some(lock_store(store)?)
-    } else {
-        None
-    };
+    let _guard = preview_lock(store)?;
     let (_, body) = request_body(request);
     Ok(
         duplicate_entry(store, request, &body)?.unwrap_or(WriteResult {
@@ -159,6 +155,32 @@ pub fn classify_entry(store: &Store, request: &WriteRequest) -> Result<WriteResu
             duplicate_of: None,
         }),
     )
+}
+
+/// Inspect without recovering journals or observing semantic history.
+pub(crate) fn preview_lock(store: &Store) -> Result<Option<StoreLock>> {
+    if !store.root.exists() {
+        return Ok(None);
+    }
+    let lock = match std::fs::symlink_metadata(store.root.join(".lock")) {
+        Ok(meta) => {
+            ensure!(
+                meta.is_file() && !meta.file_type().is_symlink(),
+                "Invalid store lock"
+            );
+            Some(lock_store_existing_read_only(store)?)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    };
+    for name in [".relations-operation.json", ".relations-mutation.json"] {
+        match std::fs::symlink_metadata(store.root.join(name)) {
+            Ok(_) => bail!("PENDING_RECOVERY: preview will not recover a mutation"),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(lock)
 }
 
 pub fn write_entry(store: &Store, request: &WriteRequest) -> Result<WriteResult> {
@@ -712,7 +734,11 @@ pub fn show_v2(stores: &[Store], id: &str, store_id: Option<&str>) -> Result<Val
     let (store, path, _) = crate::provenance::resolve_id_v2(stores, id, store_id)?
         .ok_or_else(|| anyhow::anyhow!("Memory not found"))?;
     let _lock = lock_store(&store)?;
-    let provenance = crate::provenance::read_provenance_unlocked(&store, id)?;
+    let mut provenance =
+        serde_json::to_value(crate::provenance::read_provenance_unlocked(&store, id)?)?;
+    provenance["source_revisions"] = json!(crate::provenance::read_source_revisions_unlocked(
+        &store, id
+    )?);
     let memory = crate::schema::parse_memory(&std::fs::read_to_string(&path)?)?;
     let manifest = crate::provenance::read_manifest(&store)?
         .ok_or_else(|| anyhow::anyhow!("Missing store manifest"))?;
