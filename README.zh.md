@@ -8,17 +8,25 @@
 
 [English](README.md) · [迁移与兼容说明](docs/rust-migration.md)
 
-## 原生演进候选版
+## v2.0.0
 
-当前工作区新增显式来源、任务检查点、语义修订历史、按系统时间查询、保守 Git
+v2.0.0 新增显式来源、任务检查点、语义修订历史、按系统时间查询、保守 Git
 适用性、审批提案、按日维护、有界离线 sleep、派生来源索引及可校验目录快照。
 具体契约见 [接口文档](docs/interface.md)，实际验证见
 [执行记录](docs/plans/native-evolution/EXECUTION_LOG.md)。
 
-这些改动尚不代表新 release 或真实宿主切换。显式升级启用 schema 2 / writer 3；
-升级前停用旧 writer，回滚需恢复完整升级前数据，不能只改版本标记。
-八个 MCP 名称与原生 aliases 保留。Rust 公开结构体新增字段可能破坏下游字面量
-构造，CLI 兼容不等于 crate 源码兼容；发布前需要选择相应的破坏性版本号。
+这是 Rust crate 的破坏性发布：公开结构体新增字段可能破坏下游字面量构造。CLI
+兼容不等于 crate 源码兼容；八个 MCP 工具名称与原生 aliases 保持兼容。
+
+## 下载
+
+- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-aarch64-apple-darwin.tar.gz)
+- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-x86_64-unknown-linux-gnu.tar.gz)
+- [源码包](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-source.tar.gz)
+- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/SHA256SUMS)
+
+安装前请用 `SHA256SUMS` 校验下载文件。发布二进制包含可执行文件及发布文档；ONNX
+Runtime、模型文件和 `vocab.txt` 是外部依赖，未被捆绑。
 
 ## 构建与安装
 
@@ -39,6 +47,26 @@ mnemosyne --help
 
 构建不会自动切换已有 Python 安装或宿主设置。宿主配置宜使用原生可执行文件的绝对路径，
 避免 `PATH` 仍指向旧入口。
+
+## 升级已有 store
+
+v2.0 使用 schema 2 / writer protocol 3。先停止所有旧 writer，再备份并验证全部 canonical
+store data，另行保存宿主配置。先预览，再提交升级：
+
+```sh
+# 在当前主机存在的每个 scope 上执行。
+mnemosyne store-upgrade --scope global
+mnemosyne store-upgrade --scope project
+
+# 仅在旧 writer 全部停止且完整备份已验证后执行。
+mnemosyne store-upgrade --scope global --commit
+mnemosyne store-upgrade --scope project --commit
+```
+
+`snapshot DESTINATION` 与 `restore SOURCE TARGET` 会校验 canonical store 的 manifest 并重建
+派生搜索缓存；请先恢复到独立的空目录以验证备份。snapshot 不包含宿主配置。回滚时恢复
+完整的升级前 canonical store data、还原另存的宿主配置，再切回兼容的旧 writer。不要删除
+`store.json`，也不要让旧 writer 操作已升级 store 来代替回滚。
 
 ## 快速开始
 
@@ -107,7 +135,8 @@ printf '%s\n' '{"prompt":"排查登录回调及认证逻辑"}' |
 - SQLite FTS5、中文等 CJK 文本检索；可选向量、RRF 融合、关系扩展与 cross-encoder 重排。
 - 来源、记录日期、有效状态与 evidence。默认检索过滤过期及已替代记录；记录日期不等于核查日期。
 - 保守写入：词汇相似不能自动授权丢弃或替代有变化的事实。显式关系与整合仍可用，整合先预览候选。
-- 按维护次数衰减、归档与 core 候选；候选不会自动改写 `core.md`。
+- 按 UTC 日幂等执行生命周期维护、归档与 core 候选；legacy maintenance 调用归一到
+  同一日维护记账，候选不会自动改写 `core.md`。
 - 可选蒸馏支持 Claude、Codex、Grok、role JSONL 和文本。保留消息角色边界，默认不把推理或工具内容作为证据。
   `distill` 不带 `--commit` 时只预览；会话自动蒸馏由 `[distill].enabled` 控制，默认关闭。
 - 原子 Markdown 写入、文件锁与可恢复关系变更，支持经协调的跨 store 关系写入。
@@ -139,6 +168,10 @@ cargo run --locked -- eval run --longmemeval --pipeline full --min-recall 0.95
 `tests/native_*_smoke.py` 是可选的 **开发验证脚本**，仅使用 Python 标准库驱动原生二进制；
 它们不属于安装后的记忆内核，也不构成运行时依赖。模型 smoke test 需要另行提供本地模型；
 假服务协议测试不能证明真实模型质量。内置 LongMemEval 样本也不等于完整公开基准。
+
+v2.0.0 测试套件包含 144 项测试；Linux 与 macOS CI 运行发布检查。本地宿主 hook 检查覆盖
+协议行为，不等于四个真实模型对话验收；可选 ONNX 模型验收取决于本机环境。此版本不作
+笼统的性能提升承诺。
 
 [验证记录](docs/rust-validation.md) · [本机切换记录](docs/rust-local-cutover.md)
 · [更新日志](CHANGELOG.md)。这些记录只说明各自版本、时间与验证范围，不代表后续构建及所有宿主均已通过。

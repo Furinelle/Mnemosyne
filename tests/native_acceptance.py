@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Repeatable offline native evolution checks; runtime state and endpoints are isolated."""
-import argparse, hashlib, json, os, subprocess, tarfile, tempfile
+import argparse, hashlib, json, os, subprocess, tarfile, tempfile, tomllib
 from pathlib import Path
 
 p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--old-binary',type=Path);a=p.parse_args()
 root=Path(__file__).resolve().parent.parent;output=a.output.resolve();output.mkdir(parents=True,exist_ok=True)
 home=Path.home();base_env={k:v for k,v in os.environ.items() if k in ('PATH','TMPDIR','SDKROOT','DEVELOPER_DIR')}
 base_env.update(CARGO_HOME=os.environ.get('CARGO_HOME',str(home/'.cargo')),RUSTUP_HOME=os.environ.get('RUSTUP_HOME',str(home/'.rustup')))
+version=tomllib.loads((root/"Cargo.toml").read_text())["package"]["version"]
+package_name=f"mnemosyne-{version}"
 results=[]
 with tempfile.TemporaryDirectory(prefix='mnemosyne-acceptance-') as temp:
     temp=Path(temp);env=dict(base_env,HOME=str(temp/'home'),MNEMOSYNE_HOME=str(temp/'global'))
@@ -36,8 +38,8 @@ with tempfile.TemporaryDirectory(prefix='mnemosyne-acceptance-') as temp:
     for path in listing:
         assert not any(part in ('.mnemosyne','.venv','.pytest_cache','credentials','target') for part in Path(path).parts),path
     run('package',['cargo','package','--offline','--locked','--allow-dirty','--no-verify'])
-    package=root/'target/package/mnemosyne-1.0.0.crate'
+    package=root/'target/package'/f'{package_name}.crate'
     unpack=temp/'package';unpack.mkdir()
     with tarfile.open(package) as archive:archive.extractall(unpack,filter='data')
-    run('package-offline-build',['cargo','build','--offline','--locked'],cwd=unpack/'mnemosyne-1.0.0',extra={'CARGO_TARGET_DIR':str(root/'target/package-check')})
-    (output/'source-sha256.txt').write_text(hashlib.sha256(package.read_bytes()).hexdigest()+'  mnemosyne-1.0.0.crate\n')
+    run('package-offline-build',['cargo','build','--offline','--locked'],cwd=unpack/package_name,extra={'CARGO_TARGET_DIR':str(root/'target/package-check')})
+    (output/'source-sha256.txt').write_text(hashlib.sha256(package.read_bytes()).hexdigest()+f'  {package_name}.crate\n')

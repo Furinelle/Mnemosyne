@@ -9,20 +9,28 @@ background daemon, an LLM account or a separate database server.
 
 [中文文档](README.zh.md) · [Migration and compatibility](docs/rust-migration.md)
 
-## Native evolution candidate
+## Version 2.0.0
 
-The working-tree candidate adds opt-in provenance, task checkpoints, semantic
+Version 2.0.0 adds opt-in provenance, task checkpoints, semantic
 revision history, system-time queries, conservative Git applicability, reviewed
 proposals, daily maintenance, bounded offline sleep, derived source indexes and
 verified directory snapshots. See [the interface contract](docs/interface.md)
 and [execution evidence](docs/plans/native-evolution/EXECUTION_LOG.md).
 
-These changes are not a new published release or a live host cutover. Store
-upgrade explicitly enables writer protocol 3 (schema 2). Stop old writers before
-upgrading; rollback requires the complete pre-upgrade store, not a marker edit.
-The eight MCP names and native aliases remain. Public Rust struct additions may
-break downstream struct literals; CLI compatibility does not imply crate source
-compatibility. A breaking crate version must be selected before publication.
+This is a breaking Rust crate release: public struct additions can break
+downstream struct literals. CLI compatibility does not imply crate source
+compatibility. The eight MCP tool names and native aliases remain compatible.
+
+## Downloads
+
+- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-aarch64-apple-darwin.tar.gz)
+- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-x86_64-unknown-linux-gnu.tar.gz)
+- [Source archive](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/mnemosyne-2.0.0-source.tar.gz)
+- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.0/SHA256SUMS)
+
+Verify the downloaded archive against `SHA256SUMS` before installing it. Release
+binaries include the executable and release documents. ONNX Runtime, local model
+files and `vocab.txt` are external requirements and are not bundled.
 
 ## Build and install
 
@@ -46,6 +54,29 @@ automatically. Basic memory operations work without the library; omit
 Existing Python installations and host settings are not changed by building the
 binary. Use its absolute path in host configuration to avoid resolving an old
 executable on `PATH`.
+
+## Upgrade an existing store
+
+Version 2.0 uses schema 2 and writer protocol 3. Stop every old writer first,
+then back up and verify all canonical store data and separately capture host
+configuration. Preview the upgrade before committing it:
+
+```sh
+# Run each scope that exists on this host.
+mnemosyne store-upgrade --scope global
+mnemosyne store-upgrade --scope project
+
+# Only after the old writers are stopped and the complete backups are verified.
+mnemosyne store-upgrade --scope global --commit
+mnemosyne store-upgrade --scope project --commit
+```
+
+`snapshot DESTINATION` and `restore SOURCE TARGET` verify canonical-store
+manifests and rebuild derived search caches; restore into a separate empty
+directory to test the backup. Snapshots exclude host configuration. To roll back,
+restore the complete pre-upgrade canonical store data, restore the captured host
+configuration, then use its compatible old writer. Do not delete `store.json` or
+run an old writer against an upgraded store as a substitute for rollback.
 
 ## Quickstart
 
@@ -114,8 +145,9 @@ assembled output and are **estimated**, not exact tokenizer limits.
 - Conservative writes: lexical similarity does not authorize dropping or
   superseding a changed fact. Explicit relations and consolidation remain
   available; consolidation previews candidates before changes.
-- Strength decay per maintenance run, archiving and core candidates. Candidates
-  do not automatically rewrite `core.md`.
+- UTC-day idempotent lifecycle maintenance, archiving and core candidates.
+  Legacy maintenance calls normalize to the same daily accounting; candidates do
+  not automatically rewrite `core.md`.
 - Opt-in transcript distillation for Claude, Codex, Grok, role JSONL and text.
   Message roles are preserved; reasoning and tool payloads are not evidence by
   default. `distill` previews unless `--commit` is given.
@@ -155,6 +187,11 @@ harnesses**, using the standard library to drive the native executable. They
 are not an installed kernel or a runtime dependency. Model smoke tests require
 separately supplied local assets; fake-provider tests do not establish real
 model quality. The embedded LongMemEval sample is not the full public benchmark.
+
+The v2.0.0 test suite contains 144 tests; Linux and macOS CI run the release
+checks. Local host-hook checks cover protocol behavior, not four real model
+conversations; optional ONNX model acceptance remains environment-specific. No
+general performance improvement is claimed.
 
 [Validation record](docs/rust-validation.md) · [Local cutover record](docs/rust-local-cutover.md)
 · [Changelog](CHANGELOG.md). These records describe their stated revisions and

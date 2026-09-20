@@ -36,7 +36,7 @@ jobs:
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           target=$(rustc -vV | sed -n 's/^host: //p')
           mkdir -p release
-          tar -czf "release/mnemosyne-${version}-${target}.tar.gz" -C target/release mnemosyne -C "$GITHUB_WORKSPACE" LICENSE README.md
+          tar -czf "release/mnemosyne-${version}-${target}.tar.gz" -C target/release mnemosyne -C "$GITHUB_WORKSPACE" LICENSE README.md README.zh.md CHANGELOG.md
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.os }}

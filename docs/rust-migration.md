@@ -141,13 +141,13 @@ promise. The embedded LongMemEval sample is not the complete public benchmark.
 Use a pinned external corpus to claim results on that benchmark, and distinguish
 retrieval scores from answer correctness.
 
-The subsequent evolution roadmap remains separate work: provenance, semantic
-revisions, checkpoints, system-time history, code applicability and approved
-maintenance proposals. Native migration does not imply these features exist.
+Version 2.0 adds provenance, semantic revisions, checkpoints, system-time
+history, code applicability and reviewed maintenance proposals. These features
+require the explicit store upgrade described below.
 
-## Evolution candidate and rollback
+## Version 2.0 upgrade and rollback
 
-The unpublished evolution work opts stores into schema 2 / minimum writer 3.
+Version 2.0 explicitly opts stores into schema 2 / minimum writer 3.
 `store-upgrade` without `--commit` previews; `--commit` is a real migration and
 must only run after stopping every old writer and preserving a complete copy.
 Readers do not silently upgrade stores. New history/provenance/proposal state is
@@ -161,6 +161,5 @@ independent identity. Config and endpoints are deliberately excluded: review hos
 configuration separately before any live cutover. All real host and optional model
 acceptance remains separately recorded from native protocol fixtures.
 
-The current crate still reports 1.0.0 as the baseline development version. It is
-not a published representation of this diff. Public Rust struct additions require
-a breaking crate release decision; existing CLI/MCP names remain compatible.
+Version 2.0 is a breaking Rust crate release because public structures gained
+fields. Existing CLI commands and the eight MCP tool names remain compatible.

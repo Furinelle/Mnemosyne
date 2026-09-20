@@ -4,6 +4,31 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-20
+
+### 新增 (Added)
+
+- 显式来源与事件溯源、任务检查点、语义修订历史及按系统时间查询；新增保守 Git 适用性、
+  审批提案、按日维护、有界离线 sleep、派生来源索引和可校验目录快照。
+- `snapshot` / `restore` 支持 canonical store data 的 manifest 校验与恢复；`restore` / `--fork`
+  现在在发布前重建派生 `MEMORY.md` 文件索引，恢复后的目录可直接检索和阅读。
+
+### 变更 (Changed)
+
+- **不兼容变更**：公开 Rust 结构体新增字段，crate 使用者的结构体字面量需要更新。CLI、
+  八个 MCP 工具名称及原生 aliases 保持兼容。
+- store 显式升级为 schema 2 / 最低 writer protocol 3：`store-upgrade --scope global|project`
+  预览，加入 `--commit` 才迁移。升级前必须停止旧 writer 并保存、验证完整 canonical
+  store data，另行保存宿主配置；回滚必须恢复两者，不能只修改版本标记。
+- 生命周期维护按 UTC 日幂等记账；legacy maintenance API 归一到同一日维护语义。
+- ONNX Runtime、模型文件和 `vocab.txt` 继续作为外部可选依赖，不随发布二进制捆绑。
+
+### 验证 (Validation)
+
+- 测试套件包含 144 项测试；Linux 与 macOS CI 运行发布检查。
+- 本地验证了宿主 hooks 的协议行为；这不代表四个真实模型对话验收。未把现有基准外推为
+  一般性能提升声明。
+
 ## [1.0.0] - 2026-09-19
 
 ### 变更 (Changed)
