@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "old_version": "mnemosyne 2.0.0",
+  "new_version": "mnemosyne 2.0.1",
+  "old_sha256": "9e8ac15a9fdabddd4ec6721b17a1504fcf0f0bd571d44961276d09deed025b3d",
+  "new_sha256": "f890f0cfeec5b27ec177cd951f70f7bda772c51b745c63a5279cbffd5fcfc517",
+  "bindings_after_new_old_new": [
+    1,
+    null,
+    2
+  ],
+  "live_stores_used": false
+}

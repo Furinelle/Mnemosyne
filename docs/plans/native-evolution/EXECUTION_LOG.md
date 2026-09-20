@@ -421,3 +421,20 @@ An actual retained v2.0.0 release executable was interleaved with the v2.0.1
 candidate against one temporary store. New → old → new source additions retained
 bindings [1, null, 2]; the old source remains explicitly unknown. This supplements
 the legacy-writer simulation regression (evidence/v2.0.1/writer3-compat.json).
+
+Final repair source commit: `21611f9528164b4db4594427f6cb6d2856942b9b`. Default and all-features suites each
+passed 159 tests; all 15 native_acceptance gates passed. Evidence is under
+`evidence/v2.0.1/`; build.json binds the source commit and release binary hash.
+The following documentation/evidence commit makes no runtime changes.
+
+Reproduction:
+```sh
+python3 tests/native_acceptance.py --output docs/plans/native-evolution/evidence/v2.0.1 --old-binary target/baseline-v1/debug/mnemosyne
+python3 tests/native_perf.py target/release/mnemosyne --output docs/plans/native-evolution/evidence/v2.0.1/perf.json --commit 21611f9528164b4db4594427f6cb6d2856942b9b --samples 5
+python3 tests/native_onnx_smoke.py target/release/mnemosyne "$EMBED_MODEL" "$ORT_LIBRARY" 512 "$RERANK_MODEL" --timing-output docs/plans/native-evolution/evidence/v2.0.1/onnx-timing.json
+```
+The model/runtime paths refer to already-downloaded assets; hashes are in the
+ONNX report. Five real embedding-plus-rerank searches measured model profile,
+fingerprint and initialization separately; no cached model session was assumed.
+The 10,000-record process benchmark recorded startup p50=5.5 ms, cold_index p50=554.2 ms, warm_query p50=233.4 ms, single_edit p50=234.6 ms, file_hook p50=342.5 ms.
+These are local measurements, not CI thresholds or an old/new performance claim.

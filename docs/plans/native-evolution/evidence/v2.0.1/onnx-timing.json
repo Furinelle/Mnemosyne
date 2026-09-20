@@ -1,0 +1,372 @@
+{
+  "binary": {
+    "path": "/Users/furina/Documents/Github/Mnemosyne/target/release/mnemosyne",
+    "sha256": "f890f0cfeec5b27ec177cd951f70f7bda772c51b745c63a5279cbffd5fcfc517"
+  },
+  "models": {
+    "embedding": {
+      "path": "/Users/furina/.cache/mnemosyne/models/Xenova--bge-small-zh-v1.5/model.onnx",
+      "sha256": "15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc"
+    },
+    "rerank": {
+      "path": "/Users/furina/.cache/mnemosyne/models/Xenova--ms-marco-TinyBERT-L-2-v2/model.onnx",
+      "sha256": "026c2ec3257cd351696e45bbd6040bb83cf818ba89059b4344bd6350138b62ce"
+    }
+  },
+  "ort_library": {
+    "path": "/Users/furina/.local/share/mnemosyne/native/9e8ac15a9fdabddd/libonnxruntime.dylib",
+    "sha256": "b46713ea6a25a5227541c21001f6422c1ccdeaecc369aa026a61b752520325c3"
+  },
+  "environment": {
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.3.34.2)]",
+    "trace": "MNEMOSYNE_TRACE_TIMING=1"
+  },
+  "samples": [
+    {
+      "elapsed_ms": 174.215208,
+      "phases": [
+        {
+          "duration_ms": 0.039458,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "file_enumeration",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 1.1214169999999999,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "sqlite_sync",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.409875,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "candidate_read",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.893,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.91075,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_profile",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 33.218375,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 42.8605,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.004959,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "graph_expansion",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 9.127042,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        }
+      ]
+    },
+    {
+      "elapsed_ms": 200.44275,
+      "phases": [
+        {
+          "duration_ms": 0.04625,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "file_enumeration",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 1.1906670000000001,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "sqlite_sync",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.420333,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "candidate_read",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 44.984333,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 45.000959,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_profile",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 41.860417,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.995875,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.003584,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "graph_expansion",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 8.496958000000001,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        }
+      ]
+    },
+    {
+      "elapsed_ms": 203.917333,
+      "phases": [
+        {
+          "duration_ms": 0.045042,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "file_enumeration",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 1.1875410000000002,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "sqlite_sync",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.407208,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "candidate_read",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 42.372458,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 42.389708,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_profile",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 36.688375,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.385374999999996,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.00325,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "graph_expansion",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 9.595457999999999,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        }
+      ]
+    },
+    {
+      "elapsed_ms": 190.132791,
+      "phases": [
+        {
+          "duration_ms": 0.049792,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "file_enumeration",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 1.701541,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "sqlite_sync",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.4745,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "candidate_read",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 46.04725,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 46.064041,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_profile",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 35.955,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 44.484167,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.0035,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "graph_expansion",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 8.313083,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        }
+      ]
+    },
+    {
+      "elapsed_ms": 210.639834,
+      "phases": [
+        {
+          "duration_ms": 0.0465,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "file_enumeration",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 1.2587080000000002,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "sqlite_sync",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.41691599999999995,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "candidate_read",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.806125,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 43.822041,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_profile",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 33.974,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 44.37575,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_fingerprint",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 0.0038330000000000005,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "graph_expansion",
+          "status": "measured"
+        },
+        {
+          "duration_ms": 11.376166999999999,
+          "event": "mnemosyne_timing",
+          "inclusive": true,
+          "phase": "model_initialize",
+          "status": "measured"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "phase durations are inclusive and overlapping; do not sum them"
+  ],
+  "source_commit": "21611f9528164b4db4594427f6cb6d2856942b9b"
+}

@@ -1,0 +1,3 @@
+Real ONNX embedding, vector retrieval, incremental cache: passed
+Real ONNX cross-encoder reranking: passed
+docs/plans/native-evolution/evidence/v2.0.1/onnx-timing.json

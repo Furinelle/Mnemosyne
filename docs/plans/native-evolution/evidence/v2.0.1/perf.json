@@ -1,0 +1,2179 @@
+{
+  "commit": "21611f9528164b4db4594427f6cb6d2856942b9b",
+  "binary_sha256": "f890f0cfeec5b27ec177cd951f70f7bda772c51b745c63a5279cbffd5fcfc517",
+  "build": "release; onnx feature compiled, models disabled",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "processor": "arm",
+  "samples": 5,
+  "clock": "perf_counter_ns",
+  "models": "disabled; no assets read",
+  "effective_pipeline": "lexical; no network",
+  "limitations": [
+    "phase timings are inclusive and overlapping; do not sum them",
+    "pending recovery measured by correctness tests only",
+    "no real-host/model E2E or lane ablation"
+  ],
+  "results": [
+    {
+      "records": 100,
+      "scenario": "startup",
+      "samples_ms": [
+        8.724708,
+        7.281125,
+        6.864875,
+        5.686917,
+        5.342833
+      ],
+      "p50_ms": 6.864875,
+      "p95_ms": 8.724708,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "sqlite_sync": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "candidate_read": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "graph_expansion": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "sqlite_sync": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "candidate_read": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "graph_expansion": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_profile": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_fingerprint": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_initialize": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "cold_index",
+      "samples_ms": [
+        60.024166,
+        55.502834,
+        63.266334,
+        79.399458,
+        54.896875
+      ],
+      "p50_ms": 60.024166,
+      "p95_ms": 79.399458,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          0.36554099999999995,
+          0.35666699999999996,
+          0.32858299999999996,
+          0.3415,
+          0.321666
+        ],
+        "sqlite_sync": [
+          7.844667,
+          6.196166999999999,
+          5.548792,
+          12.30575,
+          5.338709000000001
+        ],
+        "candidate_read": [
+          0.9987079999999999,
+          0.998542,
+          0.917666,
+          4.107125,
+          0.8807929999999999
+        ],
+        "graph_expansion": [
+          0.065333,
+          0.068916,
+          0.050333,
+          0.051667,
+          0.048333
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "warm_query",
+      "samples_ms": [
+        54.921,
+        51.729,
+        54.841333,
+        50.20425,
+        53.684958
+      ],
+      "p50_ms": 53.684958,
+      "p95_ms": 54.921,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          0.304334,
+          0.31545799999999996,
+          0.31070899999999996,
+          0.310708,
+          0.356583
+        ],
+        "sqlite_sync": [
+          2.4615,
+          2.582834,
+          3.102875,
+          2.444458,
+          2.9345419999999995
+        ],
+        "candidate_read": [
+          0.812041,
+          0.9136660000000001,
+          0.964542,
+          0.8415,
+          0.961792
+        ],
+        "graph_expansion": [
+          0.046917,
+          0.050667000000000004,
+          0.044583000000000005,
+          0.048167,
+          0.043792
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "single_edit",
+      "samples_ms": [
+        78.933875,
+        52.556833,
+        50.826541,
+        50.752458,
+        52.117333
+      ],
+      "p50_ms": 52.117333,
+      "p95_ms": 78.933875,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          0.31825,
+          0.343625,
+          0.334875,
+          0.31466700000000003,
+          0.30741599999999997
+        ],
+        "sqlite_sync": [
+          2.7856250000000005,
+          2.779458,
+          2.544667,
+          2.887333,
+          2.910333
+        ],
+        "candidate_read": [
+          0.846792,
+          0.955708,
+          0.9233750000000001,
+          0.8116669999999999,
+          0.901208
+        ],
+        "graph_expansion": [
+          0.04725,
+          0.058041999999999996,
+          0.045125,
+          0.049917,
+          0.046708
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 100,
+      "scenario": "file_hook",
+      "samples_ms": [
+        34.49425,
+        15.688166,
+        14.936459,
+        13.938875,
+        13.980666
+      ],
+      "p50_ms": 14.936459,
+      "p95_ms": 34.49425,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          0.19366699999999998,
+          0.189209,
+          0.179167,
+          0.171125,
+          0.171042
+        ],
+        "sqlite_sync": [
+          10.454667,
+          1.052,
+          0.989292,
+          0.913833,
+          0.949166
+        ],
+        "candidate_read": [
+          0.7004170000000001,
+          0.47887500000000005,
+          0.470792,
+          0.449125,
+          0.471416
+        ],
+        "graph_expansion": [
+          0.051667,
+          0.044083,
+          0.049,
+          0.050875000000000004,
+          0.045584
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          0.032125,
+          0.014709,
+          0.013166,
+          0.013583,
+          0.011791
+        ],
+        "hook_total": [
+          28.542708,
+          10.599834000000001,
+          9.906792,
+          9.1665,
+          9.325040999999999
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "hook_total": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ]
+      },
+      "corpus_sha256": "5672a77880ea1bd403b3450d0b4836cadbc7744ab557bff88d199505e468c912"
+    },
+    {
+      "records": 1000,
+      "scenario": "startup",
+      "samples_ms": [
+        6.261334,
+        5.97475,
+        5.14,
+        4.725125,
+        4.4985
+      ],
+      "p50_ms": 5.14,
+      "p95_ms": 6.261334,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "sqlite_sync": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "candidate_read": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "graph_expansion": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "sqlite_sync": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "candidate_read": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "graph_expansion": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_profile": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_fingerprint": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_initialize": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        99.318958,
+        107.068959,
+        89.802917,
+        119.079542,
+        97.400875
+      ],
+      "p50_ms": 99.318958,
+      "p95_ms": 119.079542,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          2.394959,
+          2.586791,
+          2.516833,
+          2.500791,
+          2.9009160000000005
+        ],
+        "sqlite_sync": [
+          35.794291,
+          31.639666,
+          30.556957999999998,
+          33.133708,
+          34.178874
+        ],
+        "candidate_read": [
+          5.352499999999999,
+          1.535375,
+          1.543583,
+          1.562709,
+          1.808708
+        ],
+        "graph_expansion": [
+          0.403792,
+          0.400083,
+          0.40487500000000004,
+          0.422542,
+          0.417125
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        75.898,
+        77.661375,
+        71.965291,
+        91.734333,
+        71.154958
+      ],
+      "p50_ms": 75.898,
+      "p95_ms": 91.734333,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          2.630917,
+          2.5628339999999996,
+          2.373125,
+          2.3172919999999997,
+          2.7957920000000005
+        ],
+        "sqlite_sync": [
+          6.786708000000001,
+          11.900625000000002,
+          10.047333,
+          6.822624,
+          6.866999999999999
+        ],
+        "candidate_read": [
+          1.563459,
+          5.228791999999999,
+          1.6509589999999998,
+          1.5464579999999999,
+          1.591042
+        ],
+        "graph_expansion": [
+          0.466959,
+          0.44991600000000004,
+          0.527625,
+          0.436583,
+          0.47654199999999997
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        68.755833,
+        70.871542,
+        70.75275,
+        71.617584,
+        71.794041
+      ],
+      "p50_ms": 70.871542,
+      "p95_ms": 71.794041,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          3.388125,
+          2.8043750000000003,
+          2.8630000000000004,
+          2.8165,
+          2.943958
+        ],
+        "sqlite_sync": [
+          8.053208999999999,
+          7.338167,
+          7.71475,
+          7.700667,
+          7.614792
+        ],
+        "candidate_read": [
+          1.5678750000000001,
+          1.6675,
+          1.7312090000000002,
+          1.7469579999999998,
+          1.7557079999999998
+        ],
+        "graph_expansion": [
+          0.410167,
+          0.397583,
+          0.40108299999999997,
+          0.450416,
+          0.447458
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 1000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        54.894875,
+        40.96175,
+        39.975209,
+        39.834041,
+        39.922209
+      ],
+      "p50_ms": 39.975209,
+      "p95_ms": 54.894875,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          1.739667,
+          1.604916,
+          1.6183750000000001,
+          1.595541,
+          1.60625
+        ],
+        "sqlite_sync": [
+          5.13425,
+          3.853792,
+          3.856042,
+          3.75625,
+          3.841541
+        ],
+        "candidate_read": [
+          1.1464999999999999,
+          1.07175,
+          1.097833,
+          1.0605829999999998,
+          1.021917
+        ],
+        "graph_expansion": [
+          0.40045800000000004,
+          0.389792,
+          0.362208,
+          0.3605,
+          0.390917
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          0.014624999999999999,
+          0.0135,
+          0.013334,
+          0.013333,
+          0.011250000000000001
+        ],
+        "hook_total": [
+          48.100792000000006,
+          35.443916,
+          34.914041,
+          34.758167,
+          34.982082999999996
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "hook_total": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ]
+      },
+      "corpus_sha256": "00107b8d718899aa116dd20d3257cd7151114e303c38fea71ad70e04bd0d8ec4"
+    },
+    {
+      "records": 10000,
+      "scenario": "startup",
+      "samples_ms": [
+        5.544166,
+        4.346375,
+        5.438833,
+        5.521542,
+        5.648041
+      ],
+      "p50_ms": 5.521542,
+      "p95_ms": 5.648041,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "sqlite_sync": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "candidate_read": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "graph_expansion": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "sqlite_sync": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "candidate_read": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "graph_expansion": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_profile": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_fingerprint": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "model_initialize": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "cold_index",
+      "samples_ms": [
+        580.412583,
+        508.463375,
+        568.533042,
+        552.844542,
+        554.159875
+      ],
+      "p50_ms": 554.159875,
+      "p95_ms": 580.412583,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          31.126832999999998,
+          24.580917,
+          24.396167000000002,
+          24.218500000000002,
+          24.267958999999998
+        ],
+        "sqlite_sync": [
+          380.835917,
+          322.8885,
+          377.80112499999996,
+          369.554126,
+          370.80275
+        ],
+        "candidate_read": [
+          8.342708,
+          8.150374,
+          7.891417,
+          7.678709,
+          8.005083
+        ],
+        "graph_expansion": [
+          6.022833,
+          5.470583,
+          6.2350840000000005,
+          5.958125,
+          5.300208
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "warm_query",
+      "samples_ms": [
+        230.483417,
+        233.4055,
+        236.487041,
+        232.538542,
+        234.567833
+      ],
+      "p50_ms": 233.4055,
+      "p95_ms": 236.487041,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          24.180042,
+          23.849541,
+          21.829874,
+          23.453083999999997,
+          23.82275
+        ],
+        "sqlite_sync": [
+          49.214666,
+          48.618165999999995,
+          54.878916000000004,
+          48.372042,
+          48.823084
+        ],
+        "candidate_read": [
+          7.882626,
+          8.097541,
+          7.919582999999999,
+          7.900875,
+          7.803999
+        ],
+        "graph_expansion": [
+          5.986167,
+          5.390458,
+          6.034000000000001,
+          5.982417,
+          5.985125
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "single_edit",
+      "samples_ms": [
+        234.481208,
+        246.435125,
+        242.592292,
+        234.581125,
+        231.001542
+      ],
+      "p50_ms": 234.581125,
+      "p95_ms": 246.435125,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          23.880625,
+          23.898166,
+          23.760583,
+          23.648416,
+          23.217291
+        ],
+        "sqlite_sync": [
+          51.582958999999995,
+          50.32025,
+          49.381084,
+          53.030292,
+          49.140667
+        ],
+        "candidate_read": [
+          7.8520829999999995,
+          7.83925,
+          7.79875,
+          7.896417,
+          7.854541
+        ],
+        "graph_expansion": [
+          6.2013750000000005,
+          6.369292000000001,
+          6.216125,
+          6.140625,
+          5.4765
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "hook_total": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ],
+        "hook_total": [
+          "absent",
+          "absent",
+          "absent",
+          "absent",
+          "absent"
+        ]
+      },
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    },
+    {
+      "records": 10000,
+      "scenario": "file_hook",
+      "samples_ms": [
+        400.865708,
+        342.384,
+        341.93775,
+        342.498042,
+        346.163875
+      ],
+      "p50_ms": 342.498042,
+      "p95_ms": 400.865708,
+      "phase_inclusive_samples_ms": {
+        "file_enumeration": [
+          20.855124999999997,
+          20.507082999999998,
+          20.967583,
+          20.764333,
+          20.806416000000002
+        ],
+        "sqlite_sync": [
+          44.520208,
+          38.246916999999996,
+          38.543082999999996,
+          38.619875,
+          38.7395
+        ],
+        "candidate_read": [
+          7.458541,
+          7.673042,
+          7.323625,
+          7.522042,
+          7.630292000000001
+        ],
+        "graph_expansion": [
+          5.4055420000000005,
+          5.368083,
+          5.403958,
+          5.434083,
+          5.684417
+        ],
+        "model_profile": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_fingerprint": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "model_initialize": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "context_render": [
+          0.017708,
+          0.017583,
+          0.021500000000000002,
+          0.017875000000000002,
+          0.019375
+        ],
+        "hook_total": [
+          394.453334,
+          336.194667,
+          335.921375,
+          336.46549999999996,
+          340.06287499999996
+        ]
+      },
+      "phase_statuses": {
+        "file_enumeration": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "sqlite_sync": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "candidate_read": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "graph_expansion": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "model_profile": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_fingerprint": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "model_initialize": [
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run",
+          "not_run"
+        ],
+        "context_render": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ],
+        "hook_total": [
+          "measured",
+          "measured",
+          "measured",
+          "measured",
+          "measured"
+        ]
+      },
+      "corpus_sha256": "64a201f6ad72223b6c4065c599428355088fb3133746d502954ea01b900b54f3"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "source_commit": "21611f9528164b4db4594427f6cb6d2856942b9b",
+  "version": "2.0.1",
+  "release_binary_sha256": "f890f0cfeec5b27ec177cd951f70f7bda772c51b745c63a5279cbffd5fcfc517",
+  "default_tests": 159,
+  "all_features_tests": 159,
+  "gates_passed": 15,
+  "local_only": true,
+  "remote_ci": "recorded by GitHub release workflow"
+}

@@ -5,7 +5,7 @@
   "base_commit": "d05f02853f42771ae9ca04d78b79739d01f1a76c",
   "observed_package_version": "2.0.1",
   "review_mode": "static_connector_review_plus_remote_ci_status",
-  "local_rust_tests": "v2.0.1 repair gates recorded in evidence/v2.0.1/results.json. R11 output continuation and R14 full cross-host model E2E remain partial. Historical scope is not blanket acceptance. Local real cached ONNX smoke passed; release CI is recorded separately.",
+  "local_rust_tests": "v2.0.1: default/all-features each 159 tests and all 15 local gates passed; real cached ONNX and five-sample phase measurements passed. R11 output continuation and R14 full cross-host model E2E remain partial. Source/binary identities in evidence/v2.0.1/build.json; release CI recorded separately.",
   "default_first_batch": [
     "R00",
     "R01",
