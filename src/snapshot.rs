@@ -619,6 +619,8 @@ pub fn restore(source: &Path, target: &Path, fork: bool) -> Result<SnapshotManif
         identity.schema_version == manifest.store_schema_version,
         "restored schema mismatch"
     );
+    // Rebuild the file-only client directory before publishing the private stage.
+    crate::api::update_markdown_index(&restored, None)?;
     destination(target)?;
     publish(stage.path(), target)?;
     File::open(parent)?.sync_all()?;

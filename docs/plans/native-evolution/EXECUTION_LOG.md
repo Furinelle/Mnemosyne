@@ -369,3 +369,16 @@ Local binary candidate and SHA256SUMS are available under target/release-candida
 They are explicitly named unreleased. Source/test/asset/interface package bytes
 were compared with the final workspace, and the source package was rebuilt offline
 after documentation closure. No GitHub publication is implied by these artifacts.
+
+## 2026-09-20 publication check
+
+The local host cutover passed configured Codex/Claude/Grok hooks, both
+Antigravity MCP configurations, real cached ONNX retrieval/reranking and
+canonical Markdown preservation checks. See the dated local cutover record.
+
+A bounded publication review found that snapshot restore/fork omitted the
+derived MEMORY.md directory. Restore now regenerates it in the private staging
+directory before publication using the existing index writer. The snapshot
+restore/fork regression checks both outputs contain the restored memory ID.
+Historical final-gate logs and binary hashes above describe the pre-fix build;
+GitHub CI validates the final committed source separately.

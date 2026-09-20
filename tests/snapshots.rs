@@ -45,6 +45,10 @@ fn fixture(root: &Path) -> Result<Store> {
 fn snapshot_restore_and_fork_keep_distinct_identity() -> Result<()> {
     let tmp = tempfile::tempdir()?;
     let original = fixture(&tmp.path().join("original"))?;
+    fs::write(
+        original.working_dir().join("restore-fact.md"),
+        "---\nid: restore-fact\ntype: codebase\nsource: agent\n---\n# Restored invariant\n",
+    )?;
     let package = tmp.path().join("package");
     let manifest = snapshot::create(&original, &package)?;
     let proposal_path = manifest
@@ -72,6 +76,7 @@ fn snapshot_restore_and_fork_keep_distinct_identity() -> Result<()> {
 
     let restored = tmp.path().join("restored");
     snapshot::restore(&package, &restored, false)?;
+    assert!(fs::read_to_string(restored.join("MEMORY.md"))?.contains("`restore-fact`"));
     let restored_store = Store {
         scope: "project".into(),
         root: restored.clone(),
@@ -97,6 +102,7 @@ fn snapshot_restore_and_fork_keep_distinct_identity() -> Result<()> {
 
     let fork = tmp.path().join("fork");
     let fork_manifest = snapshot::restore(&package, &fork, true)?;
+    assert!(fs::read_to_string(fork.join("MEMORY.md"))?.contains("`restore-fact`"));
     let fork_store = Store {
         scope: "project".into(),
         root: fork.clone(),
