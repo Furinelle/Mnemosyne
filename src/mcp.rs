@@ -199,10 +199,9 @@ fn tool(kind: Tool, a: &Value) -> Result<Value> {
                         )
                     }
                 } else if operation == "sleep_import" {
-                    crate::sleep::finish(
+                    crate::sleep::import(
                         &stores[0],
-                        &serde_json::from_value(a["request"]["batch"].clone())?,
-                        serde_json::from_value(a["request"]["proposals"].clone())?,
+                        serde_json::from_value(a["request"].clone())?,
                         &crate::provenance::SystemClock,
                     )
                 } else if operation == "view_generate" {

@@ -1,0 +1,978 @@
+{
+  "schema_version": 1,
+  "lane": "NX04_OFFLINE_NATIVE_CONTRACT",
+  "scope": "simulated fixtures; native CLI/MCP; no model or live host claim",
+  "evaluation_mode": "offline_native_contract",
+  "producer_kind": "deterministic_process",
+  "consumer_kind": "deterministic_process",
+  "model_evaluation": "NOT_RUN",
+  "live_host_evaluation": "NOT_RUN",
+  "limitations": [
+    "temporary HOME/store isolation is not an OS sandbox",
+    "no real model reasoning or authenticated host session"
+  ],
+  "execution_complete": true,
+  "acceptance_passed": true,
+  "runs": [
+    {
+      "case": "failed_test",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "store_id": "ed77a6b8-c458-4f9b-b9c1-1b15b1d61a52",
+        "memory_id": "codebase-75448f0007e97fbc7326"
+      },
+      "revision": 1,
+      "checkpoint_id": "b98fe204-49be-46fd-b3a7-61ece0763283",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 0,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 1,
+                "fact_key": "nx04-failed_test-service",
+                "recorded_at": "2026-09-26T14:28:53Z",
+                "semantic_rev": 1,
+                "source_event_count": 1,
+                "source_event_id": "failed_test-first",
+                "source_event_ledger_hash": "e9a4eb0f5adea9af0f2be9741657ae53e6ae03570897fffca4758ce768ff3004",
+                "source_kind": "code_observation",
+                "source_revision_ledger_hash": "080a9ed428559ef602668b4c00f114f1a11c3f6b02a435f0bdc154578e4d7f22",
+                "source_revisions": [
+                  1
+                ],
+                "source_session_id": "nx04-producer",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-75448f0007e97fbc7326",
+              "injection_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "agent",
+              "status": "active",
+              "strength": 70,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-75448f0007e97fbc7326",
+              "store_id": "ed77a6b8-c458-4f9b-b9c1-1b15b1d61a52"
+            },
+            "provenance": {
+              "evidence_count": 1,
+              "source_events": [
+                {
+                  "content_hash": "6eb98fc528039ed893dda60fc8fff623e84db7594834f2016e562e449c4865c1",
+                  "finding_key": "service",
+                  "origin": "native-cli-fixture",
+                  "source_event_id": "failed_test-first",
+                  "source_kind": "code_observation",
+                  "source_session_id": "nx04-producer",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "code_observation",
+              "source_revisions": [
+                1
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "18bc098075911d2483e98ef9aa8e7627c67af9fc99b371257943b625d8a4cc49",
+              "semantic_hash": "2df312eec4755bac40a0a521354a3d291aa2e38f0df3850c8c5f129276c483ed",
+              "semantic_rev": 1
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:53.401109+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Fix the failing synthetic test",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-cli-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [
+                  {
+                    "command": "python -c 'assert 1 == 2'",
+                    "cwd": ".",
+                    "executed_at": "2026-09-26T14:28:53.393644+00:00",
+                    "exit_code": 1,
+                    "summary_ref": "",
+                    "worktree_fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec"
+                  }
+                ],
+                "unresolved": [
+                  "synthetic test failed"
+                ]
+              },
+              "evidence_origin": "reported",
+              "id": "b98fe204-49be-46fd-b3a7-61ece0763283",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "ed77a6b8-c458-4f9b-b9c1-1b15b1d61a52",
+              "updated_at": "2026-09-26T14:28:53.401109+00:00",
+              "worktree": {
+                "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+                "observed_commit": null,
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+              "observed_commit": null,
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [
+              {
+                "command": "python -c 'assert 1 == 2'",
+                "needs_revalidation": false,
+                "origin": "reported",
+                "status": "reported_fail"
+              }
+            ],
+            "verification": "reported_only",
+            "worktree_matches": true
+          }
+        ],
+        "answer": {
+          "next_action": "Fix the failing synthetic test"
+        },
+        "context_bytes": 1439
+      },
+      "direction": "cli_to_mcp"
+    },
+    {
+      "case": "revised_fact",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "store_id": "12ddbc04-cf77-4eca-83b4-f12caaaa1622",
+        "memory_id": "codebase-4ebbdce118d26f55e2d2"
+      },
+      "revision": 3,
+      "checkpoint_id": "a2f9e872-bcea-4a34-96f7-941b172c91ea",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 0,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "## Quartz-J9 service Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 2,
+                "fact_key": "nx04-revised_fact-service",
+                "recorded_at": "2026-09-26T14:28:53Z",
+                "semantic_rev": 3,
+                "source_event_count": 2,
+                "source_event_id": "revised_fact-first",
+                "source_event_ledger_hash": "fb3d21baee6c719077e47843d92e2af23afed54823a66e9eb28381a77a57bb6a",
+                "source_kind": "code_observation",
+                "source_revision_ledger_hash": "49a64717d5d4cb19952e6eac2946415cf6879adacf9908e7d872332d32c6e684",
+                "source_revisions": [
+                  1,
+                  2
+                ],
+                "source_session_id": "nx04-producer",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-4ebbdce118d26f55e2d2",
+              "injection_summary": "## Quartz-J9 service Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "agent",
+              "status": "active",
+              "strength": 70,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-4ebbdce118d26f55e2d2",
+              "store_id": "12ddbc04-cf77-4eca-83b4-f12caaaa1622"
+            },
+            "provenance": {
+              "evidence_count": 2,
+              "source_events": [
+                {
+                  "content_hash": "91a929707413b5bdfecf11b43e82c614f5419004e96902b4b0157814c65382c5",
+                  "finding_key": "service",
+                  "origin": "native-cli-fixture",
+                  "source_event_id": "revised_fact-first",
+                  "source_kind": "code_observation",
+                  "source_session_id": "nx04-producer",
+                  "verification_state": "unverified"
+                },
+                {
+                  "content_hash": "a35cdb9123567121e2c85569c0f9b6152e7cb5a553761c92f3f655d2cd844571",
+                  "finding_key": "service",
+                  "origin": "native-cli-fixture",
+                  "source_event_id": "revised_fact-confirmed",
+                  "source_kind": "code_observation",
+                  "source_session_id": "nx04-producer",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "code_observation",
+              "source_revisions": [
+                1,
+                2
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "de61282e37f72f177fd92d7a95d8213b2d4467c90e724ce083726f3ea166e117",
+              "semantic_hash": "84d54f3494b44d3385bba6466e62ccf6a6f4d1f6d5c1d002913485be1e610adc",
+              "semantic_rev": 3
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:54.114472+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Check the revised source",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-cli-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [],
+                "unresolved": []
+              },
+              "evidence_origin": "reported",
+              "id": "a2f9e872-bcea-4a34-96f7-941b172c91ea",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "12ddbc04-cf77-4eca-83b4-f12caaaa1622",
+              "updated_at": "2026-09-26T14:28:54.114472+00:00",
+              "worktree": {
+                "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+                "observed_commit": null,
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+              "observed_commit": null,
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [],
+            "verification": "reported_only",
+            "worktree_matches": true
+          }
+        ],
+        "answer": {
+          "next_action": "Check the revised source"
+        },
+        "context_bytes": 1412
+      },
+      "direction": "cli_to_mcp"
+    },
+    {
+      "case": "dirty_pass",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "store_id": "29f61acb-51b3-4db6-948b-2f7ed30eaf00",
+        "memory_id": "codebase-bd4d34bf04e28bf90cd2"
+      },
+      "revision": 1,
+      "checkpoint_id": "24276203-2d52-4c75-b51e-96133495d157",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 0,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 1,
+                "fact_key": "nx04-dirty_pass-service",
+                "recorded_at": "2026-09-26T14:28:54Z",
+                "semantic_rev": 1,
+                "source_event_count": 1,
+                "source_event_id": "dirty_pass-first",
+                "source_event_ledger_hash": "624810ead7e545f98916cc629c53afe59f7454ff2fe2ca3a443a68b921959b78",
+                "source_kind": "code_observation",
+                "source_revision_ledger_hash": "080a9ed428559ef602668b4c00f114f1a11c3f6b02a435f0bdc154578e4d7f22",
+                "source_revisions": [
+                  1
+                ],
+                "source_session_id": "nx04-producer",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-bd4d34bf04e28bf90cd2",
+              "injection_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "agent",
+              "status": "active",
+              "strength": 70,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-bd4d34bf04e28bf90cd2",
+              "store_id": "29f61acb-51b3-4db6-948b-2f7ed30eaf00"
+            },
+            "provenance": {
+              "evidence_count": 1,
+              "source_events": [
+                {
+                  "content_hash": "e0cc81a3ae9a786c17139bddb6da065539ac0c4d34b94776a486d68def921b94",
+                  "finding_key": "service",
+                  "origin": "native-cli-fixture",
+                  "source_event_id": "dirty_pass-first",
+                  "source_kind": "code_observation",
+                  "source_session_id": "nx04-producer",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "code_observation",
+              "source_revisions": [
+                1
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "1ac2028ed0ebc6acc76ed404ba441525b57c38c9e5bddfaf955c3ed1320c5065",
+              "semantic_hash": "a2a5d9f7c27e6cf89d8be1260dbbb4f92f0d1d733100aa1655463491fe7af312",
+              "semantic_rev": 1
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:54.763612+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Revalidate after source change",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-cli-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [
+                  {
+                    "command": "python -c 'assert 1 == 1'",
+                    "cwd": ".",
+                    "executed_at": "2026-09-26T14:28:54.756494+00:00",
+                    "exit_code": 0,
+                    "summary_ref": "",
+                    "worktree_fingerprint": "fa5be37950fe154ee2124af61dbb7733ad47247159e370babd886d2effa13efc"
+                  }
+                ],
+                "unresolved": []
+              },
+              "evidence_origin": "reported",
+              "id": "24276203-2d52-4c75-b51e-96133495d157",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "29f61acb-51b3-4db6-948b-2f7ed30eaf00",
+              "updated_at": "2026-09-26T14:28:54.763612+00:00",
+              "worktree": {
+                "fingerprint": "fa5be37950fe154ee2124af61dbb7733ad47247159e370babd886d2effa13efc",
+                "observed_commit": "b68c30ea944cfb61e869c32ade83b6ff2f3be622",
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "755842ffab1f15a9e11f55e428ef87aa3ca267593439fcdadbcc82f458f1901d",
+              "observed_commit": "b68c30ea944cfb61e869c32ade83b6ff2f3be622",
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [
+              {
+                "command": "python -c 'assert 1 == 1'",
+                "needs_revalidation": true,
+                "origin": "reported",
+                "status": "reported_pass"
+              }
+            ],
+            "verification": "reported_only",
+            "worktree_matches": false
+          }
+        ],
+        "answer": {
+          "next_action": "Revalidate after source change"
+        },
+        "context_bytes": 1415
+      },
+      "direction": "cli_to_mcp"
+    },
+    {
+      "case": "isolated_project",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "store_id": "b4808136-1212-45be-b360-63ae0c15a0a7",
+        "memory_id": "codebase-e039d66d966a0b59aaa9"
+      },
+      "revision": 1,
+      "checkpoint_id": null,
+      "consumer": {
+        "memories": [],
+        "checkpoints": [],
+        "answer": {
+          "next_action": "unknown"
+        },
+        "context_bytes": 852
+      },
+      "direction": "cli_to_mcp"
+    },
+    {
+      "case": "failed_test",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "memory_id": "codebase-5c75e184435aa21f68b7",
+        "store_id": "1c3e5e37-9d5d-466d-8e0a-549dbdb7b67d"
+      },
+      "revision": 1,
+      "checkpoint_id": "e47f8053-e907-42d5-bf44-75076a5d1d87",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 1,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 1,
+                "fact_key": "ingest:15cd796446a5aee810752e49720cd187174c9174c0bf819cd68d9b71bc2c450b",
+                "recorded_at": "2026-09-26T14:28:55Z",
+                "semantic_rev": 1,
+                "source_event_count": 1,
+                "source_event_id": "2de62b643c5e058acfa6affe9e2b85d10a53c2b4450ffb0e27124d8f0305100f",
+                "source_event_ledger_hash": "43552a09c125210a9ef4e3be6fee231891bbdeb19320026de109f61f279a6e74",
+                "source_kind": "agent_inference",
+                "source_revision_ledger_hash": "080a9ed428559ef602668b4c00f114f1a11c3f6b02a435f0bdc154578e4d7f22",
+                "source_revisions": [
+                  1
+                ],
+                "source_session_id": "nx04-stop",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-5c75e184435aa21f68b7",
+              "injection_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "claude-code",
+              "status": "active",
+              "strength": 75,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-5c75e184435aa21f68b7",
+              "store_id": "1c3e5e37-9d5d-466d-8e0a-549dbdb7b67d"
+            },
+            "provenance": {
+              "evidence_count": 1,
+              "source_events": [
+                {
+                  "content_hash": "4a75d29c4eef39a763ccd0eae2f0f67d6f29430cd7e14e290dffa4794687fea7",
+                  "finding_key": "15cd796446a5aee810752e49720cd187174c9174c0bf819cd68d9b71bc2c450b",
+                  "origin": "claude-code",
+                  "source_event_id": "2de62b643c5e058acfa6affe9e2b85d10a53c2b4450ffb0e27124d8f0305100f",
+                  "source_kind": "agent_inference",
+                  "source_session_id": "nx04-stop",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "agent_inference",
+              "source_revisions": [
+                1
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "299aa4ab6a07b4cdb546da2909cd49366c021dc3bf8e94103bd804c22acdd660",
+              "semantic_hash": "85f2e01982b17d65c36c22f2a6ee1ef98aaa7e971c6c8ee166f9d60804786fb2",
+              "semantic_rev": 1
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:55.845231+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Fix the failing synthetic test",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-stop-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [
+                  {
+                    "command": "python -c 'assert 1 == 2'",
+                    "cwd": ".",
+                    "executed_at": "2026-09-26T14:28:55.837652+00:00",
+                    "exit_code": 1,
+                    "summary_ref": "",
+                    "worktree_fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec"
+                  }
+                ],
+                "unresolved": [
+                  "synthetic test failed"
+                ]
+              },
+              "evidence_origin": "reported",
+              "id": "e47f8053-e907-42d5-bf44-75076a5d1d87",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "1c3e5e37-9d5d-466d-8e0a-549dbdb7b67d",
+              "updated_at": "2026-09-26T14:28:55.845231+00:00",
+              "worktree": {
+                "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+                "observed_commit": null,
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+              "observed_commit": null,
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [
+              {
+                "command": "python -c 'assert 1 == 2'",
+                "needs_revalidation": false,
+                "origin": "reported",
+                "status": "reported_fail"
+              }
+            ],
+            "verification": "reported_only",
+            "worktree_matches": true
+          }
+        ],
+        "answer": {
+          "next_action": "Fix the failing synthetic test"
+        },
+        "context_bytes": 1429
+      },
+      "direction": "stop_to_cli"
+    },
+    {
+      "case": "revised_fact",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "memory_id": "codebase-b467fa4bce9d4db36227",
+        "store_id": "a57e609d-8d46-4e77-89cf-feebf7a0e69b"
+      },
+      "revision": 3,
+      "checkpoint_id": "44ff7ed2-0e0c-4420-afa5-2e2438e502e3",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 1,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "## Quartz-J9 service Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 2,
+                "fact_key": "ingest:3bd3b0091118c1fc555a3059b09638160fcf56bd718b014c870e45fcc54e7cd2",
+                "recorded_at": "2026-09-26T14:28:56Z",
+                "semantic_rev": 3,
+                "source_event_count": 2,
+                "source_event_id": "949bd60a3c262a097a8aa1b4b520458114b5944bdff6d040bd741d7eb0b0060b",
+                "source_event_ledger_hash": "6413e776e6bc6c7382987fd3fd8fbe0c60260325a1c5cb2ccd81a8969d85a30f",
+                "source_kind": "agent_inference",
+                "source_revision_ledger_hash": "49a64717d5d4cb19952e6eac2946415cf6879adacf9908e7d872332d32c6e684",
+                "source_revisions": [
+                  1,
+                  2
+                ],
+                "source_session_id": "nx04-stop",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-b467fa4bce9d4db36227",
+              "injection_summary": "## Quartz-J9 service Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "claude-code",
+              "status": "active",
+              "strength": 75,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-b467fa4bce9d4db36227",
+              "store_id": "a57e609d-8d46-4e77-89cf-feebf7a0e69b"
+            },
+            "provenance": {
+              "evidence_count": 2,
+              "source_events": [
+                {
+                  "content_hash": "2d5fbb4cf8ab7cc88a3dd42ece249878471f16285f646cb350957b1a1f5271c0",
+                  "finding_key": "3bd3b0091118c1fc555a3059b09638160fcf56bd718b014c870e45fcc54e7cd2",
+                  "origin": "claude-code",
+                  "source_event_id": "949bd60a3c262a097a8aa1b4b520458114b5944bdff6d040bd741d7eb0b0060b",
+                  "source_kind": "agent_inference",
+                  "source_session_id": "nx04-stop",
+                  "verification_state": "unverified"
+                },
+                {
+                  "content_hash": "a485026acc5d6ab9342300922634fc468a37b8af0d798d8e51ebb5f3481102a3",
+                  "finding_key": "service",
+                  "origin": "native-stop-fixture",
+                  "source_event_id": "revised_fact-confirmed",
+                  "source_kind": "code_observation",
+                  "source_session_id": "nx04-producer",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "agent_inference",
+              "source_revisions": [
+                1,
+                2
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "21506a1a4e8ac50afd55a9873a2b27124b7968329833e5f83c0839b8b8af9f46",
+              "semantic_hash": "6489a84d28671f0b6c62c70e1ce51eb3ee584d7b01de67988e04f055497c391c",
+              "semantic_rev": 3
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:56.782426+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Check the revised source",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-stop-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [],
+                "unresolved": []
+              },
+              "evidence_origin": "reported",
+              "id": "44ff7ed2-0e0c-4420-afa5-2e2438e502e3",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "a57e609d-8d46-4e77-89cf-feebf7a0e69b",
+              "updated_at": "2026-09-26T14:28:56.782426+00:00",
+              "worktree": {
+                "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+                "observed_commit": null,
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "a2041c96ee44cf3e20ccdb40643d24772da967ef894bef7b00f2543c15d926ec",
+              "observed_commit": null,
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [],
+            "verification": "reported_only",
+            "worktree_matches": true
+          }
+        ],
+        "answer": {
+          "next_action": "Check the revised source"
+        },
+        "context_bytes": 1402
+      },
+      "direction": "stop_to_cli"
+    },
+    {
+      "case": "dirty_pass",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "memory_id": "codebase-ede7d478733d0d84fcb4",
+        "store_id": "5b2b751c-5ad7-4571-b2f5-33977ce2cd96"
+      },
+      "revision": 1,
+      "checkpoint_id": "38ed9e75-2d2e-476b-a5e2-95cb0b42ca35",
+      "consumer": {
+        "memories": [
+          {
+            "applicability": {
+              "applies_to": null,
+              "branch": null,
+              "observed_commit": null,
+              "reason": "missing_applies_to",
+              "status": "unknown"
+            },
+            "memory": {
+              "access_count": 1,
+              "body": "## Quartz-J9 service\n\nQuartz-J9 uses SQLite on port 7429.",
+              "canonical_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "created": "2026-09-26",
+              "expires": "",
+              "extra": {
+                "evidence_count": 1,
+                "fact_key": "ingest:15cd796446a5aee810752e49720cd187174c9174c0bf819cd68d9b71bc2c450b",
+                "recorded_at": "2026-09-26T14:28:57Z",
+                "semantic_rev": 1,
+                "source_event_count": 1,
+                "source_event_id": "2de62b643c5e058acfa6affe9e2b85d10a53c2b4450ffb0e27124d8f0305100f",
+                "source_event_ledger_hash": "43552a09c125210a9ef4e3be6fee231891bbdeb19320026de109f61f279a6e74",
+                "source_kind": "agent_inference",
+                "source_revision_ledger_hash": "080a9ed428559ef602668b4c00f114f1a11c3f6b02a435f0bdc154578e4d7f22",
+                "source_revisions": [
+                  1
+                ],
+                "source_session_id": "nx04-stop",
+                "verification_state": "unverified"
+              },
+              "id": "codebase-ede7d478733d0d84fcb4",
+              "injection_summary": "Quartz-J9 service: Quartz-J9 uses SQLite on port 7429.",
+              "last_accessed": "2026-09-26",
+              "links": [],
+              "source": "claude-code",
+              "status": "active",
+              "strength": 75,
+              "tags": [],
+              "type": "codebase"
+            },
+            "memory_ref": {
+              "memory_id": "codebase-ede7d478733d0d84fcb4",
+              "store_id": "5b2b751c-5ad7-4571-b2f5-33977ce2cd96"
+            },
+            "provenance": {
+              "evidence_count": 1,
+              "source_events": [
+                {
+                  "content_hash": "4a75d29c4eef39a763ccd0eae2f0f67d6f29430cd7e14e290dffa4794687fea7",
+                  "finding_key": "15cd796446a5aee810752e49720cd187174c9174c0bf819cd68d9b71bc2c450b",
+                  "origin": "claude-code",
+                  "source_event_id": "2de62b643c5e058acfa6affe9e2b85d10a53c2b4450ffb0e27124d8f0305100f",
+                  "source_kind": "agent_inference",
+                  "source_session_id": "nx04-stop",
+                  "verification_state": "unverified"
+                }
+              ],
+              "source_kind": "agent_inference",
+              "source_revisions": [
+                1
+              ],
+              "verification_state": "unverified"
+            },
+            "revision": {
+              "raw_hash": "363eeddd8aab884a331414061a08397ba549b75b4b14574475fe27bbdd691d1f",
+              "semantic_hash": "1fa72ec5ed3dbbd67b8bb2f1cc745a82e0f0593369a71e0cc157e0c77ec0c8d7",
+              "semantic_rev": 1
+            },
+            "version": 2
+          }
+        ],
+        "checkpoints": [
+          {
+            "checkpoint": {
+              "created_at": "2026-09-26T14:28:57.523157+00:00",
+              "data": {
+                "artifacts": [],
+                "completed_actions": [],
+                "expires": "2099-01-01T00:00:00Z",
+                "goal": "Continue Quartz-J9 verification",
+                "next_action": "Revalidate after source change",
+                "scoped_paths": [
+                  "service.txt"
+                ],
+                "source_agent": "native-stop-fixture",
+                "source_session": "nx04-producer",
+                "task_id": "Quartz-J9",
+                "tests": [
+                  {
+                    "command": "python -c 'assert 1 == 1'",
+                    "cwd": ".",
+                    "executed_at": "2026-09-26T14:28:57.516017+00:00",
+                    "exit_code": 0,
+                    "summary_ref": "",
+                    "worktree_fingerprint": "d47f563d25208f4e4d93ffd7ec205d77f62d35885f5ec0da4c18453f9cfc08ca"
+                  }
+                ],
+                "unresolved": []
+              },
+              "evidence_origin": "reported",
+              "id": "38ed9e75-2d2e-476b-a5e2-95cb0b42ca35",
+              "revision": 1,
+              "schema_version": 1,
+              "state": "active",
+              "store_id": "5b2b751c-5ad7-4571-b2f5-33977ce2cd96",
+              "updated_at": "2026-09-26T14:28:57.523157+00:00",
+              "worktree": {
+                "fingerprint": "d47f563d25208f4e4d93ffd7ec205d77f62d35885f5ec0da4c18453f9cfc08ca",
+                "observed_commit": "1ecaec63a34da2c52a5020bff5916eddc7ae3edd",
+                "scoped_paths": [
+                  "service.txt"
+                ]
+              }
+            },
+            "current_worktree": {
+              "fingerprint": "145823ae94f96efbd1fec389722fd3d9a8c20b7b56d737bffad590bd12a1c0d3",
+              "observed_commit": "1ecaec63a34da2c52a5020bff5916eddc7ae3edd",
+              "scoped_paths": [
+                "service.txt"
+              ]
+            },
+            "expired": false,
+            "test_results": [
+              {
+                "command": "python -c 'assert 1 == 1'",
+                "needs_revalidation": true,
+                "origin": "reported",
+                "status": "reported_pass"
+              }
+            ],
+            "verification": "reported_only",
+            "worktree_matches": false
+          }
+        ],
+        "answer": {
+          "next_action": "Revalidate after source change"
+        },
+        "context_bytes": 1405
+      },
+      "direction": "stop_to_cli"
+    },
+    {
+      "case": "isolated_project",
+      "invocation_status": "completed",
+      "protocol_status": "valid",
+      "quality_status": "passed",
+      "memory_ref": {
+        "memory_id": "codebase-371566b74db02221a840",
+        "store_id": "1019dad6-003e-4fd0-9ba6-dfb989ced6a4"
+      },
+      "revision": 1,
+      "checkpoint_id": null,
+      "consumer": {
+        "memories": [],
+        "checkpoints": [],
+        "answer": {
+          "next_action": "unknown"
+        },
+        "context_bytes": 850
+      },
+      "direction": "stop_to_cli"
+    }
+  ]
+}

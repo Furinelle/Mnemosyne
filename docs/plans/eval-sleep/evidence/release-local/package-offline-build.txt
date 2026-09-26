@@ -1,0 +1,4 @@
+   Compiling mnemosyne v2.0.2 (/private/var/folders/yb/k8wzm7kn15vdmrmd0dkdsz4r0000gn/T/mnemosyne-acceptance-cecepgq7/package/mnemosyne-2.0.2)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.71s
+
+EXIT_CODE=0

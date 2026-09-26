@@ -8,9 +8,9 @@
 
 [English](README.md) · [迁移与兼容说明](docs/rust-migration.md)
 
-## v2.0.1
+## v2.0.2
 
-v2.0.1 新增显式来源、任务检查点、语义修订历史、按系统时间查询、保守 Git
+v2 包含显式来源、任务检查点、语义修订历史、按系统时间查询、保守 Git
 适用性、审批提案、按日维护、有界离线 sleep、派生来源索引及可校验目录快照。
 具体契约见 [接口文档](docs/interface.md)，实际验证见
 [执行记录](docs/plans/native-evolution/EXECUTION_LOG.md)。
@@ -18,15 +18,17 @@ v2.0.1 新增显式来源、任务检查点、语义修订历史、按系统时�
 这是 Rust crate 的破坏性发布：公开结构体新增字段可能破坏下游字面量构造。CLI
 兼容不等于 crate 源码兼容；八个 MCP 工具名称与原生 aliases 保持兼容。
 
-2.0.1 修复升级后 ingest／Stop／蒸馏写入、结构化冲突分类及修订后来源追加，
-并让 sleep 在单页字节预算内返回可继续处理的分页。
+2.0.2 补齐 sleep 输出分页及原子收据，支持源变化后的已提交页重放，快照保留已完成
+收据，并修正评测质量判分。未完成的 sleep 快照、含 sleep 收据的 fork 会明确拒绝。
+自用 V2 基线覆盖 100／1,000 条；离线生产者／消费者验证不等于真实模型或宿主验收。
+详见[验收与限制](docs/plans/eval-sleep/ACCEPTANCE.md)。
 
 ## 下载
 
-- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-aarch64-apple-darwin.tar.gz)
-- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-x86_64-unknown-linux-gnu.tar.gz)
-- [源码包](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-source.tar.gz)
-- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/SHA256SUMS)
+- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-aarch64-apple-darwin.tar.gz)
+- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-x86_64-unknown-linux-gnu.tar.gz)
+- [源码包](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-source.tar.gz)
+- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/SHA256SUMS)
 
 安装前请用 `SHA256SUMS` 校验下载文件。发布二进制包含可执行文件及发布文档；ONNX
 Runtime、模型文件和 `vocab.txt` 是外部依赖，未被捆绑。
@@ -172,7 +174,7 @@ cargo run --locked -- eval run --longmemeval --pipeline full --min-recall 0.95
 它们不属于安装后的记忆内核，也不构成运行时依赖。模型 smoke test 需要另行提供本地模型；
 假服务协议测试不能证明真实模型质量。内置 LongMemEval 样本也不等于完整公开基准。
 
-v2.0.1 测试套件包含 159 项测试；Linux 与 macOS CI 运行发布检查。本地宿主 hook 检查覆盖
+v2.0.2 测试套件包含 181 项测试；Linux 与 macOS CI 运行发布检查。本地宿主 hook 检查覆盖
 协议行为，不等于四个真实模型对话验收；可选 ONNX 模型验收取决于本机环境。此版本不作
 笼统的性能提升承诺。
 

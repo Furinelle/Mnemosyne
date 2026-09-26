@@ -1,0 +1,317 @@
+
+running 58 tests
+test adapters::tests::output_keeps_permissions_untouched_and_stop_is_not_reentrant ... ok
+test context::tests::mcp_exposure_filters_explicit_stores ... ok
+test context::tests::budget_covers_mandatory_content_and_only_selects_rendered_items ... ok
+test adapters::tests::stop_detects_source_and_install_only_describes_configuration ... ok
+test adapters::tests::auto_init_stays_in_nearest_repository_and_honors_opt_out ... ok
+test adapters::tests::maintenance_claim_is_per_store_and_once_per_day ... ok
+test context::tests::applicability_changes_refresh_delivered_context ... ok
+test context::tests::session_dedup_is_locked_and_distinguishes_stores ... ok
+test ingest::tests::codex_roles_are_preserved ... ok
+test ingest::tests::findings_and_host_respect_role ... ok
+test input::tests::bounded_read_does_not_consume_an_unlimited_stream ... ok
+test mcp::tests::protocol_errors_and_notifications ... ok
+test context::tests::file_paths_never_deliver_expired_or_superseded_memories ... ok
+test models::tests::http_vectors_reorder_and_reject_invalid_indices_and_values ... ok
+test models::tests::wordpiece_preserves_chinese_and_subwords ... ok
+test models::tests::explicit_revision_and_same_size_local_asset_changes_invalidate_profile ... ok
+test context::tests::only_rendered_memories_receive_access_credit ... ok
+test api::tests::complementary_facts_and_changed_values_survive ... ok
+test context::tests::file_touch_prefers_repo_paths_before_basename ... ok
+test context::tests::revision_epoch_and_heat_have_correct_session_identity ... ok
+test relations::tests::committed_mutation_recovers_partial_current_materialization ... ok
+test relations::tests::cross_store_links_keep_reverse_status_and_reject_cycles ... ok
+test relations::tests::mutation_commits_evidence_with_history ... ok
+test relations::tests::mutation_moves_markdown_with_absence_cas ... ok
+test relations::tests::mutation_never_claims_preexisting_history_image ... ok
+test relations::tests::cross_store_recovery_preserves_external_edits_and_rejects_journal_tampering ... ok
+test relations::tests::mutation_rejects_corrupt_hash_and_cleans_prepared_snapshot ... ok
+test relations::tests::mutation_rejects_invalid_targets_before_intent_and_preserves_conflicts ... ok
+test relations::tests::partial_commit_recovers_but_external_edit_is_preserved ... ok
+test relations::tests::typed_links_are_idempotent_and_graph_honors_depth ... ok
+test schema::tests::quoted_commas_and_unknown_fields_round_trip ... ok
+test eval::tests::external_converted_corpus_is_used_in_longmemeval_mode ... ok
+test context::tests::busy_session_state_does_not_drop_recall ... ok
+test search::tests::cjk_bigrams_match_and_expired_entries_do_not_consume_the_limit ... ok
+test search::tests::default_indexed_search_reports_fts_not_bm25 ... ok
+test relations::tests::upgraded_links_record_both_histories_without_duplicate_revisions ... ok
+test relations::tests::single_store_mutation_recovers_at_durable_stages ... ok
+test search::tests::graph_expansion_obeys_hops_and_boost_cap ... ok
+test sleep::tests::abrupt_commit_child ... ok
+test search::tests::mixed_fts_and_short_cjk_lanes_are_merged ... ok
+test search::tests::legacy_bare_links_resolve_the_first_store_target ... ok
+test search::tests::incremental_sync_refreshes_manual_canonical_edits_and_removes_deleted_files ... ok
+test store::tests::secure_atomic_round_trip ... ok
+test relations::tests::cross_store_interruption_recovers_at_every_durable_stage ... ok
+test relations::tests::upgraded_cross_store_link_records_both_histories ... ok
+test search::tests::superseded_is_filtered_and_vector_failure_degrades_to_lexical ... ok
+test vectors::tests::body_change_and_model_dimension_change_fail_the_write_cas ... ok
+test vectors::tests::access_only_change_reuses_the_vector_and_invalid_vectors_are_ignored ... ok
+test vectors::tests::corrupt_sqlite_and_missing_cache_preserve_lexical_results ... ok
+test vectors::tests::inference_config_changes_are_stale_and_calls_are_unlocked ... ok
+test vectors::tests::query_discards_profile_and_local_asset_changes ... ok
+test vectors::tests::invalid_provider_results_never_commit_and_batch_failure_rolls_back ... ok
+test vectors::tests::corrupt_vectors_are_repaired_and_diagnostics_distinguish_states ... ok
+test relations::tests::cross_store_mutation_keeps_history_with_decision ... ok
+test sleep::tests::abrupt_process_exit_retries_committed_output_without_response ... ok
+test eval::tests::full_names_the_actual_disabled_lanes ... ok
+test eval::tests::default_real_search_gate_meets_the_fixed_threshold ... ok
+test sleep::tests::output_transaction_recovers_every_boundary_and_materialization_prefix ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.33s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test global_or_unsafe_evidence_is_unknown ... ok
+test malformed_exact_evidence_is_unknown ... ok
+test gitlink_prevents_worktree_status_check ... ok
+test exact_commit_is_conservative_for_old_and_dirty_worktrees ... ok
+test tree_requires_cleanliness_and_paths_distinguish_same_basenames ... ok
+test evaluation_does_not_run_local_clean_filter ... ok
+test evaluation_does_not_run_repo_fsmonitor_or_change_index ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+
+running 5 tests
+test r06_real_commit_does_not_hide_dirty_content_or_allow_symlinks ... ok
+test r06_failures_plans_and_changed_workspace_remain_honest ... ok
+test r06_expiry_close_and_corrupt_records_do_not_leak_into_context ... ok
+test r06_updates_compare_revision_and_close_preserves_record ... ok
+test r06_twelve_directed_host_handoffs_use_same_native_contract ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+
+running 2 tests
+test bundle_budget_includes_core_checkpoint_warning_and_hint ... ok
+test checkpoint_next_action_is_never_lost_to_memory_summary_truncation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test mcp_semantic_relations_and_body_rewrites_are_pending ... ok
+test cli_and_mcp_proposals_keep_human_approval_boundary ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 5 tests
+test r08_a03_before_legacy_adoption_is_partial_and_unknown ... ok
+test r08_a02_expiry_is_evaluated_on_the_query_calendar_date ... ok
+test r08_a01_search_uses_half_open_revision_windows_and_list_show ... ok
+test r08_a05_history_reads_do_not_change_canonical_usage_expiry_or_caches ... ok
+test r08_a04_historical_results_exclude_future_supersedes_vectors_and_events ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+
+running 1 test
+test r00_same_fixture_cli_mcp_fields_and_aliases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+
+running 2 tests
+test r05_a06_cli_mcp_hook_share_candidates_and_estimated_budget ... ok
+test r04_a07_cli_mcp_versions_preview_and_copy_restore ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+
+running 4 tests
+test decay_configuration_never_grants_heat_or_overflows ... ok
+test dry_run_leaves_history_unchanged_and_commit_adds_one_revision ... ok
+test per_day_initializes_once_and_per_run_remains_per_invocation ... ok
+test per_day_clamps_clock_rollback_and_keeps_pinned_validity_policy ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+
+running 5 tests
+test malformed_envelopes_cannot_write ... ok
+test notifications_never_reply_or_execute_mutating_tools ... ok
+test initialization_negotiates_the_declared_version_and_preserves_legacy_direct_calls ... ok
+test protocol_errors_are_distinct_from_tool_execution_errors ... ok
+test stdio_is_bounded_and_invalid_utf8_does_not_kill_the_next_request ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+
+running 9 tests
+test preview_does_not_adopt_legacy_markdown_after_upgrade ... ok
+test upgraded_heuristic_distill_commits_with_unverified_provenance ... ok
+test native_stop_accepts_three_transcripts_with_source_roles_and_replay_intact ... ok
+test preview_supports_unadopted_v2_sidecar_without_creating_history ... ok
+test upgraded_ingest_preview_matches_v2_without_writing_and_keeps_evidence ... ok
+test cli_and_mcp_sleep_output_pages_advance_cursor_only_on_complete_replay ... ok
+test antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate ... ok
+test native_host_event_envelopes_need_no_python_and_never_grant_tool_permission ... ok
+test upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+
+running 7 tests
+test sleep_replay_bounds_and_stale_input_do_not_advance_cursor ... ok
+test reconciliation_distinguishes_context_conflict_and_multivalue ... ok
+test approval_hash_cas_idempotence_and_compensation ... ok
+test changed_target_stales_all_and_undo_never_overwrites_new_edit ... ok
+test relation_proposals_are_mirrored_and_supersede_has_a_replacement ... ok
+test relation_checks_all_endpoints_and_undo_rejects_new_dependency ... ok
+test reviewed_refinement_and_contradiction_add_both_edges ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s
+
+
+running 9 tests
+test unknown_flat_fields_round_trip_without_read_migration ... ok
+test sidecar_identity_and_read_size_are_checked ... ok
+test request_schema_and_payload_identity_are_strict ... ok
+test pre_binding_ledger_keeps_unknown_old_revision_and_binds_new_source ... ok
+test corrected_fact_accepts_new_support_without_rewriting_old_sources ... ok
+test explicit_upgrade_and_source_ledger ... ok
+test concurrent_replay_and_stable_refs ... ok
+test reviewed_refine_and_undo_can_support_the_resulting_fact ... ok
+test support_rechecks_live_markdown_and_inactive_state ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.08s
+
+
+running 2 tests
+test independent_support_replay_and_conflicting_append ... ok
+test classification_prioritizes_scope_cardinality_and_value ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+
+running 6 tests
+test historical_cli_and_mcp_share_read_only_contract ... ok
+test cross_store_links_reject_mixed_writer_protocols ... ok
+test old_v2_store_requires_explicit_writer_upgrade_before_history ... ok
+test archive_is_semantic_even_when_status_does_not_change ... ok
+test revisions_cli_mcp_cas_heat_and_canonical_rebuild ... ok
+test maintenance_and_relations_record_semantics_without_heat_history ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+
+running 6 tests
+test future_writer_manifest_cannot_disable_history_silently ... ok
+test legacy_adoption_preserves_raw_and_external_edit_has_gap ... ok
+test stale_semantic_snapshot_conflicts_but_heat_does_not ... ok
+test revisions_ignore_heat_and_capture_semantic_edits ... ok
+test source_support_is_versioned_and_replay_is_idempotent ... ok
+test concurrent_show_keeps_source_ledger_and_semantic_revision_together ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s
+
+
+running 8 tests
+test sqlite_cache_symlink_cannot_modify_another_file ... ok
+test installation_preview_does_not_modify_host_and_config_hides_endpoints ... ok
+test mcp_project_path_works_without_host_project_cwd ... ok
+test mcp_respects_exposure_and_has_no_stdout_noise ... ok
+test concurrent_replays_write_once ... ok
+test native_cli_round_trip_chinese_and_safety ... ok
+test legacy_markdown_and_aliases_work_without_python ... ok
+test consolidation_retains_different_values_and_old_evidence ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 24 tests
+test access_metadata_rewrite_invalidates_the_exported_snapshot ... ok
+test failed_or_partial_proposal_import_does_not_advance_cursor ... ok
+test input_links_and_output_links_are_rejected ... ok
+test importing_a_proposal_does_not_observe_or_stale_later_pages ... ok
+test changed_unread_record_invalidates_cursor ... ok
+test legacy_completed_batch_replays_without_rewriting_old_evidence ... ok
+test committed_replay_survives_source_change_and_cannot_overwrite_new_run ... ok
+test oversized_input_is_reported_without_a_cursor_write ... ok
+test concurrent_page_retries_are_identical_and_replay_cannot_rewind ... ok
+test invalid_records_do_not_hide_valid_work_or_allow_a_complete_report ... ok
+test missing_output_cannot_be_replaced_by_a_duplicate_or_final_page ... ok
+test output_order_content_limits_and_empty_terminal_are_explicit ... ok
+test replaced_unread_record_with_same_size_and_mtime_is_stale ... ok
+test relation_import_remains_pending_and_never_edits_facts ... ok
+test pending_outputs_block_other_batches_and_keep_blocked_counts ... ok
+test pages_are_bounded_and_include_checkpoint_metadata_without_checkpoint_content ... ok
+test replay_is_idempotent_and_changed_source_is_stale ... ok
+test rules_are_offline_metadata_only_and_redact_source_bodies ... ok
+test upgraded_store_observes_only_exported_memory_and_keeps_cursor_valid ... ok
+test replay_preserves_reviewed_proposals_and_sealed_output ... ok
+test large_store_pages_by_byte_budget_and_rules_can_finish_each_page ... ok
+test long_valid_ids_page_before_receipt_metadata_exceeds_budget ... ok
+test file_inventory_remains_capped_before_reading_bodies ... ok
+test paged_outputs_exceed_old_total_budgets_without_early_input_commit ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.85s
+
+
+running 9 tests
+test snapshot_rejects_links_and_pending_journal ... ok
+test restore_rejects_tampering_without_publishing ... ok
+test sleep_snapshot_rejects_symlinks_and_hardlinks ... ok
+test completed_legacy_sleep_report_is_preserved ... ok
+test snapshot_restore_and_fork_keep_distinct_identity ... ok
+test abandoned_old_sleep_output_preserves_receipt_after_new_inventory_completes ... ok
+test sleep_partial_input_refused_until_complete ... ok
+test sleep_partial_output_refused_completed_receipts_restore_and_fork_refused ... ok
+test sleep_snapshot_rejects_malformed_records_without_publishing ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
+
+
+running 6 tests
+test r01_a02_complementary_and_changed_ports_coexist ... ok
+test r01_a04_working_superseded_stays_invalid_after_repeated_maintenance ... ok
+test r01_a05_archiving_does_not_make_superseded_searchable ... ok
+test r01_a06_superseded_never_becomes_core_and_valid_behavior_is_unchanged ... ok
+test r01_a03_small_text_changes_and_metadata_are_not_duplicates ... ok
+test r01_a01_all_ingress_preserves_sources_and_same_source_replay ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+
+running 4 tests
+test unsafe_names_and_changed_managed_views_are_rejected ... ok
+test missing_refs_are_explicitly_partial_and_managed_edits_conflict ... ok
+test checked_view_can_be_explicitly_unmanaged ... ok
+test generated_index_is_traceable_not_evidence_and_stales_on_source_change ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+   Compiling mnemosyne v2.0.1 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.30s
+     Running unittests src/lib.rs (target/debug/deps/mnemosyne-3322b23691abbc10)
+     Running unittests src/main.rs (target/debug/deps/mnemosyne-cb6f90142b647088)
+     Running tests/applicability.rs (target/debug/deps/applicability-b3aab80565b9df8d)
+     Running tests/checkpoints.rs (target/debug/deps/checkpoints-483ab66b16437605)
+     Running tests/context_bundle.rs (target/debug/deps/context_bundle-f20e9731987923c7)
+     Running tests/evolution_contract.rs (target/debug/deps/evolution_contract-8b11b4507fcc02e1)
+     Running tests/history.rs (target/debug/deps/history-1eb28e103356cc32)
+     Running tests/interface_contract.rs (target/debug/deps/interface_contract-e7ae336d33222a8f)
+     Running tests/m1_contract.rs (target/debug/deps/m1_contract-346c241d266636eb)
+     Running tests/maintenance.rs (target/debug/deps/maintenance-d9c16aec53374358)
+     Running tests/mcp_boundaries.rs (target/debug/deps/mcp_boundaries-53d107dc9d531c7a)
+     Running tests/native_only.rs (target/debug/deps/native_only-47b128eeddf45ccf)
+     Running tests/proposals.rs (target/debug/deps/proposals-d829ce5e7d8bf198)
+     Running tests/provenance_v2.rs (target/debug/deps/provenance_v2-d11ca847862c2cbd)
+     Running tests/reconciliation.rs (target/debug/deps/reconciliation-f6b03a3d92c09304)
+     Running tests/revision_contract.rs (target/debug/deps/revision_contract-55e91e2a4c5a0f40)
+     Running tests/revisions.rs (target/debug/deps/revisions-06a1d31d49a12d51)
+     Running tests/rust_cli.rs (target/debug/deps/rust_cli-962daecb5ec4c65b)
+     Running tests/sleep.rs (target/debug/deps/sleep-ab92a026f38c0ff0)
+     Running tests/snapshots.rs (target/debug/deps/snapshots-ade0c6520167010a)
+     Running tests/source_lifecycle.rs (target/debug/deps/source_lifecycle-7f004775978bd9ce)
+     Running tests/views.rs (target/debug/deps/views-0bb3b1f1971dcaa4)
+
+EXIT_CODE=0

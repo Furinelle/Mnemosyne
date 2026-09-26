@@ -129,7 +129,7 @@
         },
         "request": {
           "type": "object",
-          "description": "Version 2 structured operation request. Body rewrites and semantic relations generate pending proposals; never executes commands."
+          "description": "Version 2 structured operation request. Body rewrites and semantic relations generate pending proposals; never executes commands. sleep_import takes {batch, proposals, output?: {index, total}}: zero-based output pages, at most 20 proposals per page; input progress commits only after all pages."
         }
       },
       "oneOf": [

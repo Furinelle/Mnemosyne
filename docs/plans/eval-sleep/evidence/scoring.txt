@@ -1,0 +1,8 @@
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.000s
+
+OK
+
+COMMAND=python3 tests/native_eval_scoring_test.py
+EXIT_CODE=0

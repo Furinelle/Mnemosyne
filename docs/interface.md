@@ -413,11 +413,29 @@ Heat and maintenance accounting do not increase verification or semantic revisio
 `maintain --dry-run` does not update canonical records or history.
 
 `sleep rules|export|import|cursor` is explicit, offline and bounded. Export returns
-input references/revisions and a snapshot-bound cursor; import accepts
-`{"batch": <export>, "proposals": [...]}`. Host output creates pending proposals,
-never approved changes. Failed output does not advance the cursor; replay uses
-content-addressed proposal IDs. Reports use metadata rather than private
-transcripts. There is no background scheduler or implicit external model call.
+input references/revisions and a snapshot-bound cursor. Import accepts
+`{"batch": <export>, "proposals": [...], "output": {"index": 0, "total": 3}}`.
+`output` is optional for a single page; indices are zero-based and the declared
+page total (1–1000) cannot change. Submit pages in order. Each page returns a
+version-2 receipt with `store_id`, `run_id`, `receipt_id`, `next_output`, `input_committed`, and
+`status`. Retrying the exact same page returns its receipt; changed content at
+that index conflicts. Exact committed retries remain valid after the source or
+proposal changes; they return the saved receipt without changing either proposal
+state or current progress. Read the committed input position with `sleep cursor`.
+Finish all output pages for the current input batch before importing the next
+input batch. Exporting ahead is allowed. A pending run reserves the input cursor
+without advancing it. The final page commits progress with proposals, report,
+and run state in the existing recovery transaction. Pending proposals require
+separate approval; sleep never approves or edits facts. Legacy batch-v1 inputs
+and completed v1 reports remain readable and replayable.
+
+Reports contain bounded metadata pages, never transcript copies. `partial` on an
+input batch means more inventory remains. `blocked` lists rejected oversized or
+malformed records; valid records can still proceed. Cursor/report `status` stays
+`partial` after the last input when any records were blocked. Repair those records
+and restart at zero before claiming a complete review. A source or access-metadata
+rewrite invalidates the snapshot; restart at zero, abandoning the stale pending
+run. There is no scheduler or implicit external model call.
 
 `view generate` accepts `{ "name": "architecture", "references": [
 {"memory_ref":{"store_id":"UUID","memory_id":"ID"},"revision":1}],
@@ -430,7 +448,7 @@ is never rewritten by views.
 
 `snapshot DESTINATION` creates a new standard directory containing `files/` and a
 SHA-256 manifest. It includes canonical Markdown, store identity, history,
-evidence, checkpoints and proposals; it excludes config/credentials, caches,
+evidence, checkpoints, proposals and completed sleep receipts; it excludes config/credentials, caches,
 models and raw transcripts. Detected credential material rejects the snapshot
 rather than silently altering history. `restore SOURCE TARGET [--fork]` verifies
 paths, bounded sizes, links, hashes and schema before publishing a new target;
@@ -439,6 +457,13 @@ index. Restore preserves identity for replacement of an offline original; fork
 assigns a new identity and remaps structured references. Never run restored copies
 with the same identity concurrently. Pending cross-store decisions must be
 resolved before a portable snapshot is created.
+An unfinished current sleep continuation also refuses snapshot/restore: its
+inventory identity contains filesystem metadata that cannot survive relocation.
+Completed v2 receipts remain replayable after restore; new scans start at zero.
+Abandoned old runs are preserved once the current scan completes. Forking a
+snapshot containing sleep records is explicitly unsupported, avoiding reuse of
+the original store's receipt identity. Older snapshot readers reject these new
+paths; snapshots produced before this change cannot recover omitted receipts.
 
 Semantic relation proposals use two ordered `targets`: source first, target
 second, both with `memory_ref`, `expected_rev` and `expected_hash`. `REFINE`,
@@ -460,20 +485,19 @@ their existing behavior. MCP write also exposes `sleep_export`, `sleep_rules`,
 `sleep_import`, `view_generate`; show version 2 accepts kinds `proposal` and `view`.
 Snapshot, restore and proposal approval remain trusted administrative CLI commands.
 
-Sleep batches allow 1–100 inputs, at most 20 imported proposals and a 64 KiB
-report/output budget. The directory inventory is capped at 10,000 records and
-individual records at 128 KiB. Since 2.0.1, the 4 MiB canonical input budget applies
-to each page, not the whole store: a page stops at its item/byte limit and returns
-`partial` and `next_cursor`. Checkpoints contribute references and revisions only.
-The cursor snapshot binds paths, sizes, modification times and (on Unix) inode /
-change times. Page-local history adoption refreshes the returned snapshot; carry
-that snapshot into the next request. External source changes require restarting
-from cursor zero. Invalid records, inventories above the count cap, and oversized
-proposal/output requests still fail explicitly; they are not silently truncated.
-Export observes only the current page rather than reading all canonical bodies.
-It recovers pending relation journals, but does not scan unpublished provenance
-sidecars; normal writer recovery handles those before they become visible inputs.
-Deduplicated proposals make replay safe.
+Sleep batches allow 1–100 inventory entries and at most 4 MiB of canonical input
+per page; the inventory itself has a 10,000-entry hard ceiling. Single records
+are capped at 128 KiB. Export also pages before serialized metadata exceeds
+48 KiB so receipt overhead stays inside its 64 KiB budget. Each output page
+allows at most 20 proposals, a 64 KiB serialized proposal array, and a 64 KiB
+receipt. Larger aggregate output is submitted and returned in multiple pages;
+large individual requests still fail. Checkpoints contribute references and
+revisions only. The cursor snapshot binds paths, sizes, modification times and
+(on Unix) inode/change times. Page-local history adoption refreshes the snapshot;
+carry it into the next request. Unsafe paths, symlinks/hardlinks, invalid cursors
+and oversized inventories fail explicitly. Export reads bounded page bodies and
+recovers pending relation journals; normal writer recovery handles unpublished
+provenance sidecars before they become visible inputs.
 
 Checkpoint summaries are kept whole rather than shortened by memory
 `summary_chars`, so the next action and verification limits cannot disappear

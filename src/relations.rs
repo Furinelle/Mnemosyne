@@ -273,6 +273,15 @@ fn checked_mutation_path(store: &Store, path: &Path) -> Result<PathBuf> {
                 "Invalid evidence target"
             );
         }
+        [Component::Normal(root), Component::Normal(_)] if *root == "sleep" => {
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            ensure!(
+                path.extension().is_some_and(|ext| ext == "json")
+                    && (stem == "cursor"
+                        || (stem.len() == 64 && stem.bytes().all(|b| b.is_ascii_hexdigit()))),
+                "Invalid sleep mutation target"
+            );
+        }
         _ => anyhow::bail!("Mutation target outside memory directories"),
     }
     ensure!(
@@ -287,6 +296,11 @@ fn checked_mutation_path(store: &Store, path: &Path) -> Result<PathBuf> {
                 ensure!(!meta.file_type().is_symlink(), "Symlink in mutation target");
                 if index + 1 == parts.len() {
                     ensure!(meta.is_file(), "Mutation target is not a file");
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::MetadataExt;
+                        ensure!(meta.nlink() == 1, "Hardlink mutation target");
+                    }
                 } else {
                     ensure!(meta.is_dir(), "Mutation parent is not a directory");
                 }
@@ -410,6 +424,24 @@ fn materialize(path: &Path, after: Option<&str>) -> Result<()> {
     }
 }
 
+#[cfg(test)]
+std::thread_local! {
+    pub(crate) static ABORT_RECOVERY_AFTER: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn recovery_materialized_checkpoint() {
+    ABORT_RECOVERY_AFTER.with(|remaining| {
+        let count = remaining.get();
+        if count > 0 {
+            remaining.set(count - 1);
+            if count == 1 {
+                std::process::abort();
+            }
+        }
+    });
+}
+
 fn recover_mutation(
     store: &Store,
     journal_path: &Path,
@@ -451,18 +483,24 @@ fn recover_mutation(
         is_snapshot(relative)
     }) {
         materialize(target, after.as_deref())?;
+        #[cfg(test)]
+        recovery_materialized_checkpoint();
     }
     for (target, after) in pending.iter().filter(|(path, _)| {
         let relative = path.strip_prefix(&store.root).unwrap();
         !is_snapshot(relative) && !is_manifest(relative)
     }) {
         materialize(target, after.as_deref())?;
+        #[cfg(test)]
+        recovery_materialized_checkpoint();
     }
     for (target, after) in pending
         .iter()
         .filter(|(path, _)| is_manifest(path.strip_prefix(&store.root).unwrap()))
     {
         materialize(target, after.as_deref())?;
+        #[cfg(test)]
+        recovery_materialized_checkpoint();
     }
     fs::remove_file(journal_path)?;
     File::open(&store.root)?.sync_all()?;
@@ -608,7 +646,7 @@ fn write_snapshots(store: &Store, journal: &MutationJournal) -> Result<()> {
     Ok(())
 }
 
-fn execute_mutation_with_checkpoint(
+pub(crate) fn execute_mutation_with_checkpoint(
     store: &Store,
     plan: MutationPlan,
     mut checkpoint: impl FnMut(usize) -> Result<()>,

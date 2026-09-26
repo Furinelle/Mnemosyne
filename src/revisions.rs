@@ -88,7 +88,7 @@ fn history_enabled(store: &Store) -> Result<bool> {
     }
 }
 
-fn safe_id(id: &str) -> Result<()> {
+pub(crate) fn safe_id(id: &str) -> Result<()> {
     ensure!(
         !id.is_empty()
             && id

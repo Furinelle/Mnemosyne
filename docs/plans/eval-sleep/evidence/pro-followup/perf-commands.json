@@ -1,0 +1,52 @@
+[
+  {
+    "command": [
+      "python3",
+      "tests/native_perf.py",
+      "target/release/mnemosyne",
+      "--profile",
+      "v2-current",
+      "--records",
+      "100",
+      "--records",
+      "1000",
+      "--samples",
+      "5",
+      "--command-timeout",
+      "120",
+      "--overall-timeout",
+      "600",
+      "--commit",
+      "a0da375a872001b57cb4f259492961de6edc2de6+uncommitted",
+      "--output",
+      "docs/plans/eval-sleep/evidence/pro-followup/v2-current.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 210.15273608300777
+  },
+  {
+    "command": [
+      "python3",
+      "tests/native_perf.py",
+      "target/release/mnemosyne",
+      "--profile",
+      "v2-evolution",
+      "--records",
+      "100",
+      "--records",
+      "1000",
+      "--samples",
+      "5",
+      "--command-timeout",
+      "120",
+      "--overall-timeout",
+      "600",
+      "--commit",
+      "a0da375a872001b57cb4f259492961de6edc2de6+uncommitted",
+      "--output",
+      "docs/plans/eval-sleep/evidence/pro-followup/v2-evolution.json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 428.6298574579996
+  }
+]

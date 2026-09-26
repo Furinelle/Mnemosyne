@@ -162,6 +162,23 @@ fn append(plan: &mut MutationPlan, p: &Proposal, before: Option<String>) -> Resu
     Ok(())
 }
 pub fn propose(store: &Store, request: Request, clock: &impl Clock) -> Result<Proposal> {
+    let _lock = lock_store_read_only(store)?;
+    crate::relations::recover_pending(store)?;
+    let mut plan = MutationPlan { changes: vec![] };
+    let proposal = plan_proposal(store, request, clock, &mut plan)?;
+    if !plan.changes.is_empty() {
+        execute_mutation(store, plan)?;
+    }
+    Ok(proposal)
+}
+
+/// Caller holds the store lock; append publication to its existing transaction.
+pub(crate) fn plan_proposal(
+    store: &Store,
+    request: Request,
+    clock: &impl Clock,
+    plan: &mut MutationPlan,
+) -> Result<Proposal> {
     ensure!(
         [
             "REFINE",
@@ -217,8 +234,6 @@ pub fn propose(store: &Store, request: Request, clock: &impl Clock) -> Result<Pr
         "Content proposal needs a body"
     );
     // A pending proposal does not read or change its target memories.
-    let _lock = lock_store_read_only(store)?;
-    crate::relations::recover_pending(store)?;
     let manifest = read_manifest(store)?.context("Upgrade required")?;
     ensure!(
         manifest.min_writer_version == crate::provenance::WRITER_VERSION,
@@ -233,6 +248,15 @@ pub fn propose(store: &Store, request: Request, clock: &impl Clock) -> Result<Pr
     );
     let hash = digest(&request)?;
     let id = hash.clone();
+    if let Some(change) = plan
+        .changes
+        .iter()
+        .find(|change| change.path == PathBuf::from("proposals").join(format!("{id}.json")))
+    {
+        return Ok(serde_json::from_str(
+            change.after.as_deref().context("Missing proposal")?,
+        )?);
+    }
     if path(store, &id)?.exists() {
         return Ok(read(store, &id)?.1);
     }
@@ -251,9 +275,7 @@ pub fn propose(store: &Store, request: Request, clock: &impl Clock) -> Result<Pr
         applied: vec![],
         dependents: vec![],
     };
-    let mut plan = MutationPlan { changes: vec![] };
-    append(&mut plan, &p, None)?;
-    execute_mutation(store, plan)?;
+    append(plan, &p, None)?;
     Ok(p)
 }
 pub fn show(store: &Store, id: &str) -> Result<Proposal> {

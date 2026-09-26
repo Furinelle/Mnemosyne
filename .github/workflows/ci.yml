@@ -15,6 +15,10 @@ jobs:
         run: rustup show
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - name: Offline agent evaluation scoring
+        run: |
+          python3 tests/native_eval_scoring_test.py
+          python3 tests/native_handoff_eval_test.py
       - name: Isolated native tests and retrieval gates
         shell: bash
         run: |
@@ -24,6 +28,8 @@ jobs:
           export MNEMOSYNE_HOME="$HOME/global"
           cargo test --locked --all-targets
           cargo test --locked --all-targets --all-features
+          MNEMOSYNE_PERF_BINARY="$GITHUB_WORKSPACE/target/debug/mnemosyne" python3 tests/native_perf_test.py
+          python3 tests/native_handoff_eval.py target/debug/mnemosyne --output /tmp/handoff-native.json
           python3 tests/native_transport_smoke.py target/debug/mnemosyne
           python3 tests/native_http_models_smoke.py target/debug/mnemosyne
           cargo run --locked -- eval run --min-recall 0.95
@@ -37,6 +43,13 @@ jobs:
           target=$(rustc -vV | sed -n 's/^host: //p')
           mkdir -p release
           tar -czf "release/mnemosyne-${version}-${target}.tar.gz" -C target/release mnemosyne -C "$GITHUB_WORKSPACE" LICENSE README.md README.zh.md CHANGELOG.md
+      - name: Verify packaged executable
+        shell: bash
+        run: |
+          package_dir=$(mktemp -d)
+          tar -xzf release/*.tar.gz -C "$package_dir"
+          "$package_dir/mnemosyne" --version
+          python3 tests/native_handoff_eval.py "$package_dir/mnemosyne" --output /tmp/handoff-packaged.json
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.os }}

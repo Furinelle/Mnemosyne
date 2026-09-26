@@ -9,9 +9,9 @@ background daemon, an LLM account or a separate database server.
 
 [中文文档](README.zh.md) · [Migration and compatibility](docs/rust-migration.md)
 
-## Version 2.0.1
+## Version 2.0.2
 
-Version 2.0.1 adds opt-in provenance, task checkpoints, semantic
+Version 2 includes opt-in provenance, task checkpoints, semantic
 revision history, system-time queries, conservative Git applicability, reviewed
 proposals, daily maintenance, bounded offline sleep, derived source indexes and
 verified directory snapshots. See [the interface contract](docs/interface.md)
@@ -21,16 +21,19 @@ This is a breaking Rust crate release: public struct additions can break
 downstream struct literals. CLI compatibility does not imply crate source
 compatibility. The eight MCP tool names and native aliases remain compatible.
 
-Version 2.0.1 connects upgraded-store ingestion and Stop/distillation to the
-revision-aware writer, corrects structured conflict classification and evidence
-after revisions, and makes sleep input paging resumable within its byte budget.
+Version 2.0.2 adds resumable sleep output pages and atomic receipts, preserves
+committed retries after source changes, includes completed receipts in snapshots,
+and fixes evaluation scoring. Unfinished sleep snapshots and forks containing
+sleep receipts are explicitly refused. V2 performance baselines cover 100/1,000
+records; offline producer/consumer checks do not claim real model or host coverage.
+See [validation and limits](docs/plans/eval-sleep/ACCEPTANCE.md).
 
 ## Downloads
 
-- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-aarch64-apple-darwin.tar.gz)
-- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-x86_64-unknown-linux-gnu.tar.gz)
-- [Source archive](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/mnemosyne-2.0.1-source.tar.gz)
-- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.1/SHA256SUMS)
+- [macOS ARM64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-aarch64-apple-darwin.tar.gz)
+- [Linux x86_64](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-x86_64-unknown-linux-gnu.tar.gz)
+- [Source archive](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/mnemosyne-2.0.2-source.tar.gz)
+- [SHA256SUMS](https://github.com/Furinelle/Mnemosyne/releases/download/v2.0.2/SHA256SUMS)
 
 Verify the downloaded archive against `SHA256SUMS` before installing it. Release
 binaries include the executable and release documents. ONNX Runtime, local model
@@ -192,7 +195,7 @@ are not an installed kernel or a runtime dependency. Model smoke tests require
 separately supplied local assets; fake-provider tests do not establish real
 model quality. The embedded LongMemEval sample is not the full public benchmark.
 
-The v2.0.1 test suite contains 159 tests; Linux and macOS CI run the release
+The v2.0.2 test suite contains 181 tests; Linux and macOS CI run the release
 checks. Local host-hook checks cover protocol behavior, not four real model
 conversations; optional ONNX model acceptance remains environment-specific. No
 general performance improvement is claimed.

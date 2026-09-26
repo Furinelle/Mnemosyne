@@ -381,12 +381,7 @@ fn run(command: Command) -> Result<()> {
                 "cursor" => mnemosyne::sleep::cursor(&store)?,
                 _ => {
                     let value: Value = serde_json::from_str(&stdin_text()?)?;
-                    mnemosyne::sleep::finish(
-                        &store,
-                        &serde_json::from_value(value["batch"].clone())?,
-                        serde_json::from_value(value["proposals"].clone())?,
-                        &clock,
-                    )?
+                    mnemosyne::sleep::import(&store, serde_json::from_value(value)?, &clock)?
                 }
             };
             println!("{result}");

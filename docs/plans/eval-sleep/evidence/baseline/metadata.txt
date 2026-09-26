@@ -1,0 +1,28 @@
+HEAD a0da375a872001b57cb4f259492961de6edc2de6
+
+Toolchain:
+rustc 1.95.0 (59807616e 2026-04-14)
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+1.95.0-aarch64-apple-darwin (overridden by '/Users/furina/Documents/Github/Mnemosyne/rust-toolchain.toml')
+
+Workspace status at snapshot time: clean
+
+Inherited cache roots:
+CARGO_HOME=default
+RUSTUP_HOME=default
+
+Source SHA-256:
+49b1d8f5b1325e6b10782145d3167586b126427f8f09c1bfe54a9518212bdaa5  /tmp/mnemosyne-nx00-baseline.10Lobj/source/Cargo.toml
+513b6c9777ea673beeff39bfde219148842aeb223dfff0eaafdfe62119b1fb86  /tmp/mnemosyne-nx00-baseline.10Lobj/source/Cargo.lock
+e3b53564b20b264163cc79b991e3eb50f5db5b0efd97d077f0f8969e60ce3368  /tmp/mnemosyne-nx00-baseline.10Lobj/source/src/ingest.rs
+63080b0fd7df5304ce53a86f165e402237672ad761f2869d7f80a18c00c67ba8  /tmp/mnemosyne-nx00-baseline.10Lobj/source/src/reconcile.rs
+43b305916a3f6691d1c34f62a5a3ef74148c89933bf2117a7b509bff8b6a14e1  /tmp/mnemosyne-nx00-baseline.10Lobj/source/src/provenance.rs
+7f8ff6c856634e90397128a04faaea7473a0e08d76f1c54d9538bc1535f73334  /tmp/mnemosyne-nx00-baseline.10Lobj/source/src/revisions.rs
+7b049a7714fd08ddd69f82e8b2fc717225e818aa3c1d1ba8b9653f61b401652c  /tmp/mnemosyne-nx00-baseline.10Lobj/source/src/sleep.rs
+57d3bf111b43de79a0ebcc4979a45e09e95d0d02dd1f384783027f5b11eed034  /tmp/mnemosyne-nx00-baseline.10Lobj/source/tests/native_only.rs
+cdf64265440b32c23c924f95088901c5b85e13b38508895b9f0cc1706ac9ba26  /tmp/mnemosyne-nx00-baseline.10Lobj/source/tests/provenance_v2.rs
+b4075ff0801158217d128578a846c98e4db471fe41e3d1dc72bed14c5532e8a4  /tmp/mnemosyne-nx00-baseline.10Lobj/source/tests/reconciliation.rs
+b7759fce662bdfb6eef3f47c63f413239259a3d7de71cf6ada337ab381c50c51  /tmp/mnemosyne-nx00-baseline.10Lobj/source/tests/sleep.rs
+55b38e0f5da98d5a41de9216d7cfb06737ef38f5d6a104f635d02748041e5a83  /tmp/mnemosyne-nx00-baseline.10Lobj/source/tests/revision_contract.rs
+CARGO_HOME=/Users/furina/.cargo
+RUSTUP_HOME=/Users/furina/.rustup

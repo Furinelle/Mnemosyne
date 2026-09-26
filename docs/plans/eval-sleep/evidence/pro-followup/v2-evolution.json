@@ -1,0 +1,3553 @@
+{
+  "commit": "a0da375a872001b57cb4f259492961de6edc2de6+uncommitted",
+  "binary_sha256": "6c9a6758670e7150ff36c69323d74cb4c77f07c0f4f9f5ede3e5833d4d63675c",
+  "runner_sha256": "e60b084eba8c16755abe95c4a26cde15ef495df0ee8d25dfd93516a0265e96a4",
+  "profile": "v2-evolution",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "samples": 5,
+  "clock": "perf_counter_ns",
+  "models": "disabled; no model assets or network",
+  "environment": {
+    "MNEMOSYNE_TRACE_TIMING": "1",
+    "MNEMOSYNE_AUTO_INIT": "0",
+    "HOME": "isolated",
+    "MNEMOSYNE_HOME": "isolated",
+    "PATH": ""
+  },
+  "limitations": [
+    "phase durations are inclusive and overlapping; do not sum",
+    "five-sample p95 is descriptive, not a reliable tail estimate",
+    "filesystem page cache is not evicted"
+  ],
+  "results": [
+    {
+      "profile": "v2-evolution",
+      "records_requested": 100,
+      "status": "PASS",
+      "scenarios": [
+        {
+          "scenario": "cache_absent",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 129.52,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.185583
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.053292
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.530542
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.096666
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 145.3715,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.30858399999999997
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 22.880042
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.6441669999999999
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.224375
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 132.833166,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.249792
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 19.3325
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.5573330000000001
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.104792
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 137.997625,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.197667
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.118
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.519416
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.10058299999999999
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 139.572417,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.19870900000000002
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.002417
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.541333
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.101
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 137.997625,
+          "p95_ms": 145.3715,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "warm_search",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 118.0445,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.193542
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 14.020833999999999
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.540083
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.09725
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 120.890375,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.20620799999999997
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 14.67425
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.547334
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.092458
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 124.163292,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.195083
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 14.491209
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.5279170000000001
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.113041
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 121.936042,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.199375
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 13.794417
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.552042
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.104
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 131.054791,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.206959
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 14.370375
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.861417
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.137875
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 121.936042,
+          "p95_ms": 131.054791,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "revise_then_search",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 49.694375,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.21212499999999998
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 20.265124999999998
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.575875
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.008917
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 47.94575,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.20316700000000001
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 19.43375
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.65225
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.008542000000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 48.668583,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.208
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 19.521832999999997
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.585542
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.008417
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 49.687708,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.21562499999999998
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 19.946917000000003
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.573667
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.010832999999999999
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 49.613375,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.217042
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 19.766292
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.626
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.010499999999999999
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 49.613375,
+          "p95_ms": 49.694375,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "prep_task",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 28.465042,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.192083
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.806
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.089624
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.098125
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.037709
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 28.294083,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.183583
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.370084000000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.130125
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.095875
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.039083
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 28.1535,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.202625
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.369833999999997
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.030125
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.096333
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.039
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 28.369708,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.192375
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.524375
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.115292
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.10320800000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.039916999999999994
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 27.925583,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.195626
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 18.353001
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.0681669999999999
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.104
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.040707999999999994
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            }
+          ],
+          "p50_ms": 28.294083,
+          "p95_ms": 28.465042,
+          "actual_lanes": [
+            "lexical+checkpoint"
+          ]
+        },
+        {
+          "scenario": "file_hook",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 48.232584,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.199875
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 16.963167000000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.516209
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.096625
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.012791
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 42.334625
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 45.790416,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.18425
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 16.918499999999998
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.568667
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.095042
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.013084
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 39.992
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 45.937959,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.18450000000000003
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 16.809291
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.52775
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.092167
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.012875
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 40.011125
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 46.084,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.224083
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 17.168292
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.5166660000000001
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.10754100000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.013042
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 40.613417
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 45.238833,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 0.183333
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 16.678124999999998
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 0.514291
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.10579100000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.012666
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 39.477792
+                }
+              },
+              "actual_lane": "lexical_hook"
+            }
+          ],
+          "p50_ms": 45.937959,
+          "p95_ms": 48.232584,
+          "actual_lanes": [
+            "lexical_hook"
+          ]
+        },
+        {
+          "scenario": "stop_new_replay",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 94.923542,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 88.889292
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.862958,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.268291
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 101.104125,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 89.2835
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.509125,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.267833
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 95.093125,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 88.870042
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.158375,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.253792
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 93.964792,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 87.728333
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 6.701125,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.245917
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 95.746667,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 89.678083
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.569792,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.301833
+                }
+              }
+            }
+          ],
+          "p50_ms": 95.093125,
+          "p95_ms": 101.104125,
+          "actual_lanes": [
+            "host_distill_v2"
+          ]
+        }
+      ],
+      "construction_elapsed_ms": 14081.840625003679,
+      "recipe": {
+        "memories": 100,
+        "support": 20,
+        "post_revision_support": 1,
+        "double_revise": 10,
+        "supersede": 10,
+        "checkpoints": 5,
+        "pending": 5
+      },
+      "recipe_sha256": "aeee0557ed8f04ffcf8786f8c39efdef2ecafe21fcc3ade2ad33e198e0f24401",
+      "recipe_hash_basis": "profile + recipe counts + generator SHA256",
+      "counts": {
+        "schema": 2,
+        "writer": 3,
+        "store_id": "897c3718-0f0f-48c0-9908-860891351e48",
+        "memories": 100,
+        "sources": 121,
+        "revisions": 161,
+        "checkpoints": 5,
+        "pending": 5,
+        "superseded": 10
+      },
+      "corpus_sha256": "cfe1e7a102c8cd1e17fb34cbb52ecd7f09a7fe4d77dcf78cda0b6b436652070b",
+      "corpus_bytes": 503907
+    },
+    {
+      "profile": "v2-evolution",
+      "records_requested": 1000,
+      "status": "PASS",
+      "scenarios": [
+        {
+          "scenario": "cache_absent",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 882.078167,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.2886249999999997
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 180.83729200000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.167333
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.049791
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 858.809375,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.226375
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 173.901791
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.066042
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.9933330000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 920.392125,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.515542
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 190.92083300000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.211167
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.127583
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 901.57275,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.46675
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 186.53820900000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.2590000000000003
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.098833
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 928.689083,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.4185
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 205.130042
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.2433330000000002
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.3029579999999998
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 901.57275,
+          "p95_ms": 928.689083,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "warm_search",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 864.754375,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.372125
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 143.758208
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.021541
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.182875
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 823.961959,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.391459
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 133.658625
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.037667
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.089417
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 850.447,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.435792
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 134.42425
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.0545
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.10175
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 829.514792,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.3122920000000002
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 133.88125
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 1.9963340000000003
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.131833
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "healthcheck",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 825.813875,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.437792
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 135.34875
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.0452920000000003
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.106416
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 829.514792,
+          "p95_ms": 864.754375,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "revise_then_search",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 323.5975,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.480791
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 172.726833
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.0244999999999997
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.070208
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 354.4905,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.572083
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 190.424542
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.2385420000000003
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.060792
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 417.244625,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.984167
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 214.593709
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.565
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.074334
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 457.006333,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 3.528917
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 253.06475
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.790459
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.086209
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            },
+            {
+              "command": [
+                "search",
+                "revisionmarker0",
+                "--format",
+                "json",
+                "--scope",
+                "project"
+              ],
+              "elapsed_ms": 504.334666,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 3.5339579999999997
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 280.158708
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 3.123667
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 0.078667
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical"
+            }
+          ],
+          "p50_ms": 417.244625,
+          "p95_ms": 504.334666,
+          "actual_lanes": [
+            "lexical"
+          ]
+        },
+        {
+          "scenario": "prep_task",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 248.295458,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.71875
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 213.85275000000001
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 5.367833
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.171542
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.052292
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 215.673209,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.375292
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 186.56033299999999
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 4.830834
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.20225
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.048708
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 246.724917,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.5624179999999996
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 216.04570800000002
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 4.956499
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.2193749999999999
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.057874999999999996
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 218.009958,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.518084
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 189.390542
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 4.847458
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.1103750000000001
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.044417
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            },
+            {
+              "command": [
+                "prep",
+                "resume health route",
+                "--task-id",
+                "perf-task-0",
+                "--format",
+                "json",
+                "--budget",
+                "8000"
+              ],
+              "elapsed_ms": 220.504417,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.500251
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 190.687292
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 5.068417
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.132375
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.047875
+                },
+                "hook_total": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                }
+              },
+              "actual_lane": "lexical+checkpoint"
+            }
+          ],
+          "p50_ms": 220.504417,
+          "p95_ms": 248.295458,
+          "actual_lanes": [
+            "lexical+checkpoint"
+          ]
+        },
+        {
+          "scenario": "file_hook",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 395.25475,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.47925
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 192.58266700000001
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.265167
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.070125
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.016292
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 388.456125
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 417.699541,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.548542
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 194.121125
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.18
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.088708
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.016208
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 410.88658399999997
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 430.277333,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.540959
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 215.70524999999998
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.268042
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.1405
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.016125
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 423.404458
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 385.177167,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.413292
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 182.53395799999998
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.198083
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.088208
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.016125
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 378.126167
+                }
+              },
+              "actual_lane": "lexical_hook"
+            },
+            {
+              "command": [
+                "hook",
+                "PreToolUse"
+              ],
+              "elapsed_ms": 391.973709,
+              "phases": {
+                "file_enumeration": {
+                  "status": "measured",
+                  "inclusive_ms": 2.587708
+                },
+                "sqlite_sync": {
+                  "status": "measured",
+                  "inclusive_ms": 182.6235
+                },
+                "candidate_read": {
+                  "status": "measured",
+                  "inclusive_ms": 2.2097089999999997
+                },
+                "graph_expansion": {
+                  "status": "measured",
+                  "inclusive_ms": 1.117708
+                },
+                "model_profile": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "not_run",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "measured",
+                  "inclusive_ms": 0.017915999999999998
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 385.158958
+                }
+              },
+              "actual_lane": "lexical_hook"
+            }
+          ],
+          "p50_ms": 395.25475,
+          "p95_ms": 430.277333,
+          "actual_lanes": [
+            "lexical_hook"
+          ]
+        },
+        {
+          "scenario": "stop_new_replay",
+          "status": "PASS",
+          "samples": [
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 288.80775,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 281.748916
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.100958,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.262917
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 300.715875,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 293.832208
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.089083,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.268208
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 278.562875,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 271.763209
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 7.338375,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.26966700000000005
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 301.632833,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 294.685542
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 6.684,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.23779199999999998
+                }
+              }
+            },
+            {
+              "command": [
+                "hook",
+                "Stop"
+              ],
+              "elapsed_ms": 271.203083,
+              "phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 264.48616699999997
+                }
+              },
+              "actual_lane": "host_distill_v2",
+              "replay_elapsed_ms": 6.953708,
+              "replay_phases": {
+                "file_enumeration": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "sqlite_sync": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "candidate_read": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "graph_expansion": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_profile": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_fingerprint": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "model_initialize": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "context_render": {
+                  "status": "absent",
+                  "inclusive_ms": null
+                },
+                "hook_total": {
+                  "status": "measured",
+                  "inclusive_ms": 0.25354099999999996
+                }
+              }
+            }
+          ],
+          "p50_ms": 288.80775,
+          "p95_ms": 301.632833,
+          "actual_lanes": [
+            "host_distill_v2"
+          ]
+        }
+      ],
+      "construction_elapsed_ms": 347022.3202909983,
+      "recipe": {
+        "memories": 1000,
+        "support": 200,
+        "post_revision_support": 1,
+        "double_revise": 100,
+        "supersede": 100,
+        "checkpoints": 5,
+        "pending": 5
+      },
+      "recipe_sha256": "2a4c62868954aca203e2a7f960e8148849ce53e183a1eee07119112edc463381",
+      "recipe_hash_basis": "profile + recipe counts + generator SHA256",
+      "counts": {
+        "schema": 2,
+        "writer": 3,
+        "store_id": "298405c0-81af-4341-b196-12a4e08fc40a",
+        "memories": 1000,
+        "sources": 1201,
+        "revisions": 1601,
+        "checkpoints": 5,
+        "pending": 5,
+        "superseded": 100
+      },
+      "corpus_sha256": "81629fcbf40f23e8a2ba6eb23a49d9caecd150ac0bc5a3146935e28ccd2052a7",
+      "corpus_bytes": 4971834
+    }
+  ],
+  "execution_complete": true,
+  "acceptance_passed": true
+}

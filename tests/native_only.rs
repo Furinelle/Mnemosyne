@@ -562,6 +562,92 @@ fn antigravity_native_mcp_keeps_two_projects_and_hidden_global_memory_separate()
 }
 
 #[test]
+fn cli_and_mcp_sleep_output_pages_advance_cursor_only_on_complete_replay() {
+    let sandbox = Sandbox::new();
+    let project = sandbox.project("sleep-pages");
+    sandbox.ok(
+        &project,
+        &["store-upgrade", "--scope", "project", "--commit"],
+        "",
+    );
+    for (event, title, content) in [
+        ("first", "Sleep first", "first durable sleep fact"),
+        ("second", "Sleep second", "second durable sleep fact"),
+    ] {
+        let request = json!({
+            "type":"codebase", "title":title, "content":content, "importance":70,
+            "origin":"fixture", "source_session_id":"sleep-session",
+            "source_event_id":event, "finding_key":event, "source_kind":"tool_output",
+            "verification_state":"verified", "fact_key":event
+        });
+        let written: Value =
+            serde_json::from_str(&sandbox.ok(&project, &["write-v2"], &request.to_string()))
+                .unwrap();
+        assert_eq!(written["status"], "created");
+    }
+    let batch: Value =
+        serde_json::from_str(&sandbox.ok(&project, &["sleep", "export", "--limit", "2"], ""))
+            .unwrap();
+    assert_eq!(batch["inputs"].as_array().unwrap().len(), 2);
+    assert_eq!(batch["cursor"], 0);
+    assert_eq!(batch["next_cursor"], 2);
+    assert_eq!(batch["partial"], false);
+    assert_eq!(
+        serde_json::from_str::<Value>(&sandbox.ok(&project, &["sleep", "cursor"], "")).unwrap()["next_cursor"],
+        0
+    );
+
+    let page0 = json!({
+        "batch":batch,
+        "proposals":[],
+        "output":{"index":0,"total":2}
+    });
+    let receipt0: Value =
+        serde_json::from_str(&sandbox.ok(&project, &["sleep", "import"], &page0.to_string()))
+            .unwrap();
+    assert_eq!(receipt0["status"], "pending_output");
+    assert_eq!(receipt0["input_committed"], false);
+    assert_eq!(
+        serde_json::from_str::<Value>(&sandbox.ok(&project, &["sleep", "cursor"], "")).unwrap()["next_cursor"],
+        0
+    );
+
+    let mut mcp = Mcp::start(&sandbox);
+    let initialized = mcp.send(json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"sleep-continuation-fixture","version":"1"}}}));
+    assert_eq!(initialized["result"]["serverInfo"]["name"], "mnemosyne");
+    writeln!(
+        mcp.input.as_mut().unwrap(),
+        "{}",
+        json!({"jsonrpc":"2.0","method":"notifications/initialized"})
+    )
+    .unwrap();
+    let page1 = json!({
+        "batch":receipt0["batch"],
+        "proposals":[],
+        "output":{"index":1,"total":2}
+    });
+    let args = json!({
+        "version":2,
+        "operation":"sleep_import",
+        "project_path":project,
+        "request":page1
+    });
+    let receipt1 = mcp.ok("mnemosyne_write", args.clone());
+    assert_eq!(receipt1["status"], "complete");
+    assert_eq!(receipt1["input_committed"], true);
+    assert_eq!(
+        serde_json::from_str::<Value>(&sandbox.ok(&project, &["sleep", "cursor"], "")).unwrap()["next_cursor"],
+        2
+    );
+    assert_eq!(mcp.ok("mnemosyne_write", args), receipt1);
+    assert_eq!(
+        serde_json::from_str::<Value>(&sandbox.ok(&project, &["sleep", "cursor"], "")).unwrap()["next_cursor"],
+        2
+    );
+    mcp.close();
+}
+
+#[test]
 fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
     let sandbox = Sandbox::new();
     let project = sandbox.project("upgraded");
@@ -614,6 +700,7 @@ fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
             .evidence_count,
         2
     );
+    let mut stop_memory_id = None;
     // The legacy API guard must remain in force after the integration fix.
     assert!(
         !sandbox
@@ -631,7 +718,10 @@ fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
     )
     .unwrap();
     let block = "**Findings:**\n- type: pitfall\n- importance: 70\n- title: Upgraded Stop\n- content: |\n    Stop saves through the revision-aware writer.\n";
-    for host in ["codex", "claude", "grok", "antigravity"] {
+    for (index, host) in ["codex", "claude", "grok", "antigravity"]
+        .into_iter()
+        .enumerate()
+    {
         let transcript = project.join(format!("{host}.jsonl"));
         let row = match host {
             "codex" => {
@@ -651,7 +741,47 @@ fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
                 .unwrap()
                 .contains("auto-saved")
         );
+        let memories = mnemosyne::store::load_memories(&store, false).unwrap();
+        let stop_memories: Vec<_> = memories
+            .into_iter()
+            .map(|(_, memory)| memory)
+            .filter(|memory| memory.title() == "Upgraded Stop")
+            .collect();
+        assert_eq!(stop_memories.len(), 1);
+        let stop_memory = &stop_memories[0];
+        assert_eq!(
+            stop_memory.body,
+            "## Upgraded Stop\n\nStop saves through the revision-aware writer."
+        );
+        if let Some(id) = &stop_memory_id {
+            assert_eq!(&stop_memory.id, id);
+        } else {
+            stop_memory_id = Some(stop_memory.id.clone());
+        }
+        assert!(
+            result["systemMessage"]
+                .as_str()
+                .unwrap()
+                .contains(&stop_memory.id)
+        );
+        let expected_count = index + 1;
+        let evidence = mnemosyne::provenance::read_provenance(&store, &stop_memory.id).unwrap();
+        assert_eq!(evidence.evidence_count, expected_count);
+        assert_eq!(evidence.source_events.len(), expected_count);
+        let expected_origin = match host {
+            "codex" => "codex",
+            "grok" => "grok-build",
+            _ => "claude-code",
+        };
+        assert!(
+            evidence.source_events.iter().any(|event| {
+                event.origin == expected_origin && event.source_session_id == host
+            })
+        );
         assert!(sandbox.hook(&project, "Stop", payload).is_none());
+        let replayed = mnemosyne::provenance::read_provenance(&store, &stop_memory.id).unwrap();
+        assert_eq!(replayed.evidence_count, expected_count);
+        assert_eq!(replayed.source_events, evidence.source_events);
     }
     // Exercise the direct fail-safe session_end route used by event callers too.
     let direct = json!({"source":"antigravity","session_id":"direct","text":block.replace("Upgraded Stop","Direct event")});
@@ -673,11 +803,28 @@ fn upgraded_ingest_and_real_stop_writes_keep_sources_and_replay_safely() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("auto-saved")
+    let direct_stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(direct_stdout.contains("auto-saved"));
+    let direct_memories = mnemosyne::store::load_memories(&store, false).unwrap();
+    let direct_memory = direct_memories
+        .into_iter()
+        .map(|(_, memory)| memory)
+        .find(|memory| memory.title() == "Direct event")
+        .expect("session_end must save its memory");
+    assert_eq!(
+        direct_memory.body,
+        "## Direct event\n\nStop saves through the revision-aware writer."
     );
+    assert!(
+        direct_stdout.contains(&direct_memory.id),
+        "session_end output must identify the saved memory"
+    );
+    let direct_evidence =
+        mnemosyne::provenance::read_provenance(&store, &direct_memory.id).unwrap();
+    assert_eq!(direct_evidence.evidence_count, 1);
+    assert_eq!(direct_evidence.source_events.len(), 1);
+    assert_eq!(direct_evidence.source_events[0].origin, "antigravity");
+    assert_eq!(direct_evidence.source_events[0].source_session_id, "direct");
 }
 
 #[test]

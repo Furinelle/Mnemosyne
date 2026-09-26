@@ -1,0 +1,46 @@
+{
+  "source_commit": "a0da375a872001b57cb4f259492961de6edc2de6",
+  "source_path": "tests/native_agent_eval.py",
+  "scope": "local minimal scoring-expression counterexample; no original harness/model/Rust execution",
+  "runs": [
+    {
+      "arm": "without_memory",
+      "status": "pass",
+      "answer": {
+        "database": "Oracle",
+        "port": "9999",
+        "next_action": "Restart the frontend"
+      },
+      "facts_correct": 0,
+      "handoff_correct": false,
+      "unsupported_answers": 3
+    },
+    {
+      "arm": "v1_retrieval",
+      "status": "pass",
+      "answer": {
+        "database": "Oracle",
+        "port": "9999",
+        "next_action": "Restart the frontend"
+      },
+      "facts_correct": 0,
+      "handoff_correct": false,
+      "unsupported_answers": 1
+    },
+    {
+      "arm": "candidate_handoff",
+      "status": "pass",
+      "answer": {
+        "database": "Oracle",
+        "port": "9999",
+        "next_action": "Restart the frontend"
+      },
+      "facts_correct": 0,
+      "handoff_correct": false,
+      "unsupported_answers": 0
+    }
+  ],
+  "reported_complete": true,
+  "required_quality_result": "fail",
+  "demonstrated_gap": "all three wrong answers can yield pass/complete; candidate unsupported is forced to zero"
+}

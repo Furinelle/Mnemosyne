@@ -27,6 +27,7 @@ const ALLOWED: &[&str] = &[
     "evidence",
     "checkpoints",
     "proposals",
+    "sleep",
 ];
 const EXCLUDED: &[&str] = &[
     "config.toml (host settings and API selectors)",
@@ -86,6 +87,13 @@ fn safe_relative(value: &str) -> Result<&Path> {
         parts.len() == 2 && value.ends_with(".md")
     } else if top == "archive" {
         parts.len() == 3 && value.ends_with(".md")
+    } else if top == "sleep" {
+        parts.len() == 2
+            && path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .is_some_and(|key| key == "cursor" || digest_key(key))
+            && value.ends_with(".json")
     } else if top == "history" {
         parts.len() == 3 && (value.ends_with(".md") || parts[2] == "manifest.json")
     } else {
@@ -93,6 +101,124 @@ fn safe_relative(value: &str) -> Result<&Path> {
     };
     ensure!(valid, "snapshot path not allowed: {value}");
     Ok(path)
+}
+
+fn digest_key(key: &str) -> bool {
+    key.len() == 64 && key.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn json_hash(value: &impl Serialize) -> Result<String> {
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
+}
+
+// Sleep inventory identities include host paths, inodes and timestamps. Completed
+// receipts are portable, but unfinished input/output continuations are not.
+fn validate_sleep(root: &Path, manifest: &SnapshotManifest) -> Result<()> {
+    let mut records = std::collections::BTreeMap::new();
+    for entry in manifest
+        .files
+        .iter()
+        .filter(|entry| entry.path.starts_with("sleep/"))
+    {
+        ensure!(entry.size <= 64 * 1024, "sleep record too large");
+        let value: Value = serde_json::from_slice(&fs::read(root.join(&entry.path))?)?;
+        ensure!(value.is_object(), "invalid sleep record");
+        let key = Path::new(&entry.path)
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        records.insert(key.to_string(), value);
+    }
+    if records.is_empty() {
+        return Ok(());
+    }
+    let cursor = records.get("cursor").context("missing sleep cursor")?;
+    ensure!(
+        cursor["snapshot"].as_str().is_some_and(digest_key) && cursor["next_cursor"].is_u64(),
+        "invalid sleep cursor"
+    );
+    ensure!(
+        cursor["active_run"].is_null()
+            && (cursor["status"] == "complete" || cursor["status"].is_null()),
+        "unfinished sleep continuation; snapshot refused"
+    );
+    let mut completed_cursor = false;
+    for (key, value) in &records {
+        if key == "cursor" {
+            continue;
+        }
+        if let Some(batch_value) = value.get("batch") {
+            let batch: crate::sleep::Batch = serde_json::from_value(batch_value.clone())?;
+            let run_id = json_hash(&batch)?;
+            ensure!(
+                batch.version == 1
+                    && digest_key(&batch.snapshot)
+                    && batch.next_cursor >= batch.cursor
+                    && batch
+                        .inputs
+                        .iter()
+                        .all(|input| input.memory_ref.store_id == manifest.store_id)
+                    && value["proposal_ids"].as_array().is_some_and(|ids| ids
+                        .iter()
+                        .all(|id| id.as_str().is_some_and(digest_key))),
+                "invalid sleep batch"
+            );
+            if value["version"] == 1 {
+                ensure!(key == &run_id, "invalid legacy sleep report");
+            } else {
+                let output: crate::sleep::OutputPage =
+                    serde_json::from_value(value["output"].clone())?;
+                ensure!(
+                    value["version"] == 2
+                        && value["store_id"] == manifest.store_id
+                        && (1..=1000).contains(&output.total)
+                        && output.index < output.total
+                        && value["run_id"] == run_id
+                        && value["receipt_id"] == *key
+                        && key == &json_hash(&serde_json::json!([run_id, output.index]))?
+                        && value["request_hash"].as_str().is_some_and(digest_key)
+                        && value["next_output"] == output.index + 1
+                        && value["input_committed"] == (output.index + 1 == output.total),
+                    "invalid sleep receipt"
+                );
+                let run = records.get(&run_id).context("missing sleep run")?;
+                ensure!(run["total"] == output.total, "sleep output count mismatch");
+            }
+            completed_cursor |= !batch.partial
+                && cursor["snapshot"] == batch.snapshot
+                && cursor["next_cursor"] == batch.next_cursor
+                && (value["version"] == 1 || value["input_committed"] == true);
+        } else {
+            let total = value["total"].as_u64().context("invalid sleep run")?;
+            ensure!(
+                value["version"] == 2
+                    && (1..=1000).contains(&total)
+                    && value["next_output"]
+                        .as_u64()
+                        .is_some_and(|next| next <= total),
+                "invalid sleep run"
+            );
+            let last = value["last_receipt"]
+                .as_str()
+                .and_then(|id| records.get(id))
+                .context("missing sleep receipt")?;
+            ensure!(
+                last["batch"].is_object()
+                    && last["run_id"] == *key
+                    && last["next_output"] == value["next_output"],
+                "invalid final sleep receipt"
+            );
+            // A changed inventory can abandon an earlier run. Keep its committed
+            // receipts; its uncommitted pages were already stale before snapshot.
+            ensure!(
+                value["next_output"] == total || last["batch"]["snapshot"] != cursor["snapshot"],
+                "unfinished sleep output; snapshot refused"
+            );
+        }
+    }
+    ensure!(completed_cursor, "unfinished sleep input; snapshot refused");
+    Ok(())
 }
 
 fn regular(path: &Path) -> Result<fs::Metadata> {
@@ -435,6 +561,7 @@ fn validate(source: &Path) -> Result<SnapshotManifest> {
             );
         }
     }
+    validate_sleep(&source.join("files"), &manifest)?;
     Ok(manifest)
 }
 
@@ -553,6 +680,14 @@ fn remap_json(path: &Path, old: &str, new: &str) -> Result<()> {
 pub fn restore(source: &Path, target: &Path, fork: bool) -> Result<SnapshotManifest> {
     let parent = destination(target)?;
     let mut manifest = validate(source)?;
+    ensure!(
+        !fork
+            || !manifest
+                .files
+                .iter()
+                .any(|entry| entry.path.starts_with("sleep/")),
+        "fork of snapshot with sleep receipts is unsupported"
+    );
     let stage = tempfile::Builder::new()
         .prefix(".mnemosyne-restore-")
         .tempdir_in(parent)?;

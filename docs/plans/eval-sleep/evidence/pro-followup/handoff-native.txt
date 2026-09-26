@@ -1,0 +1,3 @@
+{"schema_version": 1, "lane": "NX04_OFFLINE_NATIVE_CONTRACT", "scope": "simulated fixtures; native CLI/MCP; no model or live host claim", "evaluation_mode": "offline_native_contract", "producer_kind": "deterministic_process", "consumer_kind": "deterministic_process", "model_evaluation": "NOT_RUN", "live_host_evaluation": "NOT_RUN", "limitations": ["temporary HOME/store isolation is not an OS sandbox", "no real model reasoning or authenticated host session"], "execution_complete": true, "acceptance_passed": true}
+
+EXIT_CODE=0

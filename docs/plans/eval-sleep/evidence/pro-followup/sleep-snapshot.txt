@@ -1,0 +1,50 @@
+COMMAND: cargo test --offline --locked --test sleep --test snapshots
+
+running 24 tests
+test failed_or_partial_proposal_import_does_not_advance_cursor ... ok
+test access_metadata_rewrite_invalidates_the_exported_snapshot ... ok
+test input_links_and_output_links_are_rejected ... ok
+test importing_a_proposal_does_not_observe_or_stale_later_pages ... ok
+test changed_unread_record_invalidates_cursor ... ok
+test legacy_completed_batch_replays_without_rewriting_old_evidence ... ok
+test committed_replay_survives_source_change_and_cannot_overwrite_new_run ... ok
+test concurrent_page_retries_are_identical_and_replay_cannot_rewind ... ok
+test oversized_input_is_reported_without_a_cursor_write ... ok
+test invalid_records_do_not_hide_valid_work_or_allow_a_complete_report ... ok
+test missing_output_cannot_be_replaced_by_a_duplicate_or_final_page ... ok
+test output_order_content_limits_and_empty_terminal_are_explicit ... ok
+test replaced_unread_record_with_same_size_and_mtime_is_stale ... ok
+test pending_outputs_block_other_batches_and_keep_blocked_counts ... ok
+test relation_import_remains_pending_and_never_edits_facts ... ok
+test pages_are_bounded_and_include_checkpoint_metadata_without_checkpoint_content ... ok
+test replay_is_idempotent_and_changed_source_is_stale ... ok
+test rules_are_offline_metadata_only_and_redact_source_bodies ... ok
+test upgraded_store_observes_only_exported_memory_and_keeps_cursor_valid ... ok
+test replay_preserves_reviewed_proposals_and_sealed_output ... ok
+test large_store_pages_by_byte_budget_and_rules_can_finish_each_page ... ok
+test long_valid_ids_page_before_receipt_metadata_exceeds_budget ... ok
+test file_inventory_remains_capped_before_reading_bodies ... ok
+test paged_outputs_exceed_old_total_budgets_without_early_input_commit ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.45s
+
+
+running 9 tests
+test snapshot_rejects_links_and_pending_journal ... ok
+test restore_rejects_tampering_without_publishing ... ok
+test completed_legacy_sleep_report_is_preserved ... ok
+test sleep_snapshot_rejects_symlinks_and_hardlinks ... ok
+test snapshot_restore_and_fork_keep_distinct_identity ... ok
+test abandoned_old_sleep_output_preserves_receipt_after_new_inventory_completes ... ok
+test sleep_partial_input_refused_until_complete ... ok
+test sleep_partial_output_refused_completed_receipts_restore_and_fork_refused ... ok
+test sleep_snapshot_rejects_malformed_records_without_publishing ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+
+   Compiling mnemosyne v2.0.1 (/Users/furina/Documents/Github/Mnemosyne)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running tests/sleep.rs (target/debug/deps/sleep-2e3fbc6fcab76beb)
+     Running tests/snapshots.rs (target/debug/deps/snapshots-75ba0cb8d1d3c062)
+
+EXIT_CODE=0

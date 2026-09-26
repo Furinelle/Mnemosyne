@@ -1,0 +1,4 @@
+SSE initialization, tools, notifications, isError, UTF-8/size and Origin/Host boundaries: passed
+Non-loopback SSE rejects unauthenticated exposure: passed
+
+EXIT_CODE=0

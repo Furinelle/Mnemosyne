@@ -1,0 +1,3 @@
+pipeline: rust-bm25 (lexical lane=BM25; vectors=disabled; rerank=disabled) recall@5=1.000 MRR=1.000 p50=3.017ms p99=8.959ms queries=50
+
+EXIT_CODE=0
