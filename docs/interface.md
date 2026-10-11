@@ -90,6 +90,30 @@ These fields are shared by native CLI and MCP search. CLI search credits usage
 after ranking; MCP search is read-only. A later query can therefore rank using
 the updated strength, even when the knowledge fields are identical. Normal retrieval
 excludes expired and superseded memories before candidate limits.
+
+If a previously indexed file is unreadable, incomplete (missing ID or body), or
+keeps changing during the scan, search preserves its prior cache for recovery
+and reports the failure on stderr. A matching failed path returns a diagnostic
+object containing only `id`, `scope`, `path`, `index_status: "stale"`, `warnings`,
+and `score_breakdown.index_source_warning`. It withholds all cached knowledge
+fields, receives no access credit, does not expand links, and is omitted from
+`prep`/`inject` with reason `index_source_unavailable`. Treat it as an unavailable
+record, never as current evidence. A failed new file has no cached match but
+still emits the stderr diagnostic.
+Normal candidates take priority over stale diagnostics before the result limit;
+unavailable cached text is excluded from reranker inputs. Source warnings also
+apply to candidates merged from other retrieval lanes before graph expansion.
+
+The next search retries failed paths without advancing their cached fingerprint.
+An explicit `reindex` fails and rolls back its whole transaction if any input
+cannot be read consistently. Directory enumeration errors also fail without
+purging the cache. A successfully enumerated, absent path is a confirmed deletion
+and is removed normally; expiry, supersession and valid redaction keep their
+existing semantics. Empty/truncated files cannot distinguish a save in progress
+from an intentional clear: their old cache is inaccessible through normal
+knowledge results and remains until the file is repaired, confirmed deleted, or
+the disposable cache is removed. Clearing a file is not a deletion operation.
+
 `--archive` / MCP `include_archive` also allows expired history;
 `--include-superseded` / MCP `include_superseded` allows replaced history.
 Expiry dates remain valid through that date. A non-date expiry note requires

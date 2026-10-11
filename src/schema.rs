@@ -46,6 +46,10 @@ pub struct Memory {
 }
 
 impl Memory {
+    pub(crate) fn has_evidence(&self) -> bool {
+        !self.id.trim().is_empty() && !self.body.trim().is_empty()
+    }
+
     pub fn title(&self) -> String {
         for line in self.body.lines() {
             let line = line.trim();
