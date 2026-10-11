@@ -244,6 +244,10 @@ fn assemble_bundle(
     let mut omitted = Vec::new();
     let mut items = Vec::new();
     for item in candidates {
+        if item["index_status"] == "stale" {
+            omitted.push(item_reason(item, "index_source_unavailable"));
+            continue;
+        }
         let source = inline(text(item, "source"));
         let created = inline(text(item, "created"));
         let mut provenance = Vec::new();

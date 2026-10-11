@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 
@@ -108,6 +108,7 @@ struct IndexedMemory {
     path: PathBuf,
     memory: Memory,
     archived: bool,
+    source_warning: Option<&'static str>,
 }
 
 pub fn reindex_store(store: &Store, include_archive: bool) -> Result<usize> {
@@ -120,16 +121,24 @@ pub fn reindex_store(store: &Store, include_archive: bool) -> Result<usize> {
     transaction.execute("DELETE FROM memories_fts", [])?;
     let mut count = 0;
     for path in memory_paths(store, include_archive)? {
-        if let ConsistentMemory::Ready(memory, fingerprint) = read_memory_consistent(&path)? {
-            upsert_index(&transaction, store, &path, &memory, fingerprint)?;
-            count += 1;
+        match read_memory_consistent(&path) {
+            ConsistentMemory::Ready(memory, fingerprint) => {
+                upsert_index(&transaction, store, &path, &memory, fingerprint)?;
+                count += 1;
+            }
+            ConsistentMemory::Unavailable(reason) => {
+                bail!(
+                    "cannot rebuild index from {} ({reason}); existing cache preserved",
+                    path.display()
+                );
+            }
         }
     }
     transaction.commit()?;
     Ok(count)
 }
 
-fn sync_store(store: &Store, include_archive: bool) -> Result<()> {
+fn sync_store(store: &Store, include_archive: bool) -> Result<HashMap<PathBuf, &'static str>> {
     let _timing = crate::timing::Scope::new("sqlite_sync");
     let _lock = lock_store(store)?;
     crate::relations::recover_pending(store)?;
@@ -146,28 +155,22 @@ fn sync_store(store: &Store, include_archive: bool) -> Result<()> {
         .collect::<rusqlite::Result<HashMap<_, _>>>()?;
     let transaction = connection.transaction()?;
     let mut seen = HashSet::new();
+    let mut warnings = HashMap::new();
     for path in memory_paths(store, include_archive)? {
+        seen.insert(path.clone());
         let fingerprint = match file_fingerprint(&path) {
             Ok(fingerprint) => fingerprint,
-            Err(_) => continue,
+            Err(_) => {
+                warnings.insert(path, "source_metadata_unavailable");
+                continue;
+            }
         };
-        seen.insert(path.clone());
         if indexed.get(&path) == Some(&fingerprint) {
             continue;
         }
-        match read_memory_consistent(&path)? {
-            ConsistentMemory::Changed => continue,
-            ConsistentMemory::Invalid => {
-                if indexed.contains_key(&path) {
-                    transaction.execute(
-                        "DELETE FROM memories_fts WHERE path = ?1",
-                        params![path.to_string_lossy()],
-                    )?;
-                    transaction.execute(
-                        "DELETE FROM memories WHERE path = ?1",
-                        params![path.to_string_lossy()],
-                    )?;
-                }
+        match read_memory_consistent(&path) {
+            ConsistentMemory::Unavailable(reason) => {
+                warnings.insert(path, reason);
             }
             ConsistentMemory::Ready(memory, fingerprint) => {
                 if indexed.contains_key(&path) {
@@ -195,7 +198,13 @@ fn sync_store(store: &Store, include_archive: bool) -> Result<()> {
         )?;
     }
     transaction.commit()?;
-    Ok(())
+    for (path, reason) in &warnings {
+        eprintln!(
+            "mnemosyne: index source unavailable {} ({reason}); keeping prior evidence if cached and retrying on next search",
+            path.display()
+        );
+    }
+    Ok(warnings)
 }
 
 fn ensure_cache(connection: &mut Connection) -> Result<()> {
@@ -235,6 +244,12 @@ fn upsert_index(
         "INSERT INTO memories_fts (path, text) VALUES (?1, ?2)",
         params![path.to_string_lossy(), memory_search_text(memory)],
     )?;
+    #[cfg(test)]
+    INTERRUPT_INDEX_WRITE.with(|interrupt| {
+        if interrupt.get() {
+            std::process::exit(86);
+        }
+    });
     Ok(())
 }
 
@@ -251,33 +266,37 @@ fn file_fingerprint(path: &Path) -> Result<(i64, i64)> {
 
 enum ConsistentMemory {
     Ready(Box<Memory>, (i64, i64)),
-    Invalid,
-    Changed,
+    Unavailable(&'static str),
 }
 
-fn read_memory_consistent(path: &Path) -> Result<ConsistentMemory> {
+#[cfg(test)]
+std::thread_local! {
+    static INTERRUPT_INDEX_WRITE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn read_memory_consistent(path: &Path) -> ConsistentMemory {
     for _ in 0..2 {
         let before = match file_fingerprint(path) {
             Ok(fingerprint) => fingerprint,
-            Err(_) => return Ok(ConsistentMemory::Changed),
+            Err(_) => return ConsistentMemory::Unavailable("source_metadata_unavailable"),
         };
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
-            Err(_) => return Ok(ConsistentMemory::Changed),
+            Err(_) => return ConsistentMemory::Unavailable("source_unreadable"),
         };
         let after = match file_fingerprint(path) {
             Ok(fingerprint) => fingerprint,
-            Err(_) => return Ok(ConsistentMemory::Changed),
+            Err(_) => return ConsistentMemory::Unavailable("source_metadata_unavailable"),
         };
         if before != after {
             continue;
         }
-        return Ok(crate::schema::parse_memory(&text)
-            .map_or(ConsistentMemory::Invalid, |memory| {
-                ConsistentMemory::Ready(Box::new(memory), after)
-            }));
+        return match crate::schema::parse_memory(&text) {
+            Ok(memory) if memory.has_evidence() => ConsistentMemory::Ready(Box::new(memory), after),
+            _ => ConsistentMemory::Unavailable("source_incomplete_or_invalid"),
+        };
     }
-    Ok(ConsistentMemory::Changed)
+    ConsistentMemory::Unavailable("source_changed_during_scan")
 }
 
 fn memory_paths(store: &Store, include_archive: bool) -> Result<Vec<PathBuf>> {
@@ -285,13 +304,13 @@ fn memory_paths(store: &Store, include_archive: bool) -> Result<Vec<PathBuf>> {
     let mut paths = regular_markdown(&store.working_dir())?;
     if include_archive {
         let archive = store.archive_dir();
-        if archive.exists() {
+        if archive.try_exists()? {
             if fs::symlink_metadata(&archive)?.file_type().is_symlink() {
                 return Ok(paths);
             }
             for month in fs::read_dir(archive)? {
                 let month = month?.path();
-                if fs::symlink_metadata(&month)?.file_type().is_symlink() || !month.is_dir() {
+                if !fs::symlink_metadata(&month)?.file_type().is_dir() {
                     continue;
                 }
                 paths.extend(regular_markdown(&month)?);
@@ -303,19 +322,26 @@ fn memory_paths(store: &Store, include_archive: bool) -> Result<Vec<PathBuf>> {
 }
 
 fn regular_markdown(directory: &Path) -> Result<Vec<PathBuf>> {
-    if !directory.exists() || fs::symlink_metadata(directory)?.file_type().is_symlink() {
-        return Ok(vec![]);
+    match fs::symlink_metadata(directory) {
+        Ok(metadata) if metadata.file_type().is_symlink() => return Ok(vec![]),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+        metadata => {
+            metadata.with_context(|| format!("cannot inspect {}", directory.display()))?;
+        }
     }
-    Ok(fs::read_dir(directory)?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension().is_some_and(|extension| extension == "md")
-                && fs::symlink_metadata(path)
-                    .map(|metadata| metadata.file_type().is_file())
-                    .unwrap_or(false)
-        })
-        .collect())
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(directory)
+        .with_context(|| format!("cannot enumerate {}", directory.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_some_and(|extension| extension == "md")
+            && entry.file_type()?.is_file()
+        {
+            paths.push(path);
+        }
+    }
+    Ok(paths)
 }
 
 pub fn search(
@@ -382,6 +408,9 @@ pub fn search(
         if !indexed_lane {
             score_breakdown.insert("bm25".into(), Value::from(score));
         }
+        if let Some(warning) = entry.source_warning {
+            score_breakdown.insert("index_source_warning".into(), Value::from(warning));
+        }
         candidates.insert(
             key,
             SearchResult {
@@ -446,6 +475,16 @@ pub fn search(
         }
     }
 
+    let source_warnings = all
+        .iter()
+        .filter_map(|entry| entry.source_warning.map(|warning| (&entry.path, warning)))
+        .collect::<HashMap<_, _>>();
+    for candidate in candidates.values_mut() {
+        if let Some(warning) = source_warnings.get(&candidate.path) {
+            candidate.score_breakdown["index_source_warning"] = Value::from(*warning);
+        }
+        mark_unreadable_source(candidate);
+    }
     if config_bool(config, &["fusion", "link_expansion"], true) {
         let _timing = crate::timing::Scope::new("graph_expansion");
         expand_links(&mut candidates, &all, include_archive, config);
@@ -456,19 +495,42 @@ pub fn search(
         .filter(|result| eligible_result(result, type_filter, include_archive, include_superseded))
         .collect::<Vec<_>>();
     results.sort_by(|left, right| {
-        right
-            .score
-            .total_cmp(&left.score)
-            .then_with(|| result_identity(right).cmp(&result_identity(left)))
+        left.score_breakdown
+            .get("index_source_warning")
+            .is_some()
+            .cmp(&right.score_breakdown.get("index_source_warning").is_some())
+            .then_with(|| {
+                right
+                    .score
+                    .total_cmp(&left.score)
+                    .then_with(|| result_identity(right).cmp(&result_identity(left)))
+            })
     });
     if let Some(diagnostic) = vector_diagnostic {
         for result in &mut results {
             result.score_breakdown["vector_diagnostic"] = diagnostic.clone();
         }
     }
-    rerank(query, &mut results, config);
+    rerank(query, &mut results, config, crate::models::rerank);
+    for result in &mut results {
+        mark_unreadable_source(result);
+    }
+    results.sort_by_key(|result| result.score_breakdown.get("index_source_warning").is_some());
     results.truncate(limit);
     Ok(results)
+}
+
+fn mark_unreadable_source(result: &mut SearchResult) {
+    // Read access may change without changing the cached mtime or size.
+    if result.score_breakdown.get("index_source_warning").is_none()
+        && fs::File::open(&result.path).is_err()
+    {
+        result.score_breakdown["index_source_warning"] = Value::from("source_unreadable");
+        eprintln!(
+            "mnemosyne: index source unavailable {} (source_unreadable); cached knowledge will be withheld",
+            result.path.display()
+        );
+    }
 }
 
 fn sorted_candidates(candidates: &HashMap<String, SearchResult>) -> Vec<String> {
@@ -498,7 +560,12 @@ fn merge_breakdown(target: &mut Value, extra: &Value) {
     }
 }
 
-fn rerank(query: &str, results: &mut [SearchResult], config: &Value) {
+fn rerank(
+    query: &str,
+    results: &mut [SearchResult],
+    config: &Value,
+    infer: impl FnOnce(&Value, &str, &[String]) -> Result<Vec<f64>>,
+) {
     if !config_bool(config, &["rerank", "enabled"], false) {
         return;
     }
@@ -508,17 +575,38 @@ fn rerank(query: &str, results: &mut [SearchResult], config: &Value) {
     if count == 0 {
         return;
     }
-    let docs = results[..count]
+    let mut indices = Vec::new();
+    for (index, result) in results.iter_mut().enumerate() {
+        mark_unreadable_source(result);
+        if result.score_breakdown.get("index_source_warning").is_none() {
+            indices.push(index);
+            if indices.len() == count {
+                break;
+            }
+        }
+    }
+    if indices.is_empty() {
+        return;
+    }
+    let docs = indices
         .iter()
-        .map(|result| memory_search_text(&result.memory))
+        .map(|index| memory_search_text(&results[*index].memory))
         .collect::<Vec<_>>();
-    match crate::models::rerank(&config["rerank"], query, &docs) {
-        Ok(scores) if scores.len() == count && scores.iter().any(|score| *score != 0.0) => {
-            for (result, score) in results[..count].iter_mut().zip(scores) {
+    match infer(&config["rerank"], query, &docs) {
+        Ok(scores) if scores.len() == indices.len() && scores.iter().any(|score| *score != 0.0) => {
+            for (index, score) in indices.iter().zip(scores) {
+                let result = &mut results[*index];
                 result.score = score;
                 result.score_breakdown["rerank"] = Value::from(score);
             }
-            results[..count].sort_by(|left, right| right.score.total_cmp(&left.score));
+            let mut ranked = indices
+                .iter()
+                .map(|index| results[*index].clone())
+                .collect::<Vec<_>>();
+            ranked.sort_by(|left, right| right.score.total_cmp(&left.score));
+            for (index, result) in indices.into_iter().zip(ranked) {
+                results[index] = result;
+            }
         }
         _ => eprintln!("mnemosyne: reranking failed; keeping lexical/vector ordering"),
     }
@@ -536,7 +624,7 @@ fn read_stores(
     let mut entries = Vec::new();
     for store in stores {
         if indexed {
-            sync_store(store, include_archive)?;
+            let warnings = sync_store(store, include_archive)?;
             let _timing = crate::timing::Scope::new("candidate_read");
             let connection = Connection::open(cache_path(store)?)?;
             let mut statement =
@@ -551,6 +639,7 @@ fn read_stores(
             for row in rows {
                 let (path, memory, archived) = row?;
                 entries.push(IndexedMemory {
+                    source_warning: warnings.get(&path).copied(),
                     store: store.clone(),
                     path,
                     archived,
@@ -562,6 +651,7 @@ fn read_stores(
             for (path, memory) in load_memories(store, include_archive)? {
                 let archived = path.starts_with(store.root.join("archive"));
                 entries.push(IndexedMemory {
+                    source_warning: None,
                     store: store.clone(),
                     path,
                     memory,
@@ -763,7 +853,11 @@ fn expand_links(
     let max_hops = config_usize(config, &["fusion", "link_expansion_max_hops"], 1);
     let max_sources = config_usize(config, &["fusion", "link_expansion_max_sources"], 10);
     let boost_ratio = config_f64(config, &["fusion", "link_expansion_max_boost_ratio"], 0.8);
-    let mut ranked = candidates.values().cloned().collect::<Vec<_>>();
+    let mut ranked = candidates
+        .values()
+        .filter(|result| result.score_breakdown.get("index_source_warning").is_none())
+        .cloned()
+        .collect::<Vec<_>>();
     ranked.sort_by(|left, right| right.score.total_cmp(&left.score));
     let boost_cap = ranked
         .first()
@@ -777,6 +871,11 @@ fn expand_links(
     for hop in 0..max_hops {
         let mut next = Vec::new();
         for source in frontier {
+            if source.score_breakdown.get("index_source_warning").is_some()
+                || fs::File::open(&source.path).is_err()
+            {
+                continue;
+            }
             let source_key = result_identity(&source);
             if !visited.insert(source_key) {
                 continue;
@@ -785,6 +884,9 @@ fn expand_links(
                 let Some(target) = by_id.get(link.id.as_str()) else {
                     continue;
                 };
+                if target.source_warning.is_some() || fs::File::open(&target.path).is_err() {
+                    continue;
+                }
                 if !include_archive && (target.archived || is_expired(&target.memory.expires)) {
                     continue;
                 }
@@ -1165,6 +1267,126 @@ mod tests {
             search(&[store], "replacement", 1, "", false, false, &json!({}))
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn interrupted_index_transactions_preserve_old_rows_and_recover() {
+        const CHILD: &str = "MNEMOSYNE_INDEX_RECOVERY_CHILD";
+        const MODE: &str = "MNEMOSYNE_INDEX_RECOVERY_MODE";
+        if let Some(root) = std::env::var_os(CHILD) {
+            let store = Store {
+                scope: "project".into(),
+                root: root.into(),
+            };
+            INTERRUPT_INDEX_WRITE.with(|interrupt| interrupt.set(true));
+            if std::env::var(MODE).unwrap() == "reindex" {
+                reindex_store(&store, false).unwrap();
+            } else {
+                sync_store(&store, false).unwrap();
+            }
+            panic!("child did not interrupt an uncommitted index write");
+        }
+        for mode in ["sync", "reindex"] {
+            let dir = tempdir().unwrap();
+            let store = Store {
+                scope: "project".into(),
+                root: dir.path().to_owned(),
+            };
+            write(&store, &memory("record", "old cached evidence"));
+            reindex_store(&store, false).unwrap();
+            write(
+                &store,
+                &memory("record", "recoveryneedle replacement evidence"),
+            );
+            write(&store, &memory("second", "recoveryneedle second evidence"));
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "search::tests::interrupted_index_transactions_preserve_old_rows_and_recover",
+                    "--nocapture",
+                ])
+                .env_clear()
+                .env(CHILD, &store.root)
+                .env(MODE, mode)
+                .status()
+                .unwrap();
+            assert_eq!(status.code(), Some(86));
+            let connection = Connection::open(cache_path(&store).unwrap()).unwrap();
+            let rows: Vec<String> = connection
+                .prepare("SELECT text FROM memories")
+                .unwrap()
+                .query_map([], |row| row.get(0))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            assert_eq!(rows.len(), 1);
+            assert!(rows[0].contains("old cached evidence"));
+            assert_eq!(
+                connection
+                    .query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
+                    .unwrap(),
+                "ok"
+            );
+            let results =
+                search(&[store], "recoveryneedle", 5, "", false, false, &json!({})).unwrap();
+            assert_eq!(results.len(), 2);
+        }
+    }
+
+    #[test]
+    fn reranker_never_receives_stale_or_unreadable_knowledge_and_still_ranks_fresh_candidates() {
+        let dir = tempdir().unwrap();
+        let store = Store {
+            scope: "project".into(),
+            root: dir.path().to_owned(),
+        };
+        let make = |id: &str, body: &str, score: f64| {
+            let memory = memory(id, body);
+            write(&store, &memory);
+            SearchResult {
+                store: store.clone(),
+                path: store.working_dir().join(format!("{id}.md")),
+                memory,
+                score,
+                why_matched: String::new(),
+                score_breakdown: json!({}),
+            }
+        };
+        let mut stale = make("stale", "OLD_SENSITIVE_NEEDLE", 100.0);
+        stale.score_breakdown["index_source_warning"] = json!("source_incomplete_or_invalid");
+        let unreadable = make("unreadable", "OLD_UNREADABLE_NEEDLE", 90.0);
+        fs::remove_file(&unreadable.path).unwrap();
+        let mut results = vec![
+            stale,
+            unreadable,
+            make("fresh-a", "fresh alpha", 2.0),
+            make("fresh-b", "fresh beta", 1.0),
+        ];
+        let called = std::cell::Cell::new(false);
+        rerank(
+            "fresh",
+            &mut results,
+            &json!({"rerank":{"enabled":true,"top_n":5}}),
+            |_, _, docs| {
+                called.set(true);
+                assert_eq!(docs.len(), 2);
+                assert!(docs[0].contains("fresh alpha") && docs[1].contains("fresh beta"));
+                assert!(!docs.join(" ").contains("OLD_"));
+                Ok(vec![0.1, 0.9])
+            },
+        );
+        assert!(called.get());
+        assert_eq!(results[2].memory.id, "fresh-b");
+        assert_eq!(results[2].score_breakdown["rerank"], 0.9);
+        assert_eq!(results[3].memory.id, "fresh-a");
+        assert!(results[1].score_breakdown.get("rerank").is_none());
+        results.truncate(2);
+        rerank(
+            "fresh",
+            &mut results,
+            &json!({"rerank":{"enabled":true}}),
+            |_, _, _| panic!("no model call is allowed when every candidate is unavailable"),
         );
     }
 }

@@ -271,6 +271,14 @@ pub fn search_entries(
     let mut output = Vec::new();
     for result in results {
         let mut m = result.memory;
+        if let Some(reason) = result.score_breakdown.get("index_source_warning") {
+            output.push(json!({
+                "id": m.id, "scope": result.store.scope, "path": result.path,
+                "index_status": "stale", "score_breakdown": {"index_source_warning": reason},
+                "warnings": ["INDEX_SOURCE_UNAVAILABLE: cached evidence is retained for recovery only; knowledge fields are withheld and must not be cited as current"]
+            }));
+            continue;
+        }
         if update_access {
             let bonus = config["thresholds"][if result
                 .path

@@ -668,6 +668,14 @@ fn run(command: Command) -> Result<()> {
                 println!("no results");
             } else {
                 for r in results {
+                    if r["index_status"] == "stale" {
+                        println!(
+                            "{} ({}) [stale: source unavailable; cached knowledge withheld]",
+                            r["id"].as_str().unwrap_or(""),
+                            r["scope"].as_str().unwrap_or("")
+                        );
+                        continue;
+                    }
                     println!(
                         "{} ({}/{}, {:.4}) {}",
                         r["id"].as_str().unwrap_or(""),

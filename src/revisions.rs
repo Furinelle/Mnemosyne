@@ -494,7 +494,14 @@ pub fn observe_store(store: &Store, clock: &impl Clock) -> Result<()> {
     if !history_enabled(store)? {
         return Ok(());
     }
-    for (path, _) in load_memories_unlocked(store, true)? {
+    for (path, memory) in load_memories_unlocked(store, true)? {
+        if !memory.has_evidence() {
+            eprintln!(
+                "mnemosyne: incomplete memory {}; preserving existing history",
+                path.display()
+            );
+            continue;
+        }
         observe_memory_enabled(store, &path, clock)?;
     }
     Ok(())
