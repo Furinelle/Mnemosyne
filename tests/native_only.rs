@@ -986,3 +986,43 @@ fn preview_supports_unadopted_v2_sidecar_without_creating_history() {
     .unwrap();
     assert_eq!(committed[0]["verdict"], "supported");
 }
+
+#[test]
+fn native_project_stop_inherits_global_distill_switch() {
+    let sandbox = Sandbox::new();
+    fs::write(
+        sandbox.root().join("global/config.toml"),
+        "[distill]\nenabled = true\n",
+    )
+    .unwrap();
+    let project = sandbox.project("inherit");
+    let transcript = project.join("session.jsonl");
+    fs::write(
+        &transcript,
+        json!({"type":"user","message":{"role":"user","content":"不要用 print 调试，改用 logging。"}})
+            .to_string(),
+    )
+    .unwrap();
+    let saved = |session: &str| {
+        sandbox
+            .hook(
+                &project,
+                "Stop",
+                json!({"transcript_path":transcript,"session_id":session}),
+            )
+            .is_some()
+    };
+    fs::write(
+        project.join(".mnemosyne/config.toml"),
+        "[distill]\nenabled = false\n",
+    )
+    .unwrap();
+    assert!(!saved("explicit-off"), "an explicit project setting wins");
+    fs::remove_file(project.join(".mnemosyne/.distill_state.json")).ok();
+    fs::write(
+        project.join(".mnemosyne/config.toml"),
+        "[distill]\nengine = 'heuristic'\n",
+    )
+    .unwrap();
+    assert!(saved("inherited"), "an unset project switch follows global");
+}

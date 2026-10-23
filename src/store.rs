@@ -46,7 +46,6 @@ model = 'BAAI/bge-reranker-base'
 top_n = 5
 
 [distill]
-enabled = false
 engine = 'heuristic'
 session_summary = false
 confidence_threshold = 0.6
@@ -346,6 +345,8 @@ pub fn load_config(store: Option<&Store>) -> Result<Value> {
             }
         }
     }
+    // Projects follow the global auto-distill switch unless they set it themselves.
+    let inherit_distill = at(&loaded, &["distill", "enabled"]).is_none();
     merge_config(&mut config, &loaded);
     if chosen.scope != "global" {
         let global = load_config(Some(&global_store()))?;
@@ -353,6 +354,13 @@ pub fn load_config(store: Option<&Store>) -> Result<Value> {
             if let Some(value) = at(&global, path) {
                 set_at(&mut config, path, value.clone());
             }
+        }
+        if inherit_distill {
+            set_at(
+                &mut config,
+                &["distill", "enabled"],
+                global["distill"]["enabled"].clone(),
+            );
         }
     }
     Ok(config)
