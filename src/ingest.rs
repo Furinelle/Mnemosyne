@@ -426,7 +426,13 @@ fn parse_transcript(raw: &str, fmt: &str) -> Result<Vec<Turn>> {
                 }
                 (role, &payload["content"])
             }
-            "grok-jsonl" => (&record["type"], &record["content"]),
+            "grok-jsonl" => {
+                // Injected reminders are host text, not user statements.
+                if !record["synthetic_reason"].is_null() {
+                    continue;
+                }
+                (&record["type"], &record["content"])
+            }
             "role-jsonl" => (&record["role"], &record["text"]),
             _ => unreachable!(),
         };

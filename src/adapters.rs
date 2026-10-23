@@ -171,6 +171,13 @@ fn stop_payload(event: &Value) -> Result<Option<Value>> {
     let Some(path) = event["transcript_path"].as_str().filter(|s| !s.is_empty()) else {
         return Ok(None);
     };
+    // Grok Build passes its event stream; the conversation sits beside it.
+    let history = Path::new(path).with_file_name("chat_history.jsonl");
+    let path = if path.ends_with("updates.jsonl") && history.is_file() {
+        history.to_str().unwrap_or(path)
+    } else {
+        path
+    };
     // JSONL preambles can exceed 100 records; find the first actual message
     // without reading the whole transcript into memory a second time.
     let mut format = "auto";

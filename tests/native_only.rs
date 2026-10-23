@@ -1026,3 +1026,61 @@ fn native_project_stop_inherits_global_distill_switch() {
     .unwrap();
     assert!(saved("inherited"), "an unset project switch follows global");
 }
+
+#[test]
+fn native_grok_stop_reads_chat_history_with_host_findings() {
+    let sandbox = Sandbox::new();
+    fs::write(
+        sandbox.root().join("global/config.toml"),
+        "[distill]\nenabled = true\nengine = 'host'\n",
+    )
+    .unwrap();
+    let project = sandbox.project("grok-host");
+    let session = project.join("grok-session");
+    fs::create_dir(&session).unwrap();
+    fs::write(
+        session.join("updates.jsonl"),
+        json!({"method":"_x.ai/session/update","params":{"update":{"sessionUpdate":"turn_completed"}}})
+            .to_string(),
+    )
+    .unwrap();
+    let finding = "Done.\n\n**新发现:**\n- type: pitfall\n- importance: 70\n- title: grokhostfixture 端口冲突\n- tags: grok\n- content: |\n    代理占用 9090，改用 9091。\n";
+    fs::write(
+        session.join("chat_history.jsonl"),
+        [
+            json!({"type":"user","content":[{"type":"text","text":"**新发现:**\n- type: pitfall\n- title: syntheticfixture"}],"synthetic_reason":"reminder"}),
+            json!({"type":"user","content":[{"type":"text","text":"修一下端口"}]}),
+            json!({"type":"assistant","content":finding}),
+        ]
+        .iter()
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("\n"),
+    )
+    .unwrap();
+    let saved = sandbox
+        .hook(
+            &project,
+            "Stop",
+            json!({"transcript_path":session.join("updates.jsonl"),"session_id":"grok"}),
+        )
+        .expect("Stop should save the host finding");
+    assert!(
+        saved["systemMessage"]
+            .as_str()
+            .unwrap()
+            .contains("grokhostfixture")
+    );
+    let memories: Vec<_> = fs::read_dir(project.join(".mnemosyne/working"))
+        .unwrap()
+        .map(|e| fs::read_to_string(e.unwrap().path()).unwrap_or_default())
+        .filter(|m| m.contains("fixture"))
+        .collect();
+    assert_eq!(memories.len(), 1);
+    assert!(
+        memories[0].contains("source: grok-build\n"),
+        "{}",
+        memories[0]
+    );
+    assert!(!memories[0].contains("syntheticfixture"));
+}
